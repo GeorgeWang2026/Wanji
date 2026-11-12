@@ -415,6 +415,58 @@
     </scroll-view>
   </view>
 
+  <!-- ============ 我的积分：混合流水（DF-57，内嵌全屏层，不新增页面 / 不改 app.json） ============ -->
+  <view class="fs-page" wx:if="{{showCredits}}" style="padding-top:{{statusBarH}}px;">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="press-zone" catchtap="closeCredits">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">💎 我的积分</text>
+    </view>
+
+    <view class="credits-summary">
+      <view class="credits-balance">
+        <text class="credits-balance-num">{{creditsBalance === null ? '—' : creditsBalance}}</text>
+        <text class="credits-balance-label">当前积分</text>
+      </view>
+      <view class="credits-today">今日已消耗 {{creditsTodayUsed}} 积分</view>
+      <view class="credits-recharge-btn" hover-class="item-press" bindtap="onCreditsRecharge">充值</view>
+    </view>
+
+    <scroll-view class="fs-body credits-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}"
+                 refresher-enabled="{{true}}" refresher-triggered="{{ledgerLoading}}"
+                 bindrefresherrefresh="onLedgerRefresh" bindscrolltolower="onLedgerScrollToLower" lower-threshold="80">
+      <view class="credits-empty" wx:if="{{ledgerLoading && ledgerItems.length === 0}}">加载中…</view>
+      <block wx:elif="{{ledgerItems.length === 0}}">
+        <view class="credits-empty" wx:if="{{ledgerError}}">❌ {{ledgerError}}</view>
+        <view class="credits-empty" wx:else>暂无积分记录</view>
+        <view class="credits-load-more" wx:if="{{ledgerError}}" hover-class="item-press" bindtap="retryLedger">点击重试</view>
+      </block>
+
+      <block wx:for="{{ledgerItems}}" wx:key="key">
+        <view class="ledger-item {{item.clickable ? 'clickable' : ''}}" data-idx="{{index}}"
+              hover-class="{{item.clickable ? 'item-press' : ''}}" bindtap="onLedgerItemTap">
+          <view class="ledger-left">
+            <text class="ledger-reason">{{item.reasonText}}</text>
+            <text class="ledger-question" wx:if="{{item.question}}">{{item.question}}</text>
+            <text class="ledger-time">{{item.timeText}}</text>
+          </view>
+          <view class="ledger-right">
+            <text class="ledger-amount {{item.amountCls}}">{{item.sign}}{{item.amount}}</text>
+          </view>
+        </view>
+      </block>
+
+      <view class="credits-load-more" wx:if="{{ledgerItems.length > 0 && ledgerItems.length < ledgerTotal && !ledgerError}}"
+            hover-class="item-press" bindtap="onLedgerScrollToLower">
+        {{ledgerLoadingMore ? '加载中…' : '加载更多'}}
+      </view>
+      <view class="credits-load-more" wx:if="{{ledgerItems.length > 0 && ledgerError}}"
+            hover-class="item-press" bindtap="retryLedger">加载失败，点击重试</view>
+      <view class="credits-empty" wx:if="{{ledgerItems.length > 0 && ledgerItems.length >= ledgerTotal && !ledgerLoadingMore}}">没有更多了</view>
+    </scroll-view>
+  </view>
+
   <!-- ============ 登录 / 注册：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->
   <view class="auth-mask auth-full" wx:if="{{showLogin}}" style="padding-top:{{statusBarH}}px;">
     <view class="auth-sheet auth-full-sheet" catchtap="noop">

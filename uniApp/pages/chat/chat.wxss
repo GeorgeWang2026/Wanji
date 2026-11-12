@@ -2160,3 +2160,56 @@
   background: rgba(147, 112, 219, .18);
   border: 2rpx solid rgba(147, 112, 219, .5);
 }
+
+/* ---- 我的积分（DF-57）：混合流水全屏层 ---- */
+.credits-summary {
+  flex: 0 0 auto;
+  margin: 12rpx 28rpx 12rpx;
+  padding: 30rpx 28rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, .06);
+  border: 2rpx solid rgba(255, 255, 255, .08);
+}
+.credits-balance { display: flex; align-items: baseline; }
+.credits-balance-num { font-size: 60rpx; font-weight: 700; color: #f0e6ff; }
+.credits-balance-label { margin-left: 16rpx; font-size: 24rpx; color: rgba(224, 208, 240, .6); }
+.credits-today { margin-top: 10rpx; font-size: 24rpx; color: rgba(224, 208, 240, .6); }
+.credits-recharge-btn {
+  margin-top: 22rpx;
+  padding: 18rpx 0;
+  text-align: center;
+  border-radius: 16rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #1a0f2e;
+  background: linear-gradient(135deg, #b388ff, #7c4dff);
+}
+.credits-body { box-sizing: border-box; }
+.ledger-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 16rpx 28rpx;
+  padding: 24rpx 26rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, .05);
+  border: 2rpx solid rgba(255, 255, 255, .07);
+}
+.ledger-item.clickable { background: rgba(255, 255, 255, .07); }
+.ledger-left { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.ledger-reason { font-size: 28rpx; font-weight: 600; color: #f0e6ff; }
+.ledger-question {
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: rgba(224, 208, 240, .65);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ledger-time { margin-top: 8rpx; font-size: 22rpx; color: rgba(224, 208, 240, .4); }
+.ledger-right { flex-shrink: 0; margin-left: 16rpx; }
+.ledger-amount { font-size: 34rpx; font-weight: 700; }
+.ledger-amount.amt-increase { color: #7ee2a8; }
+.ledger-amount.amt-consume { color: #ff9aa8; }
+.credits-empty { padding: 120rpx 40rpx; text-align: center; color: rgba(224, 208, 240, .5); font-size: 26rpx; }
+.credits-load-more { padding: 28rpx; text-align: center; font-size: 26rpx; color: #c9a3ff; }

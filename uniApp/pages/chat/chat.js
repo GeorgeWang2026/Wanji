@@ -173,6 +173,17 @@ Page({
     genderOptions: ARCH_GENDER_OPTIONS,
     relationLabels: RELATION_LABELS_ARR,
     archForm: { nickname: '', gender: '', relationship: 'other', birth_year: '', birth_month: '', birth_day: '', birth_hour: '', birth_minute: '' },
+    /* ---- 我的积分（DF-57：内嵌全屏层，混合流水，不新增页面 / 不改 app.json） ---- */
+    showCredits: false,
+    ledgerItems: [],
+    ledgerLoading: false,
+    ledgerLoadingMore: false,
+    ledgerError: '',
+    ledgerTotal: 0,
+    ledgerPage: 0,
+    ledgerPageSize: 20,
+    creditsBalance: null,
+    creditsTodayUsed: 0,
     /* ---- 积分消耗确认（对应参考页自绘对话框） ---- */
     costOpen: false,
     costCredits: 5,
@@ -1324,10 +1335,151 @@ Page({
     this.historyFromProfile = this.data.showHistory;
   },
 
-  /** 我的积分：沿用现有余额接口 + 现有提示，不做参考页的独立积分页 */
+  /** 我的积分：打开混合流水全屏层（DF-57，内嵌层，不新增页面 / 不改 app.json） */
   onProfileCredits: function () {
-    this.setData({ showProfile: false });
-    this.onBalanceTap();
+    if (!api.getToken()) { this.setData({ showLogin: true }); return; }
+    this.setData({ showCredits: true });
+    this.loadCreditsBalance();
+    this.loadLedger(false);
+  },
+  closeCredits: function () { this.setData({ showCredits: false }); },
+
+  /** 拉取余额与今日已消耗（沿用 /credits/balance，口径与网页一致） */
+  loadCreditsBalance: function () {
+    var self = this;
+    api.getBalance().then(function (d) {
+      if (d && typeof d.credits === 'number') {
+        self.setData({ creditsBalance: d.credits, creditsTodayUsed: d.today_used || 0 });
+      }
+    }).catch(function () { /* 忽略：余额刷新失败不阻塞流水列表 */ });
+  },
+
+  /** 拉取积分混合流水；append=false 首屏/下拉刷新，true 触底追加 */
+  loadLedger: function (append) {
+    var self = this;
+    if (this._ledgerLoading) return;
+    if (!api.getToken()) {
+      this.setData({ ledgerLoading: false, ledgerError: '请先登录后查看积分记录' });
+      return;
+    }
+    var page = append ? (this.data.ledgerPage + 1) : 1;
+    this._ledgerLoading = true;
+    var patch = { ledgerLoading: !append, ledgerLoadingMore: !!append, ledgerError: '' };
+    if (!append) { patch.ledgerItems = []; }
+    this.setData(patch);
+
+    api.request('/credits/ledger?page=' + page + '&size=' + this.data.ledgerPageSize)
+      .then(function (res) {
+        if (!res || res.code !== 0 || !res.data) {
+          throw new Error((res && (res.detail || res.msg)) || '加载失败');
+        }
+        var items = (res.data.items || []).map(function (it) { return self._toLedgerItem(it); });
+        var merged = append ? (self.data.ledgerItems || []).concat(items) : items;
+        // usage 与 transaction 两套 id 各自从 1 起，跨表可能重复 → 按 kind+id 去重，避免触底加载重复/跳条
+        var seen = {};
+        merged = merged.filter(function (r) {
+          var k = r.kind + '-' + r.id;
+          if (seen[k]) return false;
+          seen[k] = true;
+          return true;
+        });
+        self._ledgerLoading = false;
+        self.setData({
+          ledgerItems: merged,
+          ledgerTotal: res.data.total || merged.length,
+          ledgerPage: page,
+          ledgerLoading: false,
+          ledgerLoadingMore: false,
+          ledgerError: ''
+        });
+      })
+      .catch(function (err) {
+        self._ledgerLoading = false;
+        var msg = (err && err.message) || '加载失败';
+        if (/登录已过期/.test(msg)) {
+          self.setData({ loggedIn: false, showCredits: false, showLogin: true });
+          return;
+        }
+        if (append) {
+          // 追加失败：保留已加载内容，底部给「加载失败，点击重试」
+          self.setData({ ledgerLoadingMore: false, ledgerError: msg });
+          return;
+        }
+        // 首屏失败：空态区 ❌ 错误 + 「点击重试」
+        self.setData({ ledgerItems: [], ledgerLoading: false, ledgerError: msg });
+      });
+  },
+
+  /** 后端流水项 → 展示项：补展示文案/颜色/可跳标记 */
+  _toLedgerItem: function (it) {
+    var isConsume = it.kind === 'consume';
+    var q = it.root_question || it.ask || '';
+    return {
+      key: it.kind + '-' + it.id,
+      kind: it.kind,
+      amount: it.amount || 0,
+      sign: isConsume ? '-' : '+',
+      amountCls: isConsume ? 'amt-consume' : 'amt-increase',
+      reasonText: it.reason_text || (isConsume ? '积分消耗' : '积分增加'),
+      question: isConsume ? (q || '排盘推演') : '',
+      tool: it.tool || '',
+      timeText: fmtFullTime(it.created_at),
+      clickable: isConsume && !!it.root_question_id,
+      rootQuestionId: it.root_question_id || null
+    };
+  },
+
+  onLedgerScrollToLower: function () {
+    var d = this.data;
+    if (d.ledgerLoading || d.ledgerLoadingMore || d.ledgerError) return;
+    if (d.ledgerItems.length >= (d.ledgerTotal || 0)) return;
+    this.loadLedger(true);
+  },
+  onLedgerRefresh: function () {
+    this.loadCreditsBalance();
+    this.loadLedger(false);
+  },
+  retryLedger: function () { this.loadLedger(this.data.ledgerItems.length > 0); },
+
+  /** 消耗项点击 → 关闭积分层与个人中心 → 恢复主问题上下文 → 回到主页可直接追问（追问不扣分） */
+  onLedgerItemTap: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var item = this.data.ledgerItems[idx];
+    if (!item || !item.clickable) {
+      wx.showToast({ title: '该记录暂不支持跳转追问', icon: 'none' });
+      return;
+    }
+    var rootId = item.rootQuestionId;
+    this.rootQuestionId = rootId;
+    this.questionId = null;
+    this.chatMsgId = null;
+    this.threadTypes = [];
+    this.autoMetas = [];
+    this.setData({
+      showCredits: false,
+      showProfile: false,
+      inputOpen: false,
+      topOpen: true,
+      input: '',
+      sentVisible: false,
+      sentContent: '',
+      sentFeishuUrl: '',
+      lastQuestion: item.question || this.data.lastQuestion,
+      pinned: {
+        id: rootId, timeText: item.timeText, question: item.question || '',
+        questionAnswer: '', answerLoaded: false, feishuUrl: '', followups: []
+      }
+    });
+    this._restoreThread(rootId);
+    wx.showToast({ title: '已衔接该问题，可直接追问', icon: 'none' });
+  },
+
+  onCreditsRecharge: function () {
+    wx.showModal({
+      title: '充值',
+      content: '小程序暂未开通支付，请前往网页版「万机」完成充值。',
+      showCancel: false
+    });
   },
 
   /** 我的档案：打开列表并拉取（内嵌全屏层，不新增页面 / 不改 app.json） */
