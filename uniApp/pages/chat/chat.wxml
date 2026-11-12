@@ -225,7 +225,8 @@
             <!-- 技能卡片：.chat-item-user > .chat-pan-cards > .chat-pan-tip.bound-tag -->
             <view class="chat-item-user" wx:if="{{item.skillChips.length > 0}}">
               <view class="chat-pan-cards">
-                <view class="chat-pan-tip bound-tag {{chip.cls}}" wx:for="{{item.skillChips}}" wx:for-item="chip" wx:key="type">
+                <view class="chat-pan-tip bound-tag {{chip.cls}}" wx:for="{{item.skillChips}}" wx:for-item="chip" wx:for-index="ci" wx:key="type"
+                      catchtap="onSkillChipTap" data-idx="{{index}}" data-type="{{chip.type}}">
                   <text class="bt-icon">{{chip.icon}}</text>
                   <text class="bt-detail" wx:if="{{chip.label}}">{{chip.label}}</text>
                 </view>
@@ -266,6 +267,26 @@
         <view class="chat-load-more" wx:if="{{historyRecords.length > 0 && historyAppendError}}"
               hover-class="chat-load-more-press" bindtap="loadMoreHistory">加载失败，点击重试</view>
       </scroll-view>
+  </view>
+
+  <!-- ============ 技能深度解读：全屏页面形态（FB-44，复用 fs-page 结构） ============ -->
+  <view class="fs-page" id="skillAnalysisModal" wx:if="{{showSkillAnalysis}}" style="padding-top:{{statusBarH}}px;">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="press-zone" catchtap="closeSkillAnalysis">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">深度解读</text>
+    </view>
+
+    <scroll-view class="skill-analysis-body fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="am-empty" wx:if="{{skillAnalysisState === 'loading'}}">正在生成深度解读…</view>
+      <view class="am-empty" wx:elif="{{skillAnalysisState === 'none'}}">{{skillAnalysisMsg}}</view>
+      <view class="am-empty" wx:elif="{{skillAnalysisState === 'error'}}">
+        {{skillAnalysisMsg || '暂无深度解读'}}
+        <view class="skill-analysis-retry" hover-class="press-zone" catchtap="onSkillAnalysisRetry">点此重试</view>
+      </view>
+      <rich-text wx:else nodes="{{skillAnalysisHtml}}"></rich-text>
+    </scroll-view>
   </view>
 
   <!-- ============ 个人中心：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->

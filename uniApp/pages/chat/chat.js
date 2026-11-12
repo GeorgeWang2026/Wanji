@@ -159,6 +159,11 @@ Page({
     topOpen: true,
     inputOpen: false,
     showHistory: false,
+    /* ---- 深度解读全屏层（FB-44：咨询记录技能标签 → 只弹解读） ---- */
+    showSkillAnalysis: false,
+    skillAnalysisState: '',      // loading | ready | error | none
+    skillAnalysisMsg: '',
+    skillAnalysisHtml: '',
     // 咨询记录：服务端 question_records 列表（/credits/questions），页面以此为准
     historyRecords: [],
     // 本次会话按消息聚合出的临时卡片，仅用于接口未返回/失败时的即时展示
@@ -383,13 +388,17 @@ Page({
    */
   _toRecord: function (it, prev) {
     var tools = [];
+    var aids = {};
     (it.usages || []).forEach(function (u) {
       var t = u && u.tool;
-      if (t && tools.indexOf(t) < 0) tools.push(t);
+      if (!t) return;
+      if (tools.indexOf(t) < 0) tools.push(t);
+      // FB-44：保留 usages[].analysis_id，点标签时用它取深度解读正文
+      if (u.analysis_id && !aids[t]) aids[t] = u.analysis_id;
     });
     var chips = tools.map(function (t) {
       var meta = TOOL_CHIPS[t] || { icon: '📐', cls: '' };
-      return { type: t, icon: meta.icon, cls: meta.cls || 'qm', label: '' };
+      return { type: t, icon: meta.icon, cls: meta.cls || 'qm', label: '', analysisId: aids[t] || '' };
     });
     var answer = it.answer || '';
     var url = it.feishu_doc_url || '';
@@ -669,6 +678,159 @@ Page({
     wx.setClipboardData({
       data: url,
       success: function () { wx.showToast({ title: title || '链接已复制，到浏览器打开', icon: 'none' }); }
+    });
+  },
+
+  /* ---------------- 咨询记录技能标签：全屏深度解读（FB-44） ----------------
+   * 对齐 xiaoxuan.html DF-43：点标签只弹解读正文，不跳技能详情页、不调 consume、不扣费。
+   * 取数：GET /chat/analysis_result/{analysis_id} → reply/analysis/result/content。
+   * 卡片没有 analysis_id 时先拉一次详情兜底，仍无则提示「该技能未生成深度解读，无法查看。」
+   */
+  onSkillChipTap: function (e) {
+    this._tapSkillChip(e.currentTarget.dataset.idx, e.currentTarget.dataset.type);
+  },
+
+  _tapSkillChip: function (idx, type) {
+    var self = this;
+    var rec = this.data.historyRecords[idx];
+    if (!rec || !type) return;
+    this._skillRetry = { idx: idx, type: type };
+    var chip = (rec.skillChips || []).filter(function (c) { return c.type === type; })[0];
+    if (!chip) return;
+    if (chip.analysisId) {
+      this._openSkillAnalysis(type, chip.analysisId);
+      return;
+    }
+    if (!rec.id) {
+      this._showSkillAnalysisEmpty();
+      return;
+    }
+    // 列表接口不带 analysis_id：拉一次详情兜底，成功后缓存回卡片，二次点击直接命中
+    var key = 'detail_' + rec.id;
+    this._skillInflight = this._skillInflight || {};
+    if (this._skillInflight[key]) return;
+    this._skillInflight[key] = true;
+    wx.showLoading({ title: '加载中…', mask: true });
+    api.request('/credits/questions/' + rec.id).then(function (res) {
+      var aid = self._pickAnalysisId(res && res.code === 0 ? res.data : null, type);
+      if (aid) self._patchChipAnalysisId(idx, type, aid);
+      return aid;
+    }).then(function (aid) {
+      wx.hideLoading();
+      delete self._skillInflight[key];
+      if (aid) self._openSkillAnalysis(type, aid);
+      else self._showSkillAnalysisEmpty();
+    }).catch(function (err) {
+      wx.hideLoading();
+      delete self._skillInflight[key];
+      console.warn('[FB-44] 技能解读 id 兜底失败', err);
+      self._openSkillAnalysisError();
+    });
+  },
+
+  /** 详情 usages[].analysis_id → 指定 type 的 id（与 _restoreThread 同口径，含追问） */
+  _pickAnalysisId: function (detail, type) {
+    if (!detail) return '';
+    var found = '';
+    function collect(it) {
+      (it.usages || []).forEach(function (u) {
+        if (!found && u && u.tool === type && u.analysis_id) found = u.analysis_id;
+      });
+    }
+    collect(detail);
+    (detail.followups || []).forEach(collect);
+    return found;
+  },
+
+  _patchChipAnalysisId: function (idx, type, analysisId) {
+    var rec = this.data.historyRecords[idx];
+    if (!rec) return;
+    var chips = (rec.skillChips || []).map(function (c) {
+      return c.type === type ? { type: c.type, icon: c.icon, cls: c.cls, label: c.label, analysisId: analysisId } : c;
+    });
+    var p = {};
+    p['historyRecords[' + idx + '].skillChips'] = chips;
+    this.setData(p);
+  },
+
+  /** 拉正文并渲染；同一 analysisId 请求中不重复发起（in-flight 防抖） */
+  _openSkillAnalysis: function (type, analysisId) {
+    var self = this;
+    if (!analysisId) {
+      this._showSkillAnalysisEmpty();
+      return;
+    }
+    var key = 'skill_' + analysisId;
+    this._skillInflight = this._skillInflight || {};
+    if (this._skillInflight[key]) return;
+    this._skillInflight[key] = true;
+    this._skillRetry = { idx: (this._skillRetry || {}).idx, type: type, analysisId: analysisId };
+    this.setData({
+      showSkillAnalysis: true,
+      skillAnalysisState: 'loading',
+      skillAnalysisMsg: '正在生成深度解读…',
+      skillAnalysisHtml: ''
+    });
+    api.request('/chat/analysis_result/' + analysisId, { timeout: 60000 }).then(function (j) {
+      delete self._skillInflight[key];
+      var text = self._analysisText(j);
+      if (!text) {
+        self.setData({ skillAnalysisState: 'error', skillAnalysisMsg: '暂无深度解读' });
+        return;
+      }
+      self.setData({
+        skillAnalysisState: 'ready',
+        skillAnalysisHtml: md.chatHtml(text)
+      });
+    }).catch(function (err) {
+      delete self._skillInflight[key];
+      console.warn('[FB-44] 深度解读加载失败', err);
+      self.setData({ skillAnalysisState: 'error', skillAnalysisMsg: '暂无深度解读' });
+    });
+  },
+
+  /** analysis_result 兼容字段：reply / analysis / result / content；兼容 code+data 包裹 */
+  _analysisText: function (j) {
+    if (!j) return '';
+    var d = (j.code === 0 && j.data) ? j.data : j;
+    var t = d.reply || d.analysis || d.result || d.content || '';
+    return String(t || '').trim();
+  },
+
+  /** 无 analysis_id：只提示，不空态、不退回详情（对齐参考页 DF-43 口径） */
+  _showSkillAnalysisEmpty: function () {
+    this.setData({
+      showSkillAnalysis: true,
+      skillAnalysisState: 'none',
+      skillAnalysisMsg: '该技能未生成深度解读，无法查看。',
+      skillAnalysisHtml: ''
+    });
+  },
+
+  _openSkillAnalysisError: function () {
+    this.setData({
+      showSkillAnalysis: true,
+      skillAnalysisState: 'error',
+      skillAnalysisMsg: '暂无深度解读',
+      skillAnalysisHtml: ''
+    });
+  },
+
+  onSkillAnalysisRetry: function () {
+    var r = this._skillRetry || {};
+    if (r.analysisId) {
+      this._openSkillAnalysis(r.type, r.analysisId);
+      return;
+    }
+    if (r.type && r.idx !== undefined) this._tapSkillChip(r.idx, r.type);
+  },
+
+  closeSkillAnalysis: function () {
+    this.setData({
+      showSkillAnalysis: false,
+      skillAnalysisState: '',
+      skillAnalysisMsg: '',
+      skillAnalysisHtml: ''
     });
   },
 
