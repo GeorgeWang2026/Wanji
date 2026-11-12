@@ -102,16 +102,24 @@
       <view class="pulse-ring {{recording ? 'active' : ''}}"></view>
       <view class="avatar-ring {{(recording || typing || speaking) ? '' : 'idle'}}"></view>
 
-      <image
-        wx:if="{{!avatarErr}}"
-        class="avatar-img"
-        src="{{avatarSrc}}"
-        mode="aspectFill"
-        binderror="onAvatarErr"
-        bindtap="onMicTap"
-      />
-      <view wx:else class="avatar-fallback" bindtap="onMicTap">
-        <text class="fallback-txt">玄</text>
+      <view class="avatar-stage" bindtap="onMicTap">
+        <image
+          wx:if="{{!avatarErr}}"
+          class="avatar-img"
+          src="{{avatarSrc}}"
+          mode="aspectFill"
+          binderror="onAvatarErr"
+        />
+        <view wx:else class="avatar-fallback">
+          <text class="fallback-txt">玄</text>
+        </view>
+        <view
+          wx:if="{{mouthRect}}"
+          class="mouth-overlay {{speaking ? 'on' : ''}}"
+          style="left:{{mouthRect.left}}%;top:{{mouthRect.top}}%;width:{{mouthRect.width}}%;height:{{mouthRect.height}}%;"
+        >
+          <image class="mouth-img" src="/uniApp/static/mouth.png" mode="aspectFit" style="transform:scale({{mouthSx}},{{mouthSy}});" />
+        </view>
       </view>
 
       <view class="avatar-nav prev" hover-class="press-zone" catchtap="prevAvatar">‹</view>

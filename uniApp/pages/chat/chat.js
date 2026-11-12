@@ -17,6 +17,7 @@ var md = require('../../utils/markdown.js');
 var tts = require('../../utils/tts.js');
 var asr = require('../../utils/asr.js');
 var paipanUtil = require('../../utils/paipan.js');
+var avatarMouth = require('../../utils/avatar-mouth.js');
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
 var SYSTEM_PROMPT = '你是玄机子，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
@@ -192,7 +193,11 @@ Page({
     examples: EXAMPLES,
     avatarIdx: 0,
     avatarSrc: '',
-    avatarErr: false
+    avatarErr: false,
+    /* ---- 头像口型（DF-55：播报时嘴部缩放动画，定位照抄 XB_AVATAR_CONFIGS） ---- */
+    mouthRect: null,       // {left,top,width,height} 百分比；null 则不渲染口型层
+    mouthSx: 1,            // 口型横向缩放
+    mouthSy: 1             // 口型纵向缩放
   },
 
   /* ---------------- 生命周期 ---------------- */
@@ -217,6 +222,7 @@ Page({
       statusBarH: statusBarH,
       avatarSrc: env.getApiOrigin() + AVATARS[0].file
     });
+    this._applyMouthRect(AVATARS[0].file);
     this.rootQuestionId = null; // question_records 根记录 id（追问免费）
     this.questionId = null;     // 本轮 question_records.id（consume 返回，/chat 回写答案用）
     this.chatMsgId = null;      // 上一条回复的 chat_messages.id（作为追问的 target_id）
@@ -225,7 +231,9 @@ Page({
 
     var self = this;
     tts.setStateCallback(function (state) {
-      self.setData({ speaking: state === 'playing' });
+      var speaking = state === 'playing';
+      self.setData({ speaking: speaking });
+      if (speaking) { self._startMouth(); } else { self._stopMouth(); }
     });
 
     if (!md.available) {
@@ -243,6 +251,7 @@ Page({
   onUnload: function () {
     tts.stop(true);
     if (this.recTimer) clearInterval(this.recTimer);
+    if (this._mouthTimer) { clearInterval(this._mouthTimer); this._mouthTimer = null; }
   },
 
   noop: function () {},
@@ -1301,6 +1310,37 @@ Page({
     wx.showToast({ title: '档案功能暂未接入', icon: 'none' });
   },
 
+  /* ---- 头像口型动画（DF-55） ---- */
+  // 按头像文件查定位配置，写入 mouthRect（无配置则 null → 不渲染口型层）
+  _applyMouthRect: function (avatarFile) {
+    var rect = avatarMouth.getMouthRect(avatarFile);
+    this.setData({ mouthRect: rect, mouthSx: 1, mouthSy: 1 });
+  },
+  // 播报开始：120ms 节拍用双正弦模拟开合（无 analyser，与网页模拟分支同参数）
+  _startMouth: function () {
+    if (this._mouthTimer) return;            // 幂等：已在跑不重复开
+    if (!this.data.mouthRect) return;        // 无定位配置不显示口型
+    var self = this;
+    var phase = 0;
+    this._mouthTimer = setInterval(function () {
+      phase += 0.12;
+      var v1 = Math.sin(phase) * 0.5 + 0.5;
+      var v2 = Math.sin(phase * 2.3 + 1.2) * 0.5 + 0.5;
+      var level = (v1 * 0.45 + v2 * 0.55) * 1.3;
+      if (level < 0) level = 0;
+      if (level > 1) level = 1;
+      self.setData({
+        mouthSy: 1.0 + level * 1.2,          // 1.0（闭）– 2.2（张）
+        mouthSx: 0.97 + level * 0.15         // 0.97 – 1.12
+      });
+    }, 120);
+  },
+  // 播报结束/切头像：清定时器、复位缩放（隐藏由 speaking 状态控制）
+  _stopMouth: function () {
+    if (this._mouthTimer) { clearInterval(this._mouthTimer); this._mouthTimer = null; }
+    this.setData({ mouthSx: 1, mouthSy: 1 });
+  },
+
   setAvatar: function (idx) {
     var n = AVATARS.length;
     var i = ((idx % n) + n) % n;
@@ -1309,6 +1349,10 @@ Page({
       avatarSrc: env.getApiOrigin() + AVATARS[i].file,
       avatarErr: false
     });
+    // 切换头像：先停旧口型，刷新定位，若仍在播报则在新头像上重启动画
+    this._stopMouth();
+    this._applyMouthRect(AVATARS[i].file);
+    if (this.data.speaking) { this._startMouth(); }
   },
 
   prevAvatar: function () { this.setAvatar(this.data.avatarIdx - 1); },
@@ -1316,7 +1360,8 @@ Page({
   nextAvatar: function () { this.setAvatar(this.data.avatarIdx + 1); },
 
   onAvatarErr: function () {
-    this.setData({ avatarErr: true });
+    // 头像加载失败：回退占位符并隐藏口型，避免白块/错位嘴型
+    this.setData({ avatarErr: true, mouthRect: null });
   },
 
   onRestart: function () {
