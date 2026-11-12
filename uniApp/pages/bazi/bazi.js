@@ -9,11 +9,15 @@ function p2(n) { return n < 10 ? '0' + n : '' + n; }
 
 Page({
   data: {
-    date: '',
+    years: [],
+    months: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12],
+    days: [],
+    yearIdx: 0,
+    monthIdx: 0,
+    dayIdx: 0,
     time: '',
     genders: ['男', '女'],
     genderIdx: 0,
-    name: '',
     built: false,
     pillars: [],
     dayGan: '',
@@ -27,36 +31,95 @@ Page({
 
   onLoad: function () {
     var d = new Date();
+    var thisYear = d.getFullYear();
+    var years = [];
+    for (var y = 1900; y <= thisYear + 1; y++) years.push(y);
     this.setData({
-      date: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()),
+      years: years,
+      yearIdx: years.indexOf(thisYear),
+      monthIdx: d.getMonth(),
+      days: this._daysInMonth(thisYear, d.getMonth() + 1),
+      dayIdx: d.getDate() - 1,
       time: p2(d.getHours()) + ':' + p2(d.getMinutes())
     });
     this.buildPan();
+  },
+
+  onUnload: function () {
+    if (this._rebuildTimer) {
+      clearTimeout(this._rebuildTimer);
+      this._rebuildTimer = null;
+    }
   },
 
   noop: function () {},
 
-  onDateChange: function (e) { this.setData({ date: e.detail.value }); },
-  onTimeChange: function (e) { this.setData({ time: e.detail.value }); },
-  onGenderChange: function (e) { this.setData({ genderIdx: Number(e.detail.value) }); },
-  onName: function (e) { this.setData({ name: e.detail.value }); },
+  onYearChange: function (e) { this._applyDate({ yearIdx: Number(e.detail.value) }); },
+  onMonthChange: function (e) { this._applyDate({ monthIdx: Number(e.detail.value) }); },
 
-  useNow: function () {
-    var d = new Date();
-    this.setData({
-      date: d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate()),
-      time: p2(d.getHours()) + ':' + p2(d.getMinutes())
-    });
-    this.buildPan();
+  onDayChange: function (e) {
+    var idx = Number(e.detail.value);
+    if (idx === this.data.dayIdx) return;
+    this.setData({ dayIdx: idx });
+    this._scheduleRebuild();
+  },
+
+  onTimeChange: function (e) {
+    if (e.detail.value === this.data.time) return;
+    this.setData({ time: e.detail.value });
+    this._scheduleRebuild();
+  },
+
+  onGenderChange: function (e) {
+    var idx = Number(e.detail.value);
+    if (idx === this.data.genderIdx) return;
+    this.setData({ genderIdx: idx });
+    this._scheduleRebuild();
+  },
+
+  /** 某年某月的天数列表（含闰年 2/29） */
+  _daysInMonth: function (y, m) {
+    var n = new Date(y, m, 0).getDate();
+    var arr = [];
+    for (var i = 1; i <= n; i++) arr.push(i);
+    return arr;
+  },
+
+  /** 改年/改月：重算当月天数，当前日超界时钳制到月末（1/31 → 2/28） */
+  _applyDate: function (patch) {
+    var yearIdx = patch.yearIdx !== undefined ? patch.yearIdx : this.data.yearIdx;
+    var monthIdx = patch.monthIdx !== undefined ? patch.monthIdx : this.data.monthIdx;
+    if (yearIdx === this.data.yearIdx && monthIdx === this.data.monthIdx) return;
+    var days = this._daysInMonth(this.data.years[yearIdx], this.data.months[monthIdx]);
+    var dayIdx = this.data.dayIdx;
+    if (dayIdx > days.length - 1) dayIdx = days.length - 1;
+    patch.yearIdx = yearIdx;
+    patch.monthIdx = monthIdx;
+    patch.days = days;
+    patch.dayIdx = dayIdx;
+    this.setData(patch);
+    this._scheduleRebuild();
+  },
+
+  /** 改完即排：300ms 防抖，连续修改只跑最后一次 */
+  _scheduleRebuild: function () {
+    var self = this;
+    if (this._rebuildTimer) clearTimeout(this._rebuildTimer);
+    this._rebuildTimer = setTimeout(function () {
+      self._rebuildTimer = null;
+      self.buildPan();
+    }, 300);
   },
 
   parseTime: function () {
-    var dp = String(this.data.date || '').split('-');
+    var y = this.data.years[this.data.yearIdx] || new Date().getFullYear();
+    var m = this.data.months[this.data.monthIdx] || 1;
+    var d = this.data.days[this.data.dayIdx] || 1;
     var tp = String(this.data.time || '').split(':');
     return {
-      y: parseInt(dp[0], 10) || new Date().getFullYear(),
-      m: parseInt(dp[1], 10) || 1,
-      d: parseInt(dp[2], 10) || 1,
+      y: y,
+      m: m,
+      d: d,
       h: parseInt(tp[0], 10) || 0,
       mi: parseInt(tp[1], 10) || 0
     };
@@ -70,7 +133,7 @@ Page({
     var t = this.parseTime();
     var gender = this.data.genders[this.data.genderIdx] || '男';
     try {
-      var r = paipan.buildBazi(t.y, t.m, t.d, t.h, t.mi, gender, this.data.name);
+      var r = paipan.buildBazi(t.y, t.m, t.d, t.h, t.mi, gender, '');
       this.result = r;
       this.render(r, t);
     } catch (e) {

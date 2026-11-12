@@ -4,27 +4,27 @@
      ============================================================ -->
 <view class="page">
 
+  <!-- DF-52：年/月/日/时/性别 五格一排，改完自动排盘；窄屏横向滑动兜底 -->
   <view class="cond">
-    <view class="cond-row">
-      <text class="cond-label">公历</text>
-      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
-        <view class="pick-val">{{date}}</view>
-      </picker>
-      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
-        <view class="pick-val">{{time}}</view>
-      </picker>
-    </view>
-    <view class="cond-row">
-      <text class="cond-label">性别</text>
-      <picker mode="selector" range="{{genders}}" value="{{genderIdx}}" bindchange="onGenderChange" class="picker">
-        <view class="pick-val">{{genders[genderIdx]}}</view>
-      </picker>
-      <input class="name-input" value="{{name}}" bindinput="onName" placeholder="姓名（可选）" placeholder-class="ph" />
-    </view>
-    <view class="cond-actions">
-      <view class="qm-btn qm-btn-ghost" bindtap="useNow">此刻</view>
-      <view class="qm-btn qm-btn-primary" bindtap="buildPan">排盘</view>
-    </view>
+    <scroll-view scroll-x class="cond-scroll" show-scrollbar="{{false}}">
+      <view class="cond-row">
+        <picker mode="selector" range="{{years}}" value="{{yearIdx}}" bindchange="onYearChange" class="picker">
+          <view class="pick-val">{{years[yearIdx]}}</view>
+        </picker>
+        <picker mode="selector" range="{{months}}" value="{{monthIdx}}" bindchange="onMonthChange" class="picker">
+          <view class="pick-val">{{months[monthIdx]}}</view>
+        </picker>
+        <picker mode="selector" range="{{days}}" value="{{dayIdx}}" bindchange="onDayChange" class="picker">
+          <view class="pick-val">{{days[dayIdx]}}</view>
+        </picker>
+        <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
+          <view class="pick-val">{{time}}</view>
+        </picker>
+        <picker mode="selector" range="{{genders}}" value="{{genderIdx}}" bindchange="onGenderChange" class="picker">
+          <view class="pick-val">{{genders[genderIdx]}}</view>
+        </picker>
+      </view>
+    </scroll-view>
   </view>
 
   <block wx:if="{{built}}">
@@ -86,10 +86,6 @@
       <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
     </view>
   </block>
-
-  <view class="empty" wx:else>
-    <text>填写出生时间后点「排盘」。</text>
-  </view>
 
   <!-- 提示词预览 -->
   <view class="qm-mask" wx:if="{{showHint}}" catchtap="closeHint">

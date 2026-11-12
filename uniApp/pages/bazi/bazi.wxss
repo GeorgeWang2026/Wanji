@@ -8,39 +8,26 @@
   margin-bottom: 18rpx;
 }
 
-.cond-row { display: flex; align-items: center; margin-bottom: 14rpx; }
+/* DF-52：五格一排（年/月/日/时/性别），窄屏横向滑动兜底，不换行不缩字号 */
+.cond-scroll { width: 100%; white-space: nowrap; }
 
-.cond-label { width: 80rpx; font-size: 24rpx; color: #9f8ac0; }
+.cond-row { display: flex; align-items: center; min-width: 620rpx; }
 
-.picker { flex: 1; margin-right: 14rpx; }
+.picker { flex: 1; min-width: 0; margin-right: 8rpx; }
 .picker:last-child { margin-right: 0; }
 
 .pick-val {
   height: 68rpx;
   line-height: 68rpx;
+  padding: 0 4rpx;
   text-align: center;
   border-radius: 14rpx;
-  font-size: 26rpx;
+  font-size: 24rpx;
+  white-space: nowrap;
   color: #e8dff5;
   background: rgba(147, 112, 219, .14);
   border: 1rpx solid rgba(147, 112, 219, .3);
 }
-
-.name-input {
-  flex: 1;
-  height: 68rpx;
-  padding: 0 20rpx;
-  border-radius: 14rpx;
-  font-size: 26rpx;
-  color: #e8dff5;
-  background: rgba(147, 112, 219, .14);
-  border: 1rpx solid rgba(147, 112, 219, .3);
-}
-
-.ph { color: #7d6b9c; }
-
-.cond-actions { display: flex; justify-content: flex-end; }
-.cond-actions .qm-btn { width: 180rpx; height: 66rpx; margin-left: 16rpx; }
 
 /* 四柱 */
 .pillars { display: flex; margin-bottom: 14rpx; }
