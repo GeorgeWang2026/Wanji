@@ -20,7 +20,7 @@ var paipanUtil = require('../../utils/paipan.js');
 var avatarMouth = require('../../utils/avatar-mouth.js');
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
-var SYSTEM_PROMPT = '你是玄机子，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
+var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
   + '回复温柔聪慧，中文，简洁友好。'
   + '若用户是在分析页面，你可以调用奇门遁甲/八字/梅花易数排盘来辅助判断。';
 
@@ -225,7 +225,7 @@ Page({
     sentContent: '',
     sentFeishuUrl: '',
     ttsText: '',           // #ttsLines 字幕内容
-    ttsLabel: '玄机子',
+    ttsLabel: '万机决策助手',
     examples: EXAMPLES,
     avatarIdx: 0,
     avatarSrc: '',
@@ -386,7 +386,7 @@ Page({
             timeText: m.timeText || '',
             userName: '',
             modeText: 'AI',
-            sourceText: '玄机子助手',
+            sourceText: '万机决策助手',
             skillChips: chips,
             notice: '',
             reply: '',
@@ -462,7 +462,7 @@ Page({
       timeText: fmtTime(it.created_at),
       userName: '',
       modeText: 'AI',
-      sourceText: '玄机子助手',
+      sourceText: '万机决策助手',
       skillChips: chips,
       notice: '',
       reportUrl: url,
@@ -2460,6 +2460,6 @@ Page({
   },
 
   onShareAppMessage: function () {
-    return { title: '玄机 · 时空决策助手', path: '/uniApp/pages/chat/chat' };
+    return { title: '万机决策助手', path: '/uniApp/pages/chat/chat' };
   }
 });

@@ -18,7 +18,7 @@
       <!-- 标题绝对居中；折叠三角紧贴标题左侧，不再占最右位置 -->
       <view class="p-head">
         <view class="p-arrow {{topOpen ? 'open' : ''}}">▼</view>
-        <text class="p-title">玄机决策助手</text>
+        <text class="p-title">万机决策助手</text>
       </view>
     </view>
 
@@ -474,7 +474,7 @@
         <view class="fs-back" hover-class="press-zone" catchtap="closeLogin">
           <text class="fs-back-ico">‹</text>
         </view>
-        <text class="fs-title">玄机子助手</text>
+        <text class="fs-title">万机决策助手</text>
       </view>
 
       <scroll-view class="auth-scroll" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
