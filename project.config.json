@@ -77,6 +77,14 @@
       {
         "value": ".gitignore",
         "type": "file"
+      },
+      {
+        "value": ".ndjson",
+        "type": "suffix"
+      },
+      {
+        "value": ".manifest.json",
+        "type": "suffix"
       }
     ],
     "include": []

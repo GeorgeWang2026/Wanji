@@ -25,6 +25,10 @@ project.private.config.json
 # 小程序内置静态图标（切图）例外，需要入库
 !uniApp/static/icons/*.png
 
+# --- 飞书多维表格导出产物（仅本地导出用途，不入库、不打包）---
+*.ndjson
+*.manifest.json
+
 # --- 密钥与凭据 ---
 .env
 .env.*
