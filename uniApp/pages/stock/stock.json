@@ -1,0 +1,8 @@
+{
+  "navigationBarTitleText": "证券行情",
+  "navigationBarBackgroundColor": "#1a0f2e",
+  "navigationBarTextStyle": "white",
+  "backgroundColor": "#1a1029",
+  "backgroundTextStyle": "dark",
+  "enablePullDownRefresh": true
+}

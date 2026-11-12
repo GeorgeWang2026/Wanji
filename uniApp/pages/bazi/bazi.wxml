@@ -1,0 +1,106 @@
+<!-- ============================================================
+     四柱八字（对应 xiaoxuan.html 的 paipanModal「四柱八字」页签）
+     四柱表 + 旺衰判定 + 大运列表；命运曲线（canvas）暂未迁移
+     ============================================================ -->
+<view class="page">
+
+  <view class="cond">
+    <view class="cond-row">
+      <text class="cond-label">公历</text>
+      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
+        <view class="pick-val">{{date}}</view>
+      </picker>
+      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
+        <view class="pick-val">{{time}}</view>
+      </picker>
+    </view>
+    <view class="cond-row">
+      <text class="cond-label">性别</text>
+      <picker mode="selector" range="{{genders}}" value="{{genderIdx}}" bindchange="onGenderChange" class="picker">
+        <view class="pick-val">{{genders[genderIdx]}}</view>
+      </picker>
+      <input class="name-input" value="{{name}}" bindinput="onName" placeholder="姓名（可选）" placeholder-class="ph" />
+    </view>
+    <view class="cond-actions">
+      <view class="qm-btn qm-btn-ghost" bindtap="useNow">此刻</view>
+      <view class="qm-btn qm-btn-primary" bindtap="buildPan">排盘</view>
+    </view>
+  </view>
+
+  <block wx:if="{{built}}">
+    <!-- 四柱 -->
+    <view class="pillars">
+      <view class="pillar" wx:for="{{pillars}}" wx:key="name">
+        <view class="p-name">{{item.name}}</view>
+        <view class="p-god">{{item.ganGod}}</view>
+        <view class="p-gan" style="color:{{item.ganColor}}">{{item.gan}}</view>
+        <view class="p-zhi" style="color:{{item.zhiColor}}">{{item.zhi}}</view>
+        <view class="p-god p-god-b">{{item.zhiGod}}</view>
+        <view class="p-wx">{{item.wx}}</view>
+      </view>
+    </view>
+
+    <view class="meta">
+      <text class="meta-item">日主 {{dayGan}}</text>
+      <text class="meta-item">{{info.jieqi}}</text>
+      <text class="meta-item">{{info.solarDate}}</text>
+    </view>
+
+    <!-- 旺衰判定 -->
+    <view class="qinfo">
+      <view class="qinfo-row">
+        <text class="qinfo-label">旺衰</text>
+        <text class="qinfo-val">{{prof.level}}</text>
+        <text class="badge">评分 {{prof.score}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">喜用</text>
+        <text class="qinfo-val">{{prof.xi}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">忌神</text>
+        <text class="qinfo-val">{{prof.ji}}</text>
+      </view>
+      <view class="prof-text">{{prof.text}}</view>
+    </view>
+
+    <!-- 大运 -->
+    <view class="section-title">
+      <text>大运（{{yun.direction}}，{{yun.ageStart}} 岁起运 · {{yun.startYear}} 年）</text>
+    </view>
+    <scroll-view scroll-x class="dayun-scroll" show-scrollbar="{{false}}">
+      <view class="dayun-list">
+        <view class="dayun {{item.current ? 'dayun-cur' : ''}}" wx:for="{{dayun}}" wx:key="gz">
+          <view class="dy-gz">{{item.gz}}</view>
+          <view class="dy-age">{{item.age}} 岁</view>
+          <view class="dy-year">{{item.from}}–{{item.to - 1}}</view>
+          <view class="dy-t {{item.cls}}">{{item.tendency}}</view>
+        </view>
+      </view>
+    </scroll-view>
+
+    <view class="tip">命运曲线（逐年起伏）依赖 canvas 绘制，暂未迁移；大运趋势已按引擎评分给出。</view>
+
+    <view class="actions">
+      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
+    </view>
+  </block>
+
+  <view class="empty" wx:else>
+    <text>填写出生时间后点「排盘」。</text>
+  </view>
+
+  <!-- 提示词预览 -->
+  <view class="qm-mask" wx:if="{{showHint}}" catchtap="closeHint">
+    <view class="qm-dialog" catchtap="noop">
+      <view class="qm-dialog-title">后端将使用的盘面提示词</view>
+      <scroll-view scroll-y class="hint-scroll">
+        <text class="hint-text">{{hint}}</text>
+      </scroll-view>
+      <view class="dialog-actions">
+        <view class="qm-btn qm-btn-primary" bindtap="closeHint">关闭</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,22 @@
+<!-- ============================================================
+     卦典详情（对应 xiaoxuan.html 的 _mhOpenGuaDetail）
+     后端 GET /api/v1/gua/{num} 取 Markdown，缺失时回退 /gua/fetch/{num}
+     渲染复用 static/markdown.js 的 guaMdToHtml
+     ============================================================ -->
+<view class="page">
+  <view class="gua-head">
+    <text class="gua-num">第 {{num}} 卦</text>
+    <text class="gua-yao" wx:if="{{yao > 0}}">动爻：第 {{yao}} 爻</text>
+  </view>
+
+  <view class="loading" wx:if="{{loading}}">卦典加载中…</view>
+
+  <view class="err" wx:if="{{error && !loading}}">
+    <text>{{error}}</text>
+    <view class="qm-btn qm-btn-primary retry" bindtap="retry">重试</view>
+  </view>
+
+  <view class="md-wrap" wx:if="{{!loading && !error}}">
+    <rich-text nodes="{{html}}"></rich-text>
+  </view>
+</view>

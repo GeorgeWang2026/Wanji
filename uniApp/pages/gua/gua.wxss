@@ -1,0 +1,23 @@
+.page { padding: 20rpx 24rpx 60rpx; }
+
+.gua-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16rpx 20rpx;
+  margin-bottom: 16rpx;
+  border-radius: 14rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 1rpx solid rgba(147, 112, 219, .25);
+}
+
+.gua-num { font-size: 28rpx; color: #e8b84a; font-weight: 600; }
+.gua-yao { font-size: 22rpx; color: #ff8fb5; }
+
+.md-wrap { padding: 6rpx 2rpx; }
+
+.loading { padding: 120rpx 20rpx; text-align: center; font-size: 26rpx; color: #8f7cb0; }
+
+.err { padding: 80rpx 30rpx; text-align: center; font-size: 26rpx; color: #ff8fb5; }
+
+.retry { width: 240rpx; height: 68rpx; margin: 26rpx auto 0; }

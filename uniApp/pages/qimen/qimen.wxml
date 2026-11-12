@@ -1,0 +1,127 @@
+<!-- ============================================================
+     奇门遁甲排盘（对应 xiaoxuan.html 的 paipanModal「奇门遁甲」页签）
+     转盘九宫格用 flex 布局还原，点击宫位看释义
+     ============================================================ -->
+<view class="page">
+
+  <!-- 起局条件 -->
+  <view class="cond">
+    <view class="cond-row">
+      <text class="cond-label">公历</text>
+      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
+        <view class="pick-val">{{date}}</view>
+      </picker>
+      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
+        <view class="pick-val">{{time}}</view>
+      </picker>
+    </view>
+    <view class="cond-actions">
+      <view class="qm-btn qm-btn-ghost" bindtap="useNow">此刻</view>
+      <view class="qm-btn qm-btn-primary" bindtap="buildPan">起局</view>
+    </view>
+  </view>
+
+  <block wx:if="{{built}}">
+    <!-- 起局信息 -->
+    <view class="qinfo">
+      <view class="qinfo-row">
+        <text class="qinfo-label">四柱</text>
+        <text class="qinfo-val">{{info.bazi}}</text>
+        <text class="badge">{{info.jieqi}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">定局</text>
+        <text class="qinfo-val">{{info.yuan}} · {{info.dun}}</text>
+        <text class="badge badge-ju">{{info.ju}} 局</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">值符</text>
+        <text class="qinfo-val">{{info.zf}}</text>
+        <text class="qinfo-label">值使</text>
+        <text class="qinfo-val">{{info.zs}}</text>
+      </view>
+    </view>
+
+    <!-- 九宫格 -->
+    <view class="grid">
+      <view
+        class="cell {{item.cls}}"
+        wx:for="{{cells}}"
+        wx:key="g"
+        bindtap="onCellTap"
+        data-index="{{index}}"
+      >
+        <block wx:if="{{item.g === 5}}">
+          <view class="center-txt">中五</view>
+          <view class="center-sub">寄坤</view>
+          <view class="center-tag" wx:if="{{item.centerTag}}">{{item.centerTag}}</view>
+        </block>
+        <block wx:else>
+          <view class="badges">
+            <text class="hb {{b.cls}}" wx:for="{{item.badges}}" wx:for-item="b" wx:key="t">{{b.t}}</text>
+          </view>
+          <view class="row-top">
+            <text class="tg" style="color:{{item.tgColor}}">{{item.tg}}</text>
+            <text class="shen">{{item.shen}}</text>
+          </view>
+          <view class="row-mid">
+            <text class="xing">{{item.xing}}</text>
+            <text class="men">{{item.men}}</text>
+          </view>
+          <view class="row-bot">
+            <text class="dg" style="color:{{item.dgColor}}">{{item.dg}}</text>
+            <text class="gname">{{item.gname}}</text>
+          </view>
+          <view class="flags">
+            <text class="flag" wx:for="{{item.flags}}" wx:for-item="f" wx:key="*this">{{f}}</text>
+          </view>
+        </block>
+      </view>
+    </view>
+
+    <view class="tip">点击任一宫位，查看该宫八神 / 九星 / 八门 / 天盘干的释义</view>
+
+    <!-- 关联操作 -->
+    <view class="actions">
+      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
+    </view>
+  </block>
+
+  <view class="empty" wx:else>
+    <text>选择时间后点「起局」，即可排出奇门九宫盘。</text>
+  </view>
+
+  <!-- 宫位详情：全屏页面形态（左返回 + 居中标题，无 ✕） -->
+  <view class="fs-page" wx:if="{{detail}}">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="fs-back-press" catchtap="closeDetail">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">{{detail.title}}</text>
+    </view>
+    <scroll-view scroll-y class="fs-body qm-fs-body">
+      <view class="d-row" wx:for="{{detail.rows}}" wx:key="k">
+        <text class="d-k">{{item.k}}</text>
+        <text class="d-v">{{item.v}}</text>
+        <text class="d-d">{{item.d}}</text>
+      </view>
+    </scroll-view>
+    <view class="fs-foot">
+      <view class="qm-btn qm-btn-primary" bindtap="closeDetail">知道了</view>
+    </view>
+  </view>
+
+  <!-- 提示词预览：全屏页面形态（左返回 + 居中标题，无 ✕） -->
+  <view class="fs-page" wx:if="{{showHint}}">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="fs-back-press" catchtap="closeHint">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">后端将使用的盘面提示词</text>
+    </view>
+    <scroll-view scroll-y class="fs-body qm-fs-body">
+      <text class="hint-text">{{hint}}</text>
+    </scroll-view>
+  </view>
+</view>

@@ -1,0 +1,178 @@
+/* ============================================================
+ * 全局样式（暗色紫金主题，取自 xiaoxuan.html 的视觉基调）
+ * 只作用于小程序；网页版样式仍在 xiaoxuan.html 内联 <style> 里，互不影响。
+ * ============================================================ */
+page {
+  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+  min-height: 100%;
+  color: #e8e0f0;
+  font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+  font-size: 28rpx;
+  line-height: 1.6;
+}
+
+view, text, scroll-view, button, input, textarea {
+  box-sizing: border-box;
+}
+
+/* ---------- 通用卡片 / 按钮 ---------- */
+.qm-card {
+  background: rgba(255, 255, 255, .05);
+  border: 1rpx solid rgba(147, 112, 219, .28);
+  border-radius: 20rpx;
+  padding: 20rpx 22rpx;
+}
+
+.qm-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 76rpx;
+  border-radius: 38rpx;
+  font-size: 28rpx;
+  color: #efe6ff;
+  background: rgba(255, 255, 255, .08);
+  border: 1rpx solid rgba(147, 112, 219, .38);
+}
+
+.qm-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #ff8fb5);
+  border: none;
+  box-shadow: 0 8rpx 24rpx rgba(147, 112, 219, .38);
+}
+
+.qm-btn-ghost {
+  color: #b8a5d5;
+  background: transparent;
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+
+.qm-muted { color: #9f8ac0; }
+.qm-gold { color: #e8b84a; }
+.qm-danger { color: #ff8fb5; }
+
+/* ---------- 全屏页面形态（弹层统一容器） ---------- */
+/* 左返回 + 居中标题 + 无 ✕；铺满视口、无遮罩留白、无圆角卡片感 */
+.fs-page {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+}
+
+.fs-header {
+  position: relative;
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  /* 透明底：与首页标题栏一致，只留文字与返回按钮；透明边框保留原高度 */
+  background: transparent;
+  border-bottom: 2rpx solid transparent;
+}
+
+.fs-back {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(255, 255, 255, .1);
+}
+
+.fs-back-ico {
+  margin-top: -6rpx;
+  font-size: 44rpx;
+  line-height: 1;
+  color: #e0d0f0;
+}
+
+.fs-back-press { background: rgba(255, 255, 255, .2); }
+
+.fs-title {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  max-width: 62%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #e0d0f0;
+}
+
+.fs-body {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.fs-foot {
+  flex: 0 0 auto;
+  padding: 20rpx 32rpx calc(20rpx + env(safe-area-inset-bottom));
+  border-top: 1rpx solid rgba(180, 140, 220, .15);
+}
+
+/* ---------- 弹层（页面内自绘遮罩，替代网页的 iframe/遮罩 div） ---------- */
+.qm-mask {
+  position: fixed;
+  left: 0; right: 0; top: 0; bottom: 0;
+  background: rgba(10, 5, 25, .82);
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.qm-dialog {
+  width: 620rpx;
+  max-height: 76vh;
+  overflow-y: auto;
+  background: linear-gradient(170deg, #2a1a48, #1e1033);
+  border: 1rpx solid rgba(147, 112, 219, .4);
+  border-radius: 24rpx;
+  padding: 28rpx;
+  box-shadow: 0 20rpx 60rpx rgba(0, 0, 0, .6);
+}
+
+.qm-dialog-title {
+  font-size: 32rpx;
+  font-weight: 600;
+  color: #e8dff5;
+  margin-bottom: 18rpx;
+}
+
+.qm-field {
+  display: flex;
+  align-items: center;
+  margin-bottom: 18rpx;
+}
+
+.qm-field-label {
+  width: 120rpx;
+  flex: 0 0 auto;
+  color: #b8a5d5;
+  font-size: 26rpx;
+}
+
+.qm-input {
+  flex: 1;
+  height: 76rpx;
+  padding: 0 20rpx;
+  border-radius: 14rpx;
+  background: rgba(255, 255, 255, .06);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+  color: #e8e0f0;
+  font-size: 28rpx;
+}

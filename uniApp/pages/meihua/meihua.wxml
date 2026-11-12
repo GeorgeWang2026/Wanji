@@ -1,0 +1,136 @@
+<!-- ============================================================
+     梅花易数（对应 xiaoxuan.html 的 paipanModal「梅花易数」页签）
+     支持：时间起卦 / 数字起卦 / 物象起卦（手动上下卦 + 时辰）
+     三卦并排展示（本卦 / 互卦 / 变卦），可点卦名进卦典
+     ============================================================ -->
+<view class="page">
+
+  <!-- 起卦方式 -->
+  <view class="tabs">
+    <view class="tab {{mode === item.k ? 'tab-on' : ''}}" wx:for="{{modes}}" wx:key="k" bindtap="onMode" data-k="{{item.k}}">
+      {{item.t}}
+    </view>
+  </view>
+
+  <!-- 时间起卦 -->
+  <view class="cond" wx:if="{{mode === 'time'}}">
+    <view class="cond-row">
+      <text class="cond-label">时间</text>
+      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
+        <view class="pick-val">{{date}}</view>
+      </picker>
+      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
+        <view class="pick-val">{{time}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <!-- 数字起卦 -->
+  <view class="cond" wx:if="{{mode === 'num'}}">
+    <view class="cond-row">
+      <text class="cond-label">上卦数</text>
+      <input class="num-input" type="number" value="{{n1}}" bindinput="onN1" placeholder="1-8" placeholder-class="ph" />
+      <text class="cond-label cond-label-2">下卦数</text>
+      <input class="num-input" type="number" value="{{n2}}" bindinput="onN2" placeholder="1-8" placeholder-class="ph" />
+    </view>
+    <view class="num-tip">动爻按「两数之和 ÷ 6 取余」确定（古法）。</view>
+  </view>
+
+  <!-- 物象起卦 -->
+  <view class="cond" wx:if="{{mode === 'word'}}">
+    <view class="cond-row">
+      <text class="cond-label">上卦</text>
+      <picker mode="selector" range="{{guaNames}}" value="{{upIdx}}" bindchange="onUpChange" class="picker">
+        <view class="pick-val">{{guaNames[upIdx]}}</view>
+      </picker>
+      <text class="cond-label cond-label-2">下卦</text>
+      <picker mode="selector" range="{{guaNames}}" value="{{downIdx}}" bindchange="onDownChange" class="picker">
+        <view class="pick-val">{{guaNames[downIdx]}}</view>
+      </picker>
+    </view>
+    <view class="cond-row">
+      <text class="cond-label">时辰</text>
+      <picker mode="selector" range="{{csNames}}" value="{{csIdx}}" bindchange="onCsChange" class="picker picker-wide">
+        <view class="pick-val">{{csNames[csIdx]}}</view>
+      </picker>
+    </view>
+  </view>
+
+  <view class="cond-actions">
+    <view class="qm-btn qm-btn-primary" bindtap="buildGua">起卦</view>
+  </view>
+
+  <block wx:if="{{built}}">
+    <!-- 三卦 -->
+    <view class="hexes">
+      <view class="hex" wx:for="{{hexes}}" wx:key="title" bindtap="openGua" data-num="{{item.num}}" data-yao="{{item.moveYao}}">
+        <view class="hex-title">{{item.title}}</view>
+        <view class="hex-lines">
+          <view class="hline" wx:for="{{item.lines}}" wx:for-item="l" wx:key="idx">
+            <view class="yao">
+              <block wx:if="{{l.yang}}"><view class="bar {{l.mark ? 'bar-mark' : ''}}"></view></block>
+              <block wx:else>
+                <view class="bar bar-half {{l.mark ? 'bar-mark' : ''}}"></view>
+                <view class="bar-gap"></view>
+                <view class="bar bar-half {{l.mark ? 'bar-mark' : ''}}"></view>
+              </block>
+            </view>
+          </view>
+        </view>
+        <view class="hex-name">{{item.name}}</view>
+        <view class="hex-sub">{{item.sub}}</view>
+      </view>
+    </view>
+
+    <view class="tip">点击卦象可查看卦典详情</view>
+
+    <!-- 体用 -->
+    <view class="qinfo">
+      <view class="qinfo-row">
+        <text class="qinfo-label">动爻</text>
+        <text class="qinfo-val">第 {{gua.moveYao}} 爻</text>
+        <text class="qinfo-label">体卦</text>
+        <text class="qinfo-val">{{tiYong.tiName}}（{{tiYong.tiWx}}）</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">用卦</text>
+        <text class="qinfo-val">{{tiYong.yongName}}（{{tiYong.yongWx}}）</text>
+        <text class="badge">{{tiYong.rel}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">本卦</text>
+        <text class="qinfo-val">{{summary.ben}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">互卦</text>
+        <text class="qinfo-val">{{summary.hu}}</text>
+      </view>
+      <view class="qinfo-row">
+        <text class="qinfo-label">变卦</text>
+        <text class="qinfo-val">{{summary.bian}}</text>
+      </view>
+    </view>
+
+    <view class="actions">
+      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
+    </view>
+  </block>
+
+  <view class="empty" wx:else>
+    <text>选择起卦方式后点「起卦」。</text>
+  </view>
+
+  <!-- 提示词预览 -->
+  <view class="qm-mask" wx:if="{{showHint}}" catchtap="closeHint">
+    <view class="qm-dialog" catchtap="noop">
+      <view class="qm-dialog-title">后端将使用的盘面提示词</view>
+      <scroll-view scroll-y class="hint-scroll">
+        <text class="hint-text">{{hint}}</text>
+      </scroll-view>
+      <view class="dialog-actions">
+        <view class="qm-btn qm-btn-primary" bindtap="closeHint">关闭</view>
+      </view>
+    </view>
+  </view>
+</view>

@@ -1,0 +1,403 @@
+<!-- ============================================================
+     首页：对话主流程（视觉结构对齐 xiaoxuan.html）
+     - 顶部「您的咨询」折叠面板
+     - 中部头像舞台（光环 / 脉冲 / 排盘圆钮）
+     - 底部输入面板（可折叠）+ 控制区（记录 / 麦克风 / 账号）
+     - 咨询记录弹层（参考页 #chatHistoryModal）
+     - 个人中心弹层（参考页 #profileModal）
+     - 登录/注册底部弹层（参考页 #authMask）
+     - 积分消耗确认卡片（参考页自绘对话框）
+     ============================================================ -->
+<view class="app" style="padding-top:{{statusBarH}}px;">
+
+  <!-- ============ 顶部：您的咨询 ============ -->
+  <view class="panel-top">
+    <view class="panel-header" bindtap="toggleTop">
+      <!-- 原右侧「⟳ 重新开始」文字按钮 → 左侧圆形按钮（同一点击逻辑 onRestart，热区仍是 56rpx 圆） -->
+      <view class="ph-icon" hover-class="ph-icon-press" catchtap="onRestart">⟳</view>
+      <!-- 标题绝对居中；折叠三角紧贴标题左侧，不再占最右位置 -->
+      <view class="p-head">
+        <view class="p-arrow {{topOpen ? 'open' : ''}}">▼</view>
+        <text class="p-title">玄机决策助手</text>
+      </view>
+    </view>
+
+    <view class="panel-body {{topOpen ? 'open' : ''}}">
+      <!-- 未提交问题时的默认提示（对应参考页 #pcEmptyHint） -->
+      <view class="pc-empty-hint" id="pcEmptyHint" wx:if="{{!pinned && !sentVisible}}">请先在下方用语音或文字输入你想咨询的问题</view>
+
+      <!-- 置顶上下文（对应参考页 #pinnedContext）：_renderChatRoot 平铺后的结构
+           header(您的问题 + 时间 + 查看咨询报告) → 技能标签 → 问题正文 → 追问列表 -->
+      <view class="pinned-context" id="pinnedContext" wx:if="{{pinned}}">
+        <view class="chat-item-header">
+          <text class="mode-badge">您的问题</text>
+          <text class="pc-time">{{pinned.timeText}}</text>
+          <view class="mode-badge pc-report" hover-class="pc-report-press"
+                wx:if="{{pinned.feishuUrl}}" catchtap="onPinnedFeishu">查看咨询报告</view>
+        </view>
+
+        <!-- boundTags：有置顶内容时移动到 header 之后（参考页 insertAdjacentElement('afterend')） -->
+        <view class="bound-tags" id="boundTags" wx:if="{{chips.length > 0}}">
+          <view class="bound-tag {{item.cls}}" wx:for="{{chips}}" wx:key="type"
+                hover-class="bound-tag-press" catchtap="onChipTap" data-type="{{item.type}}">
+            <text class="bt-icon">{{item.icon}}</text>
+            <text class="bt-detail" wx:if="{{item.detail}}">{{item.detail}}</text>
+            <text class="bt-close" catchtap="onChipClose" data-type="{{item.type}}">×</text>
+          </view>
+        </view>
+
+        <view class="chat-item-question" wx:if="{{pinned.question}}">{{pinned.question}}</view>
+
+        <view class="chat-item-followups" wx:if="{{pinned.followups.length > 0}}">
+          <view class="chat-item-followup" wx:for="{{pinned.followups}}" wx:for-item="fu" wx:key="id">
+            <text class="cif-tag">追问</text>{{fu.text}}
+          </view>
+        </view>
+      </view>
+
+      <!-- 已提交问题（扣积分确认后）置顶展示（对应参考页 #sentPreview） -->
+      <view class="sent-preview" id="sentPreview" wx:if="{{sentVisible}}">
+        <view class="sent-badge">✓ 已发送</view>
+        <text class="sent-badge sent-feishu-badge" id="sentFeishuBadge"
+              wx:if="{{sentFeishuUrl}}" catchtap="onSentFeishu">📄 查看咨询报告 ↗</text>
+        <view class="sent-content" id="sentContent">{{sentContent}}</view>
+      </view>
+
+      <!-- 语音字幕区（对应参考页 #ttsLines / #ttsBody） -->
+      <view class="tts-lines" id="ttsLines" wx:if="{{typing || ttsText}}">
+        <view class="tts-body" id="ttsBody">
+          <view class="thinking-marquee" wx:if="{{typing}}"><text class="dot-flash">●</text> {{typingText}}</view>
+          <block wx:else>
+            <text class="sr-label">{{ttsLabel}}</text>
+            <text class="sr-text">{{ttsText}}</text>
+            <text class="placeholder" wx:if="{{!ttsText}}">播报内容将在这里显示…</text>
+          </block>
+        </view>
+        <!-- 保留项：参考页无此控件，小程序用它暂停/恢复播报、长按关闭自动播报 -->
+        <view class="tts-vol {{ttsOn ? (speaking ? 'on' : '') : 'muted'}}"
+              hover-class="press-zone" catchtap="onTtsIcon" catchlongpress="onTtsOff">
+          <text class="tts-vol-ico">{{ttsOn ? (speaking ? '🔊' : '🔉') : '🔇'}}</text>
+        </view>
+      </view>
+
+      <!-- 无置顶内容时，绑定标签仍留在面板底部（参考页 #boundTags 的静态位置） -->
+      <view class="bound-tags" wx:if="{{!pinned && chips.length > 0}}">
+        <view class="bound-tag {{item.cls}}" wx:for="{{chips}}" wx:key="type"
+              hover-class="bound-tag-press" catchtap="onChipTap" data-type="{{item.type}}">
+          <text class="bt-icon">{{item.icon}}</text>
+          <text class="bt-detail" wx:if="{{item.detail}}">{{item.detail}}</text>
+          <text class="bt-close" catchtap="onChipClose" data-type="{{item.type}}">×</text>
+        </view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 中部：头像舞台 ============ -->
+  <view class="stage">
+    <view class="status-tag {{(recording || typing || speaking) && !topOpen ? 'show' : ''}}">{{recording ? '正在聆听…' : (typing ? typingText : (speaking ? '正在播报…' : ''))}}</view>
+
+    <view class="avatar-wrap {{recording ? 'is-listening' : ''}}">
+      <view class="pulse-ring {{recording ? 'active' : ''}}"></view>
+      <view class="avatar-ring {{(recording || typing || speaking) ? '' : 'idle'}}"></view>
+
+      <image
+        wx:if="{{!avatarErr}}"
+        class="avatar-img"
+        src="{{avatarSrc}}"
+        mode="aspectFill"
+        binderror="onAvatarErr"
+        bindtap="onMicTap"
+      />
+      <view wx:else class="avatar-fallback" bindtap="onMicTap">
+        <text class="fallback-txt">玄</text>
+      </view>
+
+      <view class="avatar-nav prev" hover-class="press-zone" catchtap="prevAvatar">‹</view>
+      <view class="avatar-nav next" hover-class="press-zone" catchtap="nextAvatar">›</view>
+    </view>
+
+    <view class="paipan-bar">
+      <view class="paipan-btn {{skillActive.qimen ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="qimen">
+        <text class="p-icon">☯</text>
+        <text class="p-label">奇门</text>
+      </view>
+      <view class="paipan-btn {{skillActive.bazi ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="bazi">
+        <text class="p-icon">命</text>
+        <text class="p-label">八字</text>
+      </view>
+      <view class="paipan-btn {{skillActive.meihua ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="meihua">
+        <text class="p-icon">☰</text>
+        <text class="p-label">梅花</text>
+      </view>
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openPaipan" data-type="stock">
+        <text class="p-icon">📈</text>
+        <text class="p-label">证券</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 底部：输入面板 ============ -->
+  <view class="panel-bot {{inputOpen ? 'open' : ''}}">
+    <view class="panel-header" bindtap="toggleInput">
+      <view class="ph-icon">⌨️</view>
+      <text class="p-title">输入问题</text>
+      <text class="p-sub" wx:if="{{!inputOpen}}">点此展开文字提问</text>
+      <view class="p-arrow {{inputOpen ? 'open' : ''}}">▼</view>
+    </view>
+
+    <!-- 展开态：向上浮在标题之上，覆盖头像/技能按钮区；catchtap 阻止点击穿透 -->
+    <view class="panel-body" wx:if="{{inputOpen}}" catchtap="noop">
+      <view class="quick-qas">
+        <view class="quick-qa" wx:for="{{examples}}" wx:key="*this" bindtap="onExample" data-text="{{item}}">{{item}}</view>
+      </view>
+
+      <view class="input-row">
+        <textarea
+          class="rec-input"
+          value="{{input}}"
+          placeholder="{{recording ? '正在聆听…说完再点一次麦克风' : '说说你想问的事…'}}"
+          placeholder-class="rec-input-ph"
+          auto-height
+          maxlength="1000"
+          cursor-spacing="30"
+          show-confirm-bar="{{false}}"
+          bindinput="onInput"
+          bindconfirm="onSendTap"
+        />
+        <view class="rec-send {{sending ? 'disabled' : ''}}" hover-class="press-zone" bindtap="onSendTap">↑</view>
+      </view>
+
+      <view class="input-foot">
+        <text class="rec-hint" wx:if="{{recording}}">正在聆听 {{recSeconds}}s，再点麦克风结束</text>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 底部控制区 ============ -->
+  <view class="controls">
+    <view class="ctrl-btn" hover-class="press-zone" bindtap="openHistory">
+      <text class="ctrl-ico">🕘</text>
+      <view class="ctrl-dot" wx:if="{{messages.length > 0}}"></view>
+    </view>
+    <view class="mic-btn {{recording ? 'recording' : ''}}" hover-class="press-zone" bindtap="onMicTap">
+      <text class="mic-ico">🎤</text>
+    </view>
+    <view class="ctrl-btn" hover-class="press-zone" bindtap="onAccountTap">
+      <text class="ctrl-ico">👤</text>
+    </view>
+  </view>
+
+  <!-- ============ 咨询记录：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->
+  <view class="fs-page" id="chatHistoryModal" wx:if="{{showHistory}}" style="padding-top:{{statusBarH}}px;">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="press-zone" catchtap="closeHistory">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">📜 咨询记录</text>
+    </view>
+
+      <scroll-view
+        class="modal-body fs-body"
+        scroll-y
+        enhanced="{{true}}"
+        show-scrollbar="{{false}}"
+      >
+        <!-- 空态 / 加载中 / 接口失败：结构与文案照抄参考页 loadChatHistory / renderChatHistory -->
+        <view class="chat-empty" wx:if="{{historyLoading && historyRecords.length === 0}}">加载中…</view>
+        <block wx:elif="{{historyRecords.length === 0}}">
+          <view class="chat-empty" wx:if="{{historyError}}">❌ {{historyError}}</view>
+          <view class="chat-empty" wx:else>还没有咨询记录，说点什么试试吧～</view>
+          <view class="chat-load-more" wx:if="{{historyError}}" hover-class="chat-load-more-press" bindtap="retryHistory">点击重试</view>
+        </block>
+
+        <!-- 一条咨询 = 一张卡：层级/类名照抄参考页 _renderChatRoot -->
+        <block wx:for="{{historyRecords}}" wx:key="id">
+          <view class="chat-item {{item.expanded ? 'expanded' : ''}}" data-qid="{{item.id}}" hover-class="chat-item-press">
+            <view class="chat-item-header" bindtap="toggleRecord" data-idx="{{index}}">
+              <text class="mode-badge">{{item.modeText}}</text>
+              <text>{{item.timeText}}</text>
+              <text class="chat-item-name" wx:if="{{item.userName}}">{{item.userName}}</text>
+              <text class="chat-item-source">{{item.sourceText}}</text>
+              <!-- 参考页为 <button class="del-btn">；小程序无原生 button → view（去掉 button 默认边框/背景） -->
+              <view class="del-btn" hover-class="del-btn-press" catchtap="onDeleteRecord" data-idx="{{index}}">🗑️</view>
+            </view>
+
+            <!-- 技能卡片：.chat-item-user > .chat-pan-cards > .chat-pan-tip.bound-tag -->
+            <view class="chat-item-user" wx:if="{{item.skillChips.length > 0}}">
+              <view class="chat-pan-cards">
+                <view class="chat-pan-tip bound-tag {{chip.cls}}" wx:for="{{item.skillChips}}" wx:for-item="chip" wx:key="type">
+                  <text class="bt-icon">{{chip.icon}}</text>
+                  <text class="bt-detail" wx:if="{{chip.label}}">{{chip.label}}</text>
+                </view>
+              </view>
+            </view>
+
+            <view class="chat-item-question" bindtap="toggleRecord" data-idx="{{index}}">{{item.question}}</view>
+
+            <!-- 追问列表：参考页只有 .cif-tag + 问题文本，点击整卡折叠 -->
+            <view class="chat-item-followups" wx:if="{{item.followups.length > 0}}">
+              <view class="chat-item-followup" wx:for="{{item.followups}}" wx:for-item="fu" wx:key="id"
+                    bindtap="toggleRecord" data-idx="{{index}}">
+                <text class="cif-tag">追问</text>{{fu.text}}
+              </view>
+            </view>
+
+            <!-- 报告区：.xb-feishu-btn + .xb-continue-btn 同一行各占一半 -->
+            <view class="chat-item-report">
+              <view class="xb-feishu-btn {{item.feishuState === 'off' ? 'xb-fs-disabled' : ''}}"
+                    hover-class="{{item.feishuState === 'off' ? 'none' : 'xb-feishu-press'}}"
+                    catchtap="onFeishu" data-idx="{{index}}">{{item.feishuLabel}}</view>
+              <view class="xb-continue-btn" hover-class="xb-continue-press" catchtap="onContinue" data-idx="{{index}}">💬 追问</view>
+            </view>
+
+            <!-- 深度解读：默认 display:none，.chat-item.expanded 时显示（1:1 CSS 控制） -->
+            <view class="chat-item-reply">
+              <rich-text wx:if="{{item.replyHtml}}" nodes="{{item.replyHtml}}"></rich-text>
+              <text wx:else>{{item.reply}}</text>
+            </view>
+          </view>
+        </block>
+
+        <!-- 分页：结构与文案照抄参考页 renderChatHistory 的 moreHtml -->
+        <view class="chat-load-more" wx:if="{{historyRecords.length > 0 && historyShown < historyTotal && !historyAppendError}}"
+              hover-class="chat-load-more-press" bindtap="loadMoreHistory">
+          {{historyLoadingMore ? '加载中…' : '点击加载更多（还剩 ' + (historyTotal - historyShown) + ' 条）'}}
+        </view>
+        <view class="chat-load-more" wx:if="{{historyRecords.length > 0 && historyAppendError}}"
+              hover-class="chat-load-more-press" bindtap="loadMoreHistory">加载失败，点击重试</view>
+      </scroll-view>
+  </view>
+
+  <!-- ============ 个人中心：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->
+  <view class="fs-page" wx:if="{{showProfile}}" style="padding-top:{{statusBarH}}px;">
+      <view class="fs-header">
+        <view class="fs-back" hover-class="press-zone" catchtap="closeProfile">
+          <text class="fs-back-ico">‹</text>
+        </view>
+        <text class="fs-title">👤 个人中心</text>
+      </view>
+
+      <scroll-view class="modal-body profile-body fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+        <view class="profile-hero">
+          <view class="profile-avatar">✦</view>
+          <view class="profile-info">
+            <view class="profile-name">{{userName || '用户'}}</view>
+            <view class="profile-sub">ID: {{userId || '-'}}</view>
+          </view>
+        </view>
+
+        <view class="profile-menu">
+          <view class="profile-item" hover-class="item-press" bindtap="onArchives">
+            <text class="pi-icon">🗂️</text>
+            <text class="pi-text">我的档案</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="onProfileHistory">
+            <text class="pi-icon">📜</text>
+            <text class="pi-text">我的咨询记录</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="onProfileCredits">
+            <text class="pi-icon">💎</text>
+            <text class="pi-text">我的积分</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item danger" hover-class="item-press" bindtap="logout">
+            <text class="pi-icon">🚪</text>
+            <text class="pi-text">退出登录</text>
+            <text class="pi-arrow">›</text>
+          </view>
+        </view>
+      </scroll-view>
+  </view>
+
+  <!-- ============ 登录 / 注册：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->
+  <view class="auth-mask auth-full" wx:if="{{showLogin}}" style="padding-top:{{statusBarH}}px;">
+    <view class="auth-sheet auth-full-sheet" catchtap="noop">
+      <view class="fs-header">
+        <view class="fs-back" hover-class="press-zone" catchtap="closeLogin">
+          <text class="fs-back-ico">‹</text>
+        </view>
+        <text class="fs-title">玄机子助手</text>
+      </view>
+
+      <scroll-view class="auth-scroll" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="auth-logo">✦</view>
+      <view class="auth-sub">登录后查看咨询记录</view>
+
+      <view class="auth-tabs">
+        <view class="auth-tab {{authMode === 'login' ? 'active' : ''}}" hover-class="item-press" bindtap="switchAuthTab" data-tab="login">登录</view>
+        <view class="auth-tab {{authMode === 'register' ? 'active' : ''}}" hover-class="item-press" bindtap="switchAuthTab" data-tab="register">注册</view>
+      </view>
+
+      <view class="auth-form">
+        <view class="auth-field">
+          <input class="auth-input" value="{{loginUser}}" bindinput="onLoginUser" placeholder="用户名" placeholder-class="auth-ph" />
+        </view>
+        <view class="auth-field">
+          <input class="auth-input" value="{{loginPwd}}" password bindinput="onLoginPwd" placeholder="密码" placeholder-class="auth-ph" />
+        </view>
+
+        <block wx:if="{{authMode === 'register'}}">
+          <view class="auth-field">
+            <input class="auth-input" value="{{loginPwd2}}" password bindinput="onLoginPwd2" placeholder="确认密码" placeholder-class="auth-ph" />
+          </view>
+          <view class="auth-field">
+            <input class="auth-input" value="{{loginName}}" bindinput="onLoginName" placeholder="昵称（选填）" placeholder-class="auth-ph" />
+          </view>
+        </block>
+
+        <view class="auth-submit" wx:if="{{authMode === 'login'}}" hover-class="press-zone" bindtap="doLogin">登录</view>
+        <view class="auth-submit" wx:else hover-class="press-zone" bindtap="doRegister">注 册</view>
+        <view class="auth-error">{{authError}}</view>
+      </view>
+
+      <!-- 参考页没有这一段，属于小程序真机调试保留的既有能力 -->
+      <view class="server-box">
+        <view class="server-label">接口地址（真机调试可改成局域网 IP）</view>
+        <view class="server-row">
+          <input class="auth-input" value="{{apiOrigin}}" bindinput="onApiOrigin" placeholder="https://wanji.sh.cn" placeholder-class="auth-ph" />
+          <view class="mini-btn" bindtap="saveApiOrigin">保存</view>
+        </view>
+      </view>
+
+      <view class="auth-cancel" bindtap="closeLogin">稍后再说</view>
+      </scroll-view>
+    </view>
+  </view>
+
+  <!-- ============ 积分消耗确认（对齐参考页自绘卡片） ============ -->
+  <view class="cost-mask" wx:if="{{costOpen}}" catchtap="cancelCost">
+    <view class="cost-card" catchtap="noop">
+      <view class="cost-head">
+        <text class="cost-ico">💎</text>
+        <text class="cost-title">积分消耗确认</text>
+      </view>
+
+      <view class="cost-body">
+        <view class="cost-line">检测到你当前已关联 <text class="cost-gold">{{costTypesText}}</text> 信息，进行深度解读将消耗 <text class="cost-pink">{{costCredits}}</text> 积分。</view>
+        <view class="cost-note">
+          <text class="cost-note-line">· 每次深度解读固定消耗 {{costCredits}} 积分（追问、追加技能信息不额外扣积分）</text>
+          <text class="cost-note-line">· 积分不足时请先到个人中心充值</text>
+        </view>
+      </view>
+
+      <view class="cost-foot">
+        <view class="cost-btn ghost" hover-class="press-zone" bindtap="cancelCost">暂不消耗</view>
+        <view class="cost-btn primary" hover-class="press-zone" bindtap="confirmCostYes">确认消耗</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 删除确认：参考页 ui-dialogs.confirm 的浅色自绘确认框 ============ -->
+  <view class="qd-mask" wx:if="{{delOpen}}" catchtap="cancelDelete">
+    <view class="qd-box" catchtap="noop">
+      <view class="qd-title">确认删除</view>
+      <view class="qd-content">确定要删除这条咨询记录（含其下所有追问）吗？删除后无法恢复。</view>
+      <view class="qd-actions">
+        <view class="qd-btn cancel" hover-class="qd-btn-press" bindtap="cancelDelete">取消</view>
+        <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="confirmDelete">确定</view>
+      </view>
+    </view>
+  </view>
+</view>

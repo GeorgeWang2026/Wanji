@@ -1,0 +1,2032 @@
+/* ============================================================
+ * 首页：视觉对齐 xiaoxuan.html
+ * 配色 / 圆角 / 阴影 / 动效均取自参考页内联样式（px→rpx 约 2 倍）
+ * ============================================================ */
+
+.app {
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  position: relative;
+  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+}
+
+/* ================= 顶部：您的咨询 ================= */
+.panel-top {
+  flex: 0 0 auto;
+  padding: 24rpx 32rpx 16rpx;
+  position: relative;
+  z-index: 30;
+}
+
+.panel-header {
+  position: relative;
+  display: flex;
+  align-items: center;
+  height: 60rpx;
+}
+
+.ph-icon {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  background: rgba(147, 112, 219, .25);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 26rpx;
+}
+
+/* 圆形刷新按钮按压态（原来只有右侧文字按钮，无按压态） */
+.ph-icon-press { background: rgba(147, 112, 219, .45); }
+
+/* 标题组绝对居中；折叠三角紧贴标题左侧，不再占最右位置 */
+.p-head {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  display: flex;
+  align-items: center;
+}
+
+.p-head .p-title {
+  flex: none;
+  margin-left: 0;
+  white-space: nowrap;
+}
+
+.p-head .p-arrow {
+  position: absolute;
+  right: 100%;
+  margin-right: 10rpx;
+  padding-left: 0;
+}
+
+.p-title {
+  flex: 1;
+  margin-left: 16rpx;
+  font-size: 26rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #b8a5d5;
+}
+
+.p-arrow {
+  font-size: 22rpx;
+  color: #8a75b0;
+  /* 收起：尖头朝下；展开：尖头朝上 */
+  transform: rotate(0deg);
+  transition: transform .25s ease;
+  padding-left: 8rpx;
+}
+
+.p-arrow.open { transform: rotate(180deg); }
+
+/* 展开时覆盖式浮层，不挤压头像舞台
+   参考页 .panel-top .panel-body：absolute top:100% / left-right:16px / z-index:6 /
+   max-height:min(80vh+50px,100dvh-110px) / bg rgba(22,12,40,.96) */
+.panel-body {
+  position: absolute;
+  top: 100%;
+  left: 32rpx;
+  right: 32rpx;
+  z-index: 6;
+  max-height: 0;
+  padding: 0 28rpx;
+  margin-top: 12rpx;
+  border-radius: 24rpx;
+  background: rgba(22, 12, 40, .96);
+  border: 2rpx solid rgba(255, 255, 255, .08);
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, .5);
+  overflow: hidden;
+  opacity: 0;
+  font-size: 28rpx;
+  line-height: 1.7;
+  color: #e8dff5;
+  transition: max-height .3s ease, opacity .25s ease, padding .25s ease;
+}
+
+.panel-body.open {
+  max-height: calc(80vh + 100rpx);
+  max-height: min(calc(80vh + 100rpx), calc(100vh - 220rpx));
+  padding: 24rpx 28rpx;
+  overflow-y: auto;
+  opacity: 1;
+}
+
+/* ---- 空提示（参考页 .pc-empty-hint） ---- */
+.pc-empty-hint {
+  padding: 24rpx 8rpx;              /* 12px 4px */
+  font-size: 26rpx;                /* 13px */
+  line-height: 1.5;
+  color: rgba(255, 255, 255, .55);
+  text-align: center;
+}
+
+/* 参考页 #pinnedContext 展开后是 display:block（inline style），子块靠自身 margin 排布 */
+.pinned-context {
+  display: block;
+  padding: 0 0 16rpx;               /* 0 0 8px */
+  margin-bottom: 12rpx;             /* 6px */
+  border-bottom: 2rpx solid rgba(147, 112, 219, .18);
+  max-height: calc(80vh - 80rpx);
+  overflow-y: auto;
+  overflow-x: hidden;
+}
+
+/* 参考页由 _renderChatRoot 产出 .chat-item-header，再改 badge 文案为「您的问题」 */
+.pinned-context .chat-item-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #9b87b5;
+}
+
+.pinned-context .chat-item-header .mode-badge {
+  padding: 4rpx 18rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #b8a5d5;
+  background: rgba(147, 112, 219, .2);
+}
+
+/* 参考页 header 内追加的 .mode-badge「查看咨询报告」：margin-left:auto */
+.pinned-context .pc-report { margin-left: auto; }
+.pc-report-press { background: rgba(147, 112, 219, .32) !important; color: #ecdcff !important; }
+
+.pinned-context .chat-item-question {
+  color: #ffffff;
+  font-size: 29rpx;                /* 14.5px */
+  line-height: 1.7;
+  font-weight: 600;
+  margin-bottom: 12rpx;
+  padding: 16rpx 24rpx;
+  background: rgba(147, 112, 219, .22);
+  border-radius: 16rpx;
+  border-left: 6rpx solid #b886e0;
+  word-break: break-word;
+}
+
+.pinned-context .chat-item-followups {
+  display: flex;
+  flex-direction: column;
+  gap: 12rpx;                       /* 6px */
+  margin: 8rpx 0;
+}
+
+.pinned-context .chat-item-followup {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;
+  color: #c8b5e8;
+  font-size: 25rpx;                /* 12.5px */
+  line-height: 1.6;
+  padding: 10rpx 20rpx;
+  margin-top: 8rpx;
+  background: rgba(255, 255, 255, .03);
+  border-radius: 12rpx;
+  border-left: 4rpx solid rgba(147, 112, 219, .45);
+}
+
+.pinned-context .chat-item-followup .cif-tag {
+  flex: 0 0 auto;
+  font-size: 20rpx;
+  color: #b886e0;
+  border: 2rpx solid rgba(147, 112, 219, .5);
+  border-radius: 8rpx;
+  padding: 0 10rpx;
+  line-height: 32rpx;
+  margin-top: 2rpx;
+}
+
+/* ---- 已发送预览（参考页 .sent-preview） ---- */
+.sent-preview {
+  padding: 20rpx 28rpx;            /* 10px 14px */
+  margin-bottom: 8rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 2rpx solid rgba(147, 112, 219, .3);
+  border-radius: 20rpx;
+}
+
+.sent-badge {
+  display: inline-block;
+  font-size: 22rpx;                /* 11px */
+  font-weight: 600;
+  letter-spacing: 1rpx;
+  color: #b59aff;
+  background: rgba(147, 112, 219, .18);
+  border-radius: 20rpx;
+  padding: 4rpx 16rpx;
+  margin-bottom: 12rpx;
+}
+
+/* 参考页 #sentFeishuBadge：跟在「已发送」后面，紫色文字链接 */
+.sent-feishu-badge {
+  margin-left: 12rpx;
+  color: #9370db;
+}
+
+.sent-content {
+  font-size: 26rpx;                /* 13px */
+  line-height: 1.65;
+  color: #e8dff5;
+  white-space: pre-wrap;
+  word-break: break-word;
+  max-height: 200rpx;              /* 100px */
+  overflow-y: auto;
+}
+
+/* ---- 语音字幕区（参考页 .tts-lines / #ttsBody） ---- */
+.tts-lines {
+  position: relative;
+  padding: 8rpx 12rpx;             /* 4px 6px */
+  margin-bottom: 8rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, .05);
+  border: 2rpx solid rgba(255, 255, 255, .08);
+}
+
+.tts-lines .tts-body {
+  min-height: calc(2 * 1.7em);
+  max-height: calc(15 * 1.7em);
+  overflow-y: auto;
+  padding: 12rpx 56rpx 12rpx 20rpx;   /* 右侧留出音量按钮 */
+  font-size: 26rpx;                   /* 13px */
+  line-height: 1.7;
+}
+
+.tts-lines .placeholder {
+  color: #6a5a85;
+  font-size: 26rpx;
+  font-style: italic;
+}
+
+.tts-lines .sr-label {
+  display: inline-block;
+  margin-right: 12rpx;
+  margin-bottom: 8rpx;
+  padding: 4rpx 16rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #9370db;
+  background: rgba(147, 112, 219, .18);
+}
+
+.tts-lines .sr-text {
+  white-space: pre-wrap;
+  word-break: break-word;
+  color: #e8dff5;
+}
+
+.thinking-marquee { color: #c9bce2; }
+
+.dot-flash {
+  color: #9370db;
+  animation: dot-flash 1.2s ease-in-out infinite;
+}
+
+@keyframes dot-flash {
+  0%, 100% { opacity: .3; }
+  50% { opacity: 1; }
+}
+
+/* 保留项：参考页没有这个控件，小程序用它暂停/恢复播报、长按关闭自动播报 */
+.tts-vol {
+  position: absolute;
+  right: 12rpx;
+  top: 12rpx;
+  width: 40rpx;
+  height: 40rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(147, 112, 219, .22);
+  border: 1rpx solid rgba(147, 112, 219, .35);
+}
+
+.tts-vol.on {
+  background: rgba(147, 112, 219, .45);
+  border-color: rgba(147, 112, 219, .6);
+}
+
+.tts-vol.muted {
+  background: rgba(255, 255, 255, .05);
+  border-color: rgba(255, 255, 255, .12);
+}
+
+.tts-vol-ico { font-size: 22rpx; line-height: 1; }
+
+/* ---- 绑定标签（参考页 .bound-tags / .bound-tag） ---- */
+.bound-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;                       /* 6px */
+  padding: 0 0 12rpx;
+}
+
+.bound-tag {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;                       /* 5px */
+  max-width: 100%;
+  padding: 8rpx 20rpx 8rpx 16rpx;   /* 4px 10px 4px 8px */
+  border-radius: 32rpx;             /* 16px */
+  font-size: 24rpx;                 /* 12px */
+  color: #e8dff5;
+  background: linear-gradient(135deg, rgba(147, 112, 219, .45), rgba(100, 80, 170, .35));
+  border: 2rpx solid rgba(147, 112, 219, .5);
+}
+
+.bound-tag-press { box-shadow: 0 4rpx 20rpx rgba(147, 112, 219, .3); }
+
+.bound-tag.bazi {
+  background: linear-gradient(135deg, rgba(80, 170, 200, .4), rgba(60, 120, 180, .3));
+  border-color: rgba(80, 170, 200, .45);
+}
+
+.bound-tag.meihua {
+  background: linear-gradient(135deg, rgba(200, 140, 80, .4), rgba(170, 100, 60, .3));
+  border-color: rgba(200, 140, 80, .45);
+}
+
+.bound-tag.stock {
+  background: linear-gradient(135deg, rgba(60, 150, 120, .4), rgba(40, 110, 160, .3));
+  border-color: rgba(60, 170, 150, .45);
+}
+
+.bound-tag .bt-icon {
+  font-size: 28rpx;
+  opacity: .9;
+}
+
+.bound-tag .bt-text {
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #e8dff5;
+  white-space: nowrap;
+}
+
+.bound-tag .bt-detail {
+  font-size: 22rpx;
+  opacity: .7;
+  margin-left: 4rpx;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.bound-tag .bt-close {
+  flex: 0 0 auto;
+  width: 32rpx;
+  height: 32rpx;
+  line-height: 30rpx;
+  text-align: center;
+  border-radius: 50%;
+  font-size: 22rpx;
+  color: #d8bfd8;
+  background: rgba(255, 255, 255, .12);
+}
+
+/* ================= 中部：头像舞台 ================= */
+.stage {
+  flex: 1 1 auto;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 10rpx 0 0;
+  position: relative;
+}
+
+.status-tag {
+  position: absolute;
+  top: 4rpx;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 5;
+  padding: 10rpx 28rpx;
+  border-radius: 28rpx;
+  font-size: 24rpx;
+  letter-spacing: 1rpx;
+  white-space: nowrap;
+  color: #e0d0f0;
+  background: rgba(60, 30, 80, .9);
+  box-shadow: 0 8rpx 32rpx rgba(60, 30, 80, .4);
+  opacity: 0;
+  transition: opacity .3s;
+}
+
+.status-tag.show { opacity: 1; }
+
+.avatar-wrap {
+  position: relative;
+  width: 560rpx;
+  height: 560rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 旋转光环：conic-gradient + rotate（部分低版本安卓会退化为静态环） */
+.avatar-ring {
+  position: absolute;
+  left: -14rpx;
+  top: -14rpx;
+  right: -14rpx;
+  bottom: -14rpx;
+  border-radius: 50%;
+  background: conic-gradient(from 0deg, rgba(147, 112, 219, 0), rgba(147, 112, 219, .6), rgba(255, 182, 193, .5), rgba(147, 112, 219, .6), rgba(147, 112, 219, 0));
+  opacity: .5;
+  animation: ring-spin 8s linear infinite;
+}
+
+.avatar-ring.idle {
+  animation-play-state: paused;
+  opacity: .2;
+}
+
+/* 录音脉冲圈 */
+.pulse-ring {
+  position: absolute;
+  left: -28rpx;
+  top: -28rpx;
+  right: -28rpx;
+  bottom: -28rpx;
+  border-radius: 50%;
+  border: 4rpx solid rgba(255, 100, 120, .5);
+  opacity: 0;
+}
+
+.pulse-ring.active { animation: pulse 1.2s ease-out infinite; }
+
+.avatar-img {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  border: 6rpx solid rgba(255, 255, 255, .95);
+  background: #f8f5ff;
+  box-shadow: 0 16rpx 56rpx rgba(147, 112, 219, .35);
+}
+
+.avatar-wrap.is-listening .avatar-img {
+  box-shadow: 0 0 0 6rpx rgba(255, 100, 120, .35), 0 0 56rpx rgba(255, 100, 120, .55);
+}
+
+.avatar-fallback {
+  position: relative;
+  z-index: 2;
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border: 6rpx solid rgba(255, 255, 255, .95);
+  background: linear-gradient(135deg, #9370db, #ffb6c1);
+  box-shadow: 0 16rpx 56rpx rgba(147, 112, 219, .35);
+}
+
+.fallback-txt {
+  font-size: 140rpx;
+  font-weight: 700;
+  color: #fff;
+}
+
+.avatar-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 10;
+  width: 62rpx;
+  height: 62rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #d8c8ee;
+  background: rgba(147, 112, 219, .28);
+  border: 1rpx solid rgba(255, 255, 255, .18);
+}
+
+.avatar-nav.prev { left: -86rpx; }
+.avatar-nav.next { right: -86rpx; }
+
+/* 排盘快捷圆钮 */
+.paipan-bar {
+  display: flex;
+  justify-content: center;
+  margin-top: 48rpx;
+}
+
+.paipan-btn {
+  width: 100rpx;
+  height: 100rpx;
+  margin: 0 14rpx;
+  border-radius: 50%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  color: #e8dff5;
+  background: rgba(255, 255, 255, .06);
+  border: 3rpx solid rgba(147, 112, 219, .35);
+}
+
+.paipan-btn.active {
+  background: rgba(147, 112, 219, .5);
+  border-color: rgba(147, 112, 219, .65);
+  box-shadow: 0 0 28rpx rgba(147, 112, 219, .35);
+}
+
+.paipan-btn .p-icon { font-size: 34rpx; line-height: 1; }
+
+.paipan-btn .p-label {
+  margin-top: 4rpx;
+  font-size: 20rpx;
+  letter-spacing: 1rpx;
+  color: #c8b8e8;
+}
+
+/* ================= 底部：输入面板 ================= */
+.panel-bot {
+  flex: 0 0 auto;
+  padding: 0 32rpx;
+  position: relative;
+  z-index: 20;
+}
+
+.panel-bot .panel-header {
+  height: 76rpx;
+  padding: 0 24rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, .04);
+  border: 1rpx solid rgba(255, 255, 255, .07);
+}
+
+.panel-bot.open .panel-header {
+  background: rgba(147, 112, 219, .12);
+  border-color: rgba(147, 112, 219, .28);
+}
+
+.panel-bot.open {
+  /* 展开时抬升层级，浮层要压在头像导航 / 状态胶囊 / 排盘按钮之上 */
+  z-index: 40;
+}
+
+/* 收起态不渲染（WXML 用 wx:if 控制），这里只定义浮层外观 */
+.panel-bot .panel-body {
+  margin: 0;
+  padding: 20rpx 24rpx;
+  max-height: none;
+  opacity: 1;
+  border-radius: 20rpx 20rpx 0 0;
+  background: linear-gradient(160deg, #241540, #1a0f2e);
+  border: 1rpx solid rgba(147, 112, 219, .25);
+  border-bottom: none;
+  box-shadow: 0 24rpx 64rpx rgba(0, 0, 0, .55);
+  overflow-y: auto;
+}
+
+/*
+ * 展开态：向上生长，底边与「输入问题」标题上沿衔接
+ * - bottom:calc(100% - 2rpx)：底边落在标题上沿并压住 2rpx，避免出现缝隙
+ * - top:auto：只由 bottom 定位，高度随内容自然增长
+ * - max-height 限高，超出后在浮层内部滚动，不影响上方元素布局
+ * - .panel-bot 本身不改变高度，头像 / 排盘按钮 / 标题都不位移
+ */
+.panel-bot.open .panel-body {
+  position: absolute;
+  top: auto;
+  left: 32rpx;
+  right: 32rpx;
+  bottom: calc(100% - 2rpx);
+  z-index: 2;
+  max-height: 52vh;
+  animation: panel-up .26s ease;
+}
+
+.p-sub {
+  font-size: 22rpx;
+  color: #7c6a9b;
+  padding-right: 8rpx;
+}
+
+.quick-qas {
+  display: flex;
+  flex-direction: column;
+  margin-bottom: 12rpx;
+}
+
+.quick-qa {
+  padding: 12rpx 20rpx;
+  margin-bottom: 8rpx;
+  border-radius: 14rpx;
+  font-size: 23rpx;
+  line-height: 1.5;
+  color: #b8a8d8;
+  background: rgba(255, 255, 255, .04);
+}
+
+.input-row {
+  display: flex;
+  align-items: flex-end;
+}
+
+.rec-input {
+  flex: 1;
+  min-height: 76rpx;
+  max-height: 220rpx;
+  padding: 18rpx 22rpx;
+  border-radius: 18rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #e8dff5;
+  background: rgba(255, 255, 255, .08);
+  border: 1rpx solid rgba(147, 112, 219, .25);
+}
+
+.rec-input-ph { color: #6a5a85; font-style: italic; }
+
+.rec-send {
+  flex: 0 0 auto;
+  width: 76rpx;
+  height: 76rpx;
+  margin-left: 16rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 34rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #b886e0);
+  box-shadow: 0 4rpx 20rpx rgba(147, 112, 219, .35);
+}
+
+.rec-send.disabled { opacity: .4; }
+
+.input-foot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-top: 12rpx;
+}
+
+.rec-hint { font-size: 22rpx; color: #ff8fb5; }
+
+/* ================= 底部控制区 ================= */
+.controls {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20rpx 0 calc(24rpx + env(safe-area-inset-bottom));
+}
+
+.ctrl-btn {
+  position: relative;
+  width: 104rpx;
+  height: 104rpx;
+  margin: 0 40rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #c4b5e0;
+  background: rgba(255, 255, 255, .12);
+}
+
+.ctrl-ico { font-size: 38rpx; }
+
+.ctrl-dot {
+  position: absolute;
+  top: 8rpx;
+  right: 10rpx;
+  width: 14rpx;
+  height: 14rpx;
+  border-radius: 50%;
+  background: #ff6478;
+  box-shadow: 0 0 8rpx rgba(255, 100, 120, .9);
+}
+
+.mic-btn {
+  width: 128rpx;
+  height: 128rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #b088e0);
+  box-shadow: 0 12rpx 40rpx rgba(147, 112, 219, .45);
+}
+
+.mic-btn.recording {
+  background: linear-gradient(135deg, #ff6478, #ff8fa0);
+  animation: mic-pulse 1.2s ease-out infinite;
+}
+
+.mic-ico { font-size: 48rpx; }
+
+.press-zone { opacity: .82; transform: scale(.96); }
+
+/* ================= 弹层通用（咨询记录 / 个人中心） ================= */
+.modal-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(0, 0, 0, .6);
+}
+
+.modal-box {
+  width: 92%;
+  height: 86vh;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  border-radius: 36rpx;
+  border: 1rpx solid rgba(180, 140, 220, .25);
+  background: linear-gradient(160deg, #2a1a4a, #1e1033);
+  box-shadow: 0 40rpx 120rpx rgba(0, 0, 0, .5);
+  animation: fade-in .2s ease;
+}
+
+/* 参考页 #chatHistoryModal .modal-box：宽高 100%、圆角 14px */
+.history-box {
+  width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 28rpx;
+  border: none;
+}
+
+/* 参考页 #profileModal .modal-box：宽 95%、高 90% */
+.profile-box {
+  width: 95%;
+  height: 84vh;
+}
+
+.modal-header {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  padding: 26rpx 32rpx;
+  border-bottom: 1rpx solid rgba(180, 140, 220, .15);
+  background: linear-gradient(135deg, rgba(147, 112, 219, .15), rgba(255, 182, 193, .08));
+}
+
+.mh-title {
+  flex: 1;
+  font-size: 30rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #e0d0f0;
+}
+
+.modal-close {
+  width: 56rpx;
+  height: 56rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  color: #c4b5e0;
+  background: rgba(255, 255, 255, .1);
+}
+
+/* 咨询记录标题栏：小程序习惯（左返回 / 标题居中 / 右侧等宽占位保证居中） */
+.history-header {
+  padding: 20rpx 24rpx;
+  gap: 0;
+}
+
+.history-header .mh-title {
+  flex: 1;
+  text-align: center;
+  font-size: 32rpx;
+  letter-spacing: 0;
+}
+
+.mh-back,
+.mh-ph {
+  flex: 0 0 56rpx;
+  width: 56rpx;
+  height: 56rpx;
+}
+
+.mh-back {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 50%;
+}
+
+.mh-back-ico {
+  margin-top: -6rpx;
+  font-size: 48rpx;
+  line-height: 1;
+  color: #e0d0f0;
+}
+
+.modal-body {
+  flex: 1;
+  min-height: 0;
+  padding: 20rpx 24rpx;
+}
+
+.anchor { height: 40rpx; }
+
+.chat-empty {
+  padding: 80rpx 40rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #6a5a85;
+}
+
+/* 接口失败但仍有本地兜底数据时的顶部提示 */
+.chat-error-tip {
+  margin-bottom: 16rpx;
+  padding: 12rpx 20rpx;
+  border-radius: 12rpx;
+  background: rgba(255, 128, 144, .12);
+  border: 1rpx solid rgba(255, 128, 144, .35);
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #ff9aa6;
+}
+
+/* 分页加载更多（参考页 .chat-load-more） */
+.chat-load-more {
+  margin: 8rpx 0 24rpx;
+  padding: 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx dashed rgba(147, 112, 219, .45);
+  text-align: center;
+  font-size: 24rpx;
+  color: #b9a5dd;
+}
+
+/* ---------- 咨询记录条目（参考页 .chat-item） ---------- */
+.chat-item {
+  margin-bottom: 20rpx;
+  padding: 24rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, .05);
+  border: 1rpx solid rgba(255, 255, 255, .08);
+}
+
+.chat-item-header {
+  display: flex;
+  align-items: center;
+  margin-bottom: 12rpx;
+  font-size: 24rpx;
+  color: #9b87b5;
+}
+
+.mode-badge {
+  margin-right: 16rpx;
+  padding: 4rpx 18rpx;
+  border-radius: 16rpx;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #b8a5d5;
+  background: rgba(147, 112, 219, .2);
+}
+
+.ci-time { font-size: 20rpx; color: #8a75b0; }
+
+.chat-item-name {
+  max-width: 160rpx;
+  margin-left: 16rpx;
+  font-weight: 600;
+  color: #c8b5e8;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.chat-item-source {
+  margin-left: 12rpx;
+  font-size: 20rpx;
+  color: #8a75b0;
+  opacity: .7;
+}
+
+.del-btn {
+  margin-left: auto;
+  padding-left: 16rpx;
+  font-size: 26rpx;
+  color: #8a75b0;
+}
+
+.item-caret {
+  margin-left: auto;
+  padding-left: 16rpx;
+  font-size: 24rpx;
+  color: #8a75b0;
+}
+
+.chat-item-question {
+  padding: 16rpx 24rpx;
+  border-radius: 16rpx;
+  border-left: 6rpx solid #b886e0;
+  background: rgba(147, 112, 219, .22);
+  font-size: 29rpx;
+  font-weight: 600;
+  line-height: 1.7;
+  color: #fff;
+  word-break: break-word;
+}
+
+/* 已关联技能行（参考页 .chat-item-user） */
+.chat-item-user {
+  margin-bottom: 12rpx;
+  padding-left: 12rpx;
+  border-left: 4rpx solid #9370db;
+  font-size: 25rpx;
+  line-height: 1.6;
+  color: #e8dff5;
+}
+
+/* 技能信息卡片（参考页 .chat-pan-tip） */
+.chat-pan-tip {
+  display: flex;
+  align-items: flex-start;
+  margin-bottom: 12rpx;
+  padding: 16rpx 20rpx;
+  border-radius: 16rpx;
+  border: 1rpx solid rgba(147, 112, 219, .35);
+  background: linear-gradient(135deg, rgba(147, 112, 219, .18), rgba(184, 134, 11, .12));
+}
+
+.cpt-icon {
+  margin-right: 14rpx;
+  font-size: 30rpx;
+  line-height: 1.2;
+  color: #b8860b;
+}
+
+.cpt-main { flex: 1; min-width: 0; }
+
+.cpt-head {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.cpt-skill {
+  margin-right: 10rpx;
+  font-size: 22rpx;
+  color: #8a75b0;
+}
+
+.cpt-ju {
+  margin-right: 8rpx;
+  padding: 2rpx 12rpx;
+  border-radius: 10rpx;
+  font-size: 21rpx;
+  font-weight: 600;
+  color: #f0d080;
+  background: rgba(184, 134, 11, .35);
+}
+
+.cpt-time {
+  margin-left: auto;
+  font-size: 22rpx;
+  font-weight: 600;
+  color: #e8dff5;
+}
+
+.cpt-hint {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 20rpx;
+  font-style: italic;
+  color: #8a75b0;
+}
+
+/* 追问列表：逐条列出，默认折叠 */
+.chat-item-followups { margin-top: 12rpx; }
+
+.fu-item { margin-bottom: 8rpx; }
+
+.fu-q {
+  display: flex;
+  align-items: flex-start;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  background: rgba(255, 255, 255, .04);
+  font-size: 25rpx;
+  color: #d5c8ee;
+}
+
+.fu-dot {
+  margin-right: 10rpx;
+  color: #9370db;
+}
+
+.fu-text { flex: 1; min-width: 0; word-break: break-word; }
+
+.fu-caret {
+  margin-left: 12rpx;
+  font-size: 22rpx;
+  color: #8a75b0;
+}
+
+.fu-a {
+  margin: 8rpx 0 0 24rpx;
+  padding-left: 16rpx;
+  border-left: 2rpx solid rgba(255, 182, 193, .5);
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: #d5c8ee;
+  word-break: break-word;
+}
+
+/* 报告区：飞书文档 + 继续追问 */
+.chat-item-report {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  margin-top: 14rpx;
+}
+
+.report-link {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  margin-right: 12rpx;
+  padding: 12rpx 16rpx;
+  border-radius: 12rpx;
+  border: 1rpx solid rgba(147, 112, 219, .3);
+  background: rgba(147, 112, 219, .14);
+}
+
+.report-ico {
+  margin-right: 10rpx;
+  font-size: 26rpx;
+}
+
+.report-main { flex: 1; min-width: 0; }
+
+.report-text {
+  display: block;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #c8b5e8;
+}
+
+.report-url {
+  display: block;
+  font-size: 20rpx;
+  color: #8a75b0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+
+.report-arrow {
+  margin-left: 8rpx;
+  font-size: 28rpx;
+  color: #8a75b0;
+}
+
+.ci-continue {
+  flex: 0 0 auto;
+  margin-left: auto;
+  padding: 12rpx 22rpx;
+  border-radius: 12rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #f0d080;
+  background: rgba(184, 134, 11, .22);
+  border: 1rpx solid rgba(184, 134, 11, .45);
+}
+
+/* 过程提示（扣费提示等） */
+.ci-notice {
+  margin-top: 12rpx;
+  padding-left: 10rpx;
+  border-left: 2rpx solid rgba(147, 112, 219, .5);
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #9b87b5;
+}
+
+.chat-item-reply {
+  margin-top: 12rpx;
+  padding-left: 20rpx;
+  border-left: 4rpx solid rgba(255, 182, 193, .5);
+  font-size: 25rpx;
+  line-height: 1.7;
+  color: #d5c8ee;
+  word-break: break-word;
+}
+
+/* ---------- 个人中心（参考页 .profile-*） ---------- */
+.profile-hero {
+  display: flex;
+  align-items: center;
+  padding: 16rpx 8rpx 32rpx;
+  border-bottom: 1rpx solid rgba(180, 140, 220, .15);
+}
+
+.profile-avatar {
+  width: 104rpx;
+  height: 104rpx;
+  margin-right: 28rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 48rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #ffb6c1);
+  box-shadow: 0 8rpx 32rpx rgba(147, 112, 219, .35);
+}
+
+.profile-name { font-size: 32rpx; font-weight: 600; color: #f0e8ff; }
+
+.profile-info { flex: 1; min-width: 0; }
+
+.profile-body { padding: 32rpx 36rpx; }
+
+.profile-sub { margin-top: 4rpx; font-size: 24rpx; color: #8a75b0; }
+
+.profile-menu { margin-top: 16rpx; }
+
+.profile-item {
+  display: flex;
+  align-items: center;
+  padding: 26rpx 24rpx;
+  margin-bottom: 8rpx;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  color: #d5c8ef;
+}
+
+.profile-item.danger { color: #ff8090; }
+
+.item-press { background: rgba(255, 255, 255, .06); }
+
+.pi-icon {
+  width: 48rpx;
+  margin-right: 24rpx;
+  text-align: center;
+  font-size: 32rpx;
+}
+
+.pi-text { flex: 1; }
+
+.pi-arrow { color: #7a6a95; font-size: 32rpx; }
+
+.dots { display: flex; align-items: center; margin-left: 12rpx; }
+
+.dot {
+  width: 12rpx;
+  height: 12rpx;
+  border-radius: 50%;
+  margin-right: 8rpx;
+  background: #9b7fd4;
+  animation: blink 1.2s infinite;
+}
+
+.dot:nth-child(2) { animation-delay: .2s; }
+.dot:nth-child(3) { animation-delay: .4s; }
+
+.ci-tools { display: flex; margin-top: 12rpx; }
+
+.ci-tool {
+  margin-right: 20rpx;
+  padding: 6rpx 20rpx;
+  border-radius: 20rpx;
+  font-size: 22rpx;
+  color: #9d87c4;
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+
+/* ================= 登录 / 账号底部弹层 ================= */
+.auth-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: flex-end;
+  background: rgba(15, 5, 30, .85);
+  animation: fade-in .2s ease;
+}
+
+.auth-sheet {
+  width: 100%;
+  max-height: 92vh;
+  overflow-y: auto;
+  padding: 72rpx 56rpx calc(64rpx + env(safe-area-inset-bottom));
+  border-radius: 56rpx 56rpx 0 0;
+  border: 1rpx solid rgba(180, 140, 220, .2);
+  background: linear-gradient(180deg, #2a1a4a, #1e1033);
+  animation: sheet-up .35s cubic-bezier(.22, 1, .36, 1);
+}
+
+.auth-logo {
+  width: 120rpx;
+  height: 120rpx;
+  margin: 0 auto 24rpx;
+  border-radius: 50%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 56rpx;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #ffb6c1);
+  box-shadow: 0 16rpx 48rpx rgba(147, 112, 219, .45);
+}
+
+.auth-title {
+  text-align: center;
+  font-size: 40rpx;
+  font-weight: 700;
+  line-height: 64rpx;
+  letter-spacing: 4rpx;
+  color: #f0e8ff;
+}
+
+.auth-sub {
+  text-align: center;
+  margin: 12rpx 0 48rpx;
+  font-size: 24rpx;
+  color: #9b87b5;
+}
+
+/* 参考页 auth-tabs：底槽 + 两个 tab，选中态底色 rgba(147,112,219,.3) */
+.auth-tabs {
+  display: flex;
+  height: 92rpx;
+  margin-bottom: 44rpx;
+  padding: 6rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, .06);
+}
+
+.auth-tab {
+  flex: 1;
+  height: 80rpx;
+  border-radius: 16rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #9b87b5;
+}
+
+.auth-tab.active {
+  color: #f0e8ff;
+  background: rgba(147, 112, 219, .3);
+}
+
+.auth-field { margin-bottom: 28rpx; }
+
+.auth-form { display: block; }
+
+.auth-input {
+  height: 94rpx;
+  padding: 0 32rpx;
+  border-radius: 24rpx;
+  font-size: 30rpx;
+  color: #f0e8ff;
+  background: rgba(255, 255, 255, .08);
+  border: 1rpx solid rgba(255, 255, 255, .1);
+}
+
+.auth-ph { color: #6a5a85; }
+
+.auth-submit {
+  margin-top: 12rpx;
+  height: 106rpx;
+  border-radius: 28rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 32rpx;
+  font-weight: 600;
+  letter-spacing: 4rpx;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #b088e0);
+  box-shadow: 0 16rpx 48rpx rgba(147, 112, 219, .4);
+}
+
+/* 参考页 .auth-error：居中红字，固定高度避免弹层跳动 */
+.auth-error {
+  min-height: 36rpx;
+  margin-top: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  line-height: 36rpx;
+  color: #ff8090;
+}
+
+.server-box {
+  margin-top: 32rpx;
+  padding-top: 24rpx;
+  border-top: 1rpx solid rgba(147, 112, 219, .22);
+}
+
+.server-label { font-size: 22rpx; color: #8f7cb0; margin-bottom: 12rpx; }
+
+.server-row { display: flex; align-items: center; }
+
+.server-row .auth-input { flex: 1; }
+
+.mini-btn {
+  flex: 0 0 auto;
+  margin-left: 16rpx;
+  height: 94rpx;
+  line-height: 94rpx;
+  padding: 0 28rpx;
+  border-radius: 20rpx;
+  font-size: 26rpx;
+  color: #cdbce8;
+  background: rgba(147, 112, 219, .18);
+}
+
+/* 参考页 .auth-cancel：13px、#7a6a95、居中 */
+.auth-cancel {
+  margin-top: 36rpx;
+  padding: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #7a6a95;
+}
+
+/* ================= 积分消耗确认（参考页自绘卡片） ================= */
+.cost-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1100;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(0, 0, 0, .6);
+  /* 参考页有 blur(4px)；部分安卓端 backdrop-filter 不生效，会退化为纯半透明遮罩 */
+  backdrop-filter: blur(4px);
+  animation: fade-in .2s ease;
+}
+
+.cost-card {
+  width: 88%;
+  max-width: 680rpx;
+  overflow: hidden;
+  border-radius: 32rpx;
+  border: 1rpx solid rgba(147, 112, 219, .4);
+  background: linear-gradient(170deg, #2a1a48, #1e1033);
+  box-shadow: 0 40rpx 120rpx rgba(0, 0, 0, .6);
+}
+
+.cost-head {
+  display: flex;
+  align-items: center;
+  padding: 28rpx 32rpx;
+  border-bottom: 1rpx solid rgba(147, 112, 219, .2);
+  background: linear-gradient(135deg, rgba(147, 112, 219, .25), rgba(255, 182, 193, .15));
+}
+
+.cost-ico { margin-right: 20rpx; font-size: 40rpx; }
+
+.cost-title { font-size: 28rpx; font-weight: 600; color: #e8dff5; }
+
+.cost-body { padding: 32rpx 36rpx; }
+
+.cost-line {
+  margin-bottom: 16rpx;
+  font-size: 26rpx;
+  line-height: 1.8;
+  color: #c8b8e8;
+}
+
+.cost-gold { color: #ffd700; font-weight: 600; }
+
+.cost-pink { color: #ff8fb5; font-weight: 600; }
+
+.cost-note {
+  padding: 20rpx;
+  border-radius: 16rpx;
+  background: rgba(255, 255, 255, .04);
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #8a75b0;
+}
+
+.cost-note-line { display: block; }
+
+.cost-foot {
+  display: flex;
+  padding: 20rpx 32rpx 28rpx;
+  border-top: 1rpx solid rgba(147, 112, 219, .15);
+}
+
+.cost-btn {
+  flex: 1;
+  padding: 20rpx 0;
+  border-radius: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+}
+
+.cost-btn.ghost {
+  margin-right: 20rpx;
+  color: #b8a5d5;
+  background: rgba(255, 255, 255, .08);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+
+.cost-btn.primary {
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #ff8fb5);
+  box-shadow: 0 4rpx 20rpx rgba(147, 112, 219, .4);
+}
+
+/* ================= 动画 ================= */
+@keyframes ring-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+@keyframes pulse {
+  0% { transform: scale(.96); opacity: .9; }
+  100% { transform: scale(1.14); opacity: 0; }
+}
+
+@keyframes mic-pulse {
+  0% { box-shadow: 0 0 0 0 rgba(255, 100, 120, .6); }
+  70% { box-shadow: 0 0 0 32rpx rgba(255, 100, 120, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(255, 100, 120, 0); }
+}
+
+@keyframes blink {
+  0%, 80%, 100% { opacity: .25; }
+  40% { opacity: 1; }
+}
+
+@keyframes sheet-up {
+  from { transform: translateY(100%); }
+  to { transform: translateY(0); }
+}
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+/* 输入面板展开：从标题上沿向上滑出（不参与布局） */
+@keyframes panel-up {
+  from { opacity: 0; transform: translateY(16rpx); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* ============================================================
+ * 咨询记录弹层：1:1 照搬 xiaoxuan.html #chatHistoryModal
+ * 参考源码：xiaoxuan.html 695-703（mask/box/header/close/body）、860-990（.chat-item 全量）
+ * 换算规则：参考页 px × 2 = rpx；class 名、DOM 层级、属性顺序照抄。
+ * 选择器统一加 #chatHistoryModal 前缀：仅用于压过本页遗留的旧咨询记录样式，
+ * 不改变任何声明值。
+ * 全局说明：网页端的 cursor / user-select / :hover / :active 在小程序无鼠标，
+ * 一律略去；:active 反馈用 WXML 的 hover-class 还原（见下方 *-press 规则）。
+ * ============================================================ */
+
+/* ---- .modal-mask ---- */
+#chatHistoryModal.modal-mask {
+  /* 原 CSS：position:absolute; inset:0（相对 .app 容器）
+     → 替代：position:fixed + 四边 0（小程序 WXSS 不支持 inset 简写；.app 已满屏，视觉等价） */
+  position: fixed;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  left: 0;
+  background: rgba(0, 0, 0, .6);
+  z-index: 49;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;               /* 20px */
+  overflow: hidden;
+  /* 原 CSS：backdrop-filter:blur(4px) → 保留并补 -webkit- 前缀；
+     Android 部分机型不支持该属性，属系统渲染限制，无等价替代 */
+  -webkit-backdrop-filter: blur(4px);
+  backdrop-filter: blur(4px);
+  /* 原 CSS：border-radius:inherit → .app 无圆角，等价 0，省略 */
+  /* 原 CSS：.modal-mask.show{display:flex;animation:fade-in .2s} → wx:if 控制显隐，动画直接挂在遮罩上 */
+  animation: fade-in .2s ease;
+}
+
+/* ---- .modal-box（含 #chatHistoryModal 覆盖） ---- */
+#chatHistoryModal .modal-box {
+  /* 原 CSS：#chatHistoryModal .modal-box{width:100%;max-width:100%;max-height:100%;height:100%;border-radius:14px;border:none;} */
+  width: 100%;
+  max-width: 100%;
+  height: 100%;
+  max-height: 100%;
+  border-radius: 28rpx;         /* 14px */
+  border: none;
+  background: linear-gradient(160deg, #2a1a4a, #1e1033);
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  box-shadow: 0 40rpx 120rpx rgba(0, 0, 0, .5);   /* 0 20px 60px */
+  animation: slide-up .25s ease;                 /* 原 slide-up 用 20px → 40rpx，见文件末尾 keyframes */
+}
+
+/* ---- .modal-header ---- */
+#chatHistoryModal .modal-header {
+  padding: 28rpx 32rpx;                          /* 14px 16px */
+  border-bottom: 2rpx solid rgba(180, 140, 220, .15);
+  display: flex;
+  align-items: center;
+  gap: 20rpx;                                    /* 10px */
+  background: linear-gradient(135deg, rgba(147, 112, 219, .15), rgba(255, 182, 193, .08));
+}
+
+/* 原 CSS：.modal-header h3{flex:1;font-size:15px;color:#e0d0f0;letter-spacing:1px}
+   → 替代：#chatHistoryModal .modal-title（小程序无 h3；<text> 默认不加粗，
+     h3 的浏览器默认 font-weight:bold 用 700 显式补齐，其余属性原样） */
+#chatHistoryModal .modal-title {
+  flex: 1;
+  margin: 0;
+  font-size: 30rpx;                              /* 15px */
+  font-weight: 700;
+  color: #e0d0f0;
+  letter-spacing: 2rpx;                          /* 1px */
+}
+
+/* 原 CSS：.modal-close 为 <button>（浏览器默认 border/padding）
+   → 替代：<view> + border:none（view 无默认边框，无需清 padding） */
+#chatHistoryModal .modal-close {
+  width: 56rpx;                                  /* 28px */
+  height: 56rpx;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, .1);
+  color: #c4b5e0;
+  font-size: 32rpx;                              /* 16px */
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* 原 CSS：.modal-close:active{background:rgba(255,255,255,.2)} → hover-class */
+#chatHistoryModal .modal-close-press { background: rgba(255, 255, 255, .2); }
+
+/* 原 CSS：.modal-body{flex:1;overflow-y:auto;padding:12px}
+   → 替代：<scroll-view> 必须有确定高度才能滚动，flex:1 + height:0 等价占满剩余高度 */
+#chatHistoryModal .modal-body {
+  flex: 1;
+  height: 0;
+  min-height: 0;
+  padding: 24rpx;                                /* 12px */
+  /* 原 CSS：.modal-body::-webkit-scrollbar{width:4px} / thumb 紫色
+     → 小程序无法自定义滚动条，WXML 用 show-scrollbar="{{false}}" 隐藏（限制项） */
+}
+
+/* ---- .chat-item ---- */
+#chatHistoryModal .chat-item {
+  background: rgba(255, 255, 255, .05);
+  border: 2rpx solid rgba(255, 255, 255, .08);
+  border-radius: 24rpx;                          /* 12px */
+  padding: 24rpx;                                /* 12px */
+  margin-bottom: 20rpx;                          /* 10px */
+  transition: background .15s;
+}
+
+/* 原 CSS：.chat-item:active{background:rgba(255,255,255,.08)} → hover-class */
+#chatHistoryModal .chat-item-press { background: rgba(255, 255, 255, .08); }
+
+#chatHistoryModal .chat-item-header {
+  display: flex;
+  align-items: center;
+  gap: 16rpx;                                    /* 8px */
+  margin-bottom: 12rpx;                          /* 6px */
+  font-size: 24rpx;                              /* 12px */
+  color: #9b87b5;
+}
+
+#chatHistoryModal .chat-item-header .mode-badge {
+  margin: 0;                                     /* 覆盖本页旧 .mode-badge 的 margin-right（参考页用 gap） */
+  background: rgba(147, 112, 219, .2);
+  color: #b8a5d5;
+  padding: 4rpx 18rpx;                           /* 2px 9px */
+  border-radius: 16rpx;                          /* 8px */
+  font-size: 22rpx;                              /* 11px */
+  font-weight: 600;
+}
+
+#chatHistoryModal .chat-item-header .mode-badge.mock {
+  background: rgba(255, 182, 193, .18);
+  color: #d5b5c5;
+}
+
+/* 原 CSS：.chat-item-header .del-btn{...cursor:pointer;font-size:13px} → 去掉 cursor */
+#chatHistoryModal .chat-item-header .del-btn {
+  margin-left: auto;
+  padding: 0;                                    /* 覆盖本页旧 .del-btn 的 padding-left */
+  background: none;
+  border: none;
+  color: #8a75b0;
+  font-size: 26rpx;                              /* 13px */
+  /* 原 CSS 未设 line-height（<button> 取浏览器默认 normal）
+     → 替代：显式 line-height:normal；否则 <view> 会继承 page 的 1.6，行高偏高 */
+  line-height: normal;
+}
+
+#chatHistoryModal .del-btn-press { color: #ff6478; }
+
+/* ---- 报告行：飞书 + 继续追问，同一行各占一半 ---- */
+#chatHistoryModal .chat-item-report {
+  display: flex;
+  flex-wrap: nowrap;
+  gap: 16rpx;                                    /* 8px */
+  margin: 16rpx 0;                               /* 8px 0 */
+}
+
+#chatHistoryModal .chat-item-report > .xb-feishu-btn,
+#chatHistoryModal .chat-item-report > .xb-continue-btn {
+  flex: 1 1 0;
+  min-width: 0;
+  justify-content: center;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* 原 CSS：.chat-item .xb-feishu-btn 为 <button>/<a>，line-height:1.5、nowrap
+   → 替代：<view>（无默认边框）+ 同名 class，声明值不变 */
+#chatHistoryModal .chat-item .xb-feishu-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;                                     /* 4px */
+  background: linear-gradient(135deg, rgba(184, 134, 224, .3), rgba(147, 112, 219, .22));
+  border: 2rpx solid rgba(184, 134, 224, .55);
+  color: #ecdcff;
+  border-radius: 16rpx;                          /* 8px */
+  padding: 10rpx 28rpx;                          /* 5px 14px */
+  font-size: 24rpx;                              /* 12px */
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#chatHistoryModal .xb-feishu-press { background: rgba(184, 134, 224, .42); }
+
+#chatHistoryModal .chat-item .xb-feishu-btn.xb-fs-disabled {
+  background: rgba(255, 255, 255, .05);
+  border-color: rgba(255, 255, 255, .1);
+  color: #6a5a85;
+  opacity: .85;
+  font-weight: 400;
+}
+
+#chatHistoryModal .chat-item .xb-continue-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 8rpx;
+  background: linear-gradient(135deg, rgba(112, 219, 180, .28), rgba(80, 170, 150, .2));
+  border: 2rpx solid rgba(112, 219, 180, .5);
+  color: #d6fff0;
+  border-radius: 16rpx;
+  padding: 10rpx 28rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  line-height: 1.5;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#chatHistoryModal .xb-continue-press { background: rgba(112, 219, 180, .4); }
+
+/* ---- header 昵称 / 来源 ---- */
+#chatHistoryModal .chat-item-header .chat-item-name {
+  margin-left: 0;                                /* 覆盖旧样式（参考页用 gap 排版） */
+  color: #c8b5e8;
+  font-weight: 600;
+  max-width: 160rpx;                             /* 80px */
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+#chatHistoryModal .chat-item-header .chat-item-source {
+  margin-left: 0;                                /* 覆盖旧样式 */
+  color: #8a75b0;
+  font-size: 20rpx;                              /* 10px */
+  opacity: .7;
+}
+
+/* ---- 技能卡片容器 ---- */
+#chatHistoryModal .chat-item-user {
+  color: #e8dff5;
+  font-size: 26rpx;                              /* 13px */
+  line-height: 1.6;
+  margin-bottom: 12rpx;                          /* 6px */
+  font-weight: 500;
+  padding-left: 20rpx;                           /* 10px */
+  border-left: 4rpx solid #9370db;               /* 2px */
+}
+
+#chatHistoryModal .chat-pan-cards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12rpx;                                    /* 6px */
+  max-width: 100%;
+}
+
+#chatHistoryModal .chat-pan-cards .bound-tag { margin-bottom: 0; }
+
+#chatHistoryModal .chat-pan-cards .bound-tag .bt-detail {
+  white-space: normal;
+  word-break: break-word;
+}
+
+/* 原 CSS：.bound-tag（主界面同款胶囊；user-select:none 略去） */
+#chatHistoryModal .bound-tag {
+  display: flex;
+  align-items: center;
+  gap: 10rpx;                                    /* 5px */
+  padding: 8rpx 20rpx 8rpx 16rpx;                /* 4px 10px 4px 8px */
+  border-radius: 32rpx;                          /* 16px */
+  font-size: 24rpx;                              /* 12px */
+  color: #e8dff5;
+  background: linear-gradient(135deg, rgba(147, 112, 219, .45), rgba(100, 80, 170, .35));
+  border: 2rpx solid rgba(147, 112, 219, .5);
+  max-width: 100%;
+}
+
+#chatHistoryModal .bound-tag .bt-icon {
+  margin-right: 0;                               /* 覆盖旧的 margin-right（参考页用 gap） */
+  font-size: 28rpx;                              /* 14px */
+  opacity: .9;
+}
+
+#chatHistoryModal .bound-tag .bt-text {
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+#chatHistoryModal .bound-tag .bt-detail {
+  font-size: 22rpx;                              /* 11px */
+  opacity: .7;
+  margin-left: 4rpx;                             /* 2px */
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#chatHistoryModal .bound-tag.bazi {
+  background: linear-gradient(135deg, rgba(80, 170, 200, .4), rgba(60, 120, 180, .3));
+  border-color: rgba(80, 170, 200, .45);
+}
+
+#chatHistoryModal .bound-tag.meihua {
+  background: linear-gradient(135deg, rgba(200, 140, 80, .4), rgba(170, 100, 60, .3));
+  border-color: rgba(200, 140, 80, .45);
+}
+
+#chatHistoryModal .bound-tag.stock {
+  background: linear-gradient(135deg, rgba(60, 150, 120, .4), rgba(40, 110, 160, .3));
+  border-color: rgba(60, 170, 150, .45);
+}
+
+/* 原 CSS 顺序：.chat-pan-tip 写在 .bound-tag 之后，同特异性时后者覆盖前者
+   （padding / border / background / 圆角取 .chat-pan-tip 的值），此处保持同样顺序 */
+#chatHistoryModal .chat-pan-tip {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 8rpx 12rpx;                               /* 4px 6px */
+  padding: 16rpx 20rpx;                          /* 8px 10px */
+  margin-bottom: 12rpx;                          /* 6px */
+  background: linear-gradient(135deg, rgba(147, 112, 219, .18), rgba(184, 134, 11, .12));
+  border: 2rpx solid rgba(147, 112, 219, .35);
+  border-radius: 16rpx;                          /* 8px */
+  /* 原 CSS：transition/ hover 阴影 / :active scale → 小程序无 hover，
+     点击行为（弹深度解读）当前未实现，故不加 hover-class（见差异清单） */
+}
+
+/* ---- 用户问题 ---- */
+#chatHistoryModal .chat-item-question {
+  color: #ffffff;
+  font-size: 29rpx;                              /* 14.5px */
+  line-height: 1.7;
+  font-weight: 600;
+  margin-bottom: 12rpx;                          /* 6px */
+  padding: 16rpx 24rpx;                          /* 8px 12px */
+  background: rgba(147, 112, 219, .22);
+  border-radius: 16rpx;                          /* 8px */
+  border-left: 6rpx solid #b886e0;               /* 3px */
+  word-break: break-word;
+}
+
+/* ---- 追问列表 ---- */
+#chatHistoryModal .chat-item-followups { margin: 8rpx 0 16rpx; }   /* 4px 0 8px */
+
+#chatHistoryModal .chat-item-followup {
+  display: flex;
+  align-items: flex-start;
+  gap: 12rpx;                                    /* 6px */
+  color: #c8b5e8;
+  font-size: 25rpx;                              /* 12.5px */
+  line-height: 1.6;
+  padding: 10rpx 20rpx;                          /* 5px 10px */
+  margin-top: 8rpx;                              /* 4px */
+  background: rgba(255, 255, 255, .03);
+  border-radius: 12rpx;                          /* 6px */
+  border-left: 4rpx solid rgba(147, 112, 219, .45);  /* 2px */
+}
+
+#chatHistoryModal .chat-item-followup .cif-tag {
+  flex: 0 0 auto;
+  font-size: 20rpx;                              /* 10px */
+  color: #b886e0;
+  border: 2rpx solid rgba(147, 112, 219, .5);
+  border-radius: 8rpx;                           /* 4px */
+  padding: 0 10rpx;                              /* 0 5px */
+  line-height: 32rpx;                            /* 16px */
+  margin-top: 2rpx;                              /* 1px */
+}
+
+/* ---- 深度解读（折叠区） ---- */
+#chatHistoryModal .chat-item-reply {
+  color: #d5c8ee;
+  font-size: 25rpx;                              /* 12.5px */
+  line-height: 1.7;
+  padding-left: 20rpx;                           /* 10px */
+  border-left: 4rpx solid rgba(255, 182, 193, .5);   /* 2px */
+  word-break: break-word;
+  display: none;
+}
+
+#chatHistoryModal .chat-item.expanded .chat-item-reply { display: block; }
+
+/* 原 CSS：.chat-item-reply h1/h2/h3/b/strong/ol/ul/li/hr/p 逐标签着色
+   → 限制：小程序 <rich-text> 内部节点不参与页面 WXSS 选择器匹配，无法逐标签命中；
+     这里只保证继承型属性（颜色/字号/行高）与参考页一致。 */
+#chatHistoryModal .chat-item-reply rich-text {
+  color: #d5c8ee;
+  font-size: 25rpx;
+  line-height: 1.7;
+}
+
+/* ---- 空态 / 加载更多 ---- */
+#chatHistoryModal .chat-empty {
+  text-align: center;
+  color: #6a5a85;
+  padding: 80rpx 40rpx;                          /* 40px 20px */
+  font-size: 26rpx;                              /* 13px */
+}
+
+/* 原 CSS：.chat-load-more{text-align:center;padding:10px;color:#9370db;font-size:12px;cursor:pointer}
+   额外清掉本页旧样式（虚线边框 / 圆角 / 外边距），确保与参考页一致 */
+#chatHistoryModal .chat-load-more {
+  margin: 0;
+  border: none;
+  border-radius: 0;
+  background: transparent;
+  text-align: center;
+  padding: 20rpx;                                /* 10px */
+  color: #9370db;
+  font-size: 24rpx;                              /* 12px */
+}
+
+#chatHistoryModal .chat-load-more-press { color: #b088e0; }
+
+/* 原 CSS：@keyframes slide-up{from{transform:translateY(20px);opacity:0}...} */
+@keyframes slide-up {
+  from { transform: translateY(40rpx); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+/* ================= 登录 / 注册：全屏页面形态 ================= */
+/* 原底部 sheet（圆角 + 底部留白）→ 全屏页；只改容器，表单内容不变 */
+.auth-mask.auth-full {
+  align-items: stretch;
+  background: transparent;
+  animation: none;
+}
+
+.auth-sheet.auth-full-sheet {
+  height: 100%;
+  max-height: none;
+  padding: 0;
+  border: none;
+  border-radius: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  animation: none;
+}
+
+.auth-scroll {
+  flex: 1;
+  min-height: 0;
+  padding: 48rpx 56rpx calc(64rpx + env(safe-area-inset-bottom));
+}
+
+/* ================= 删除确认（参考页 ui-dialogs.confirm 浅色自绘框） ================= */
+/* 原实现：wx.showModal（系统样式） → 自绘，与参考页 confirm/confirmCredit 一致 */
+.qd-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(0, 0, 0, .5);
+}
+
+.qd-box {
+  width: 100%;
+  max-width: 840rpx;                             /* 参考页 max-width:420px */
+  padding: 56rpx 64rpx;                          /* 28px 32px */
+  border-radius: 24rpx;                          /* 12px */
+  background: #fff;
+  box-shadow: 0 16rpx 64rpx rgba(0, 0, 0, .18);   /* 0 8px 32px */
+}
+
+.qd-title {
+  margin-bottom: 28rpx;                          /* 14px */
+  font-size: 32rpx;                              /* 16px */
+  font-weight: 700;
+  color: #7a3b1d;
+}
+
+.qd-content {
+  margin-bottom: 44rpx;                          /* 22px */
+  font-size: 27rpx;                              /* 13.5px */
+  line-height: 1.7;
+  color: #3b2f1d;
+  word-break: break-word;
+}
+
+.qd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20rpx;                                    /* 10px */
+}
+
+.qd-btn {
+  padding: 16rpx 36rpx;                          /* 8px 18px */
+  border-radius: 16rpx;                          /* 8px */
+  font-size: 26rpx;                              /* 13px */
+}
+
+.qd-btn.cancel {
+  color: #8a7a5f;
+  background: #fff;
+  border: 3rpx solid #d8ccb0;                    /* 1.5px */
+}
+
+.qd-btn.ok {
+  padding: 16rpx 40rpx;                          /* 8px 20px */
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #7a3b1d, #b85a2c);
+}
+
+.qd-btn-press { opacity: .8; }

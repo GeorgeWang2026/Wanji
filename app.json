@@ -1,0 +1,27 @@
+{
+  "pages": [
+    "uniApp/pages/chat/chat",
+    "uniApp/pages/qimen/qimen",
+    "uniApp/pages/bazi/bazi",
+    "uniApp/pages/meihua/meihua",
+    "uniApp/pages/gua/gua",
+    "uniApp/pages/stock/stock"
+  ],
+  "window": {
+    "navigationBarBackgroundColor": "#1a0f2e",
+    "navigationBarTextStyle": "white",
+    "navigationBarTitleText": "玄机智能助手",
+    "backgroundColor": "#1a1029",
+    "backgroundTextStyle": "dark",
+    "enablePullDownRefresh": false
+  },
+  "sitemapLocation": "sitemap.json",
+  "lazyCodeLoading": "requiredComponents",
+  "style": "v2",
+  "plugins": {
+    "WechatSI": {
+      "version": "0.3.10",
+      "provider": "wx069ba97219f66d99"
+    }
+  }
+}
