@@ -1508,7 +1508,12 @@ Page({
           id: a.id, name: a.name, nickname: a.nickname, gender: a.gender,
           relationship: a.relationship, is_self: !!a.is_self,
           relationLabel: RELATION_LABELS[a.relationship] || '其他',
-          birthText: self._archBirthText(a)
+          birthText: self._archBirthText(a),
+          birth_year: a.birth_year,
+          birth_month: a.birth_month,
+          birth_day: a.birth_day,
+          birth_hour: a.birth_hour,
+          birth_minute: a.birth_minute
         };
       });
       self.setData({ archives: mapped });
