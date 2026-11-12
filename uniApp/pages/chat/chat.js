@@ -542,53 +542,133 @@ Page({
   },
 
   /**
-   * 飞书文档：列表/详情已带 feishu_doc_url 就直接复制；
-   * 没有则 POST /credits/questions/{id}/feishu_doc 生成后复制。
-   * 小程序不能直接唤起外部浏览器，所以走「复制链接 + 提示」。
+   * 咨询报告：记录卡片入口（DF-51）
+   * 不再复制飞书链接，改为小程序内全屏预览 PDF。
    */
   onFeishu: function (e) {
     var idx = e.currentTarget.dataset.idx;
     var rec = this.data.historyRecords[idx];
     if (!rec) return;
-    if (rec.reportUrl) {
-      this._copyLink(rec.reportUrl);
-      return;
-    }
     var self = this;
-    wx.showLoading({ title: '生成中…', mask: true });
-    api.request('/credits/questions/' + rec.id + '/feishu_doc', { method: 'POST', timeout: 120000 })
-      .then(function (r) {
-        wx.hideLoading();
-        if (r && r.code === 0 && r.data && r.data.url) {
-          var p = {};
-          p['historyRecords[' + idx + '].reportUrl'] = r.data.url;
-          p['historyRecords[' + idx + '].feishuState'] = 'ready';
-          p['historyRecords[' + idx + '].feishuLabel'] = feishuLabel(r.data.url, 'ready');
-          self.setData(p);
-          self._copyLink(r.data.url);
-          return;
-        }
-        var msg = (r && (r.detail || r.msg)) || '生成失败';
-        if (/未配置|FEISHU_APP_ID|503/.test(msg)) {
+    this._openReport({
+      id: rec.qid || rec.id,
+      url: rec.reportUrl,
+      onDoc: function (docUrl) {
+        // 旧接口生成成功：同步卡片「📄 报告 ↗」状态（沿用原有行为）
+        var p = {};
+        p['historyRecords[' + idx + '].reportUrl'] = docUrl;
+        p['historyRecords[' + idx + '].feishuState'] = 'ready';
+        p['historyRecords[' + idx + '].feishuLabel'] = feishuLabel(docUrl, 'ready');
+        self.setData(p);
+      },
+      onError: function (body) {
+        // 飞书未配置：卡片沿用「📄 报告（未配置）」
+        if (Number(body && body.code) === 50300) {
           var off = {};
           off['historyRecords[' + idx + '].feishuState'] = 'off';
           off['historyRecords[' + idx + '].feishuLabel'] = feishuLabel('', 'off');
           self.setData(off);
-          wx.showToast({ title: '咨询报告未配置', icon: 'none' });
-          return;
         }
-        wx.showToast({ title: msg, icon: 'none' });
-      })
-      .catch(function (err) {
-        wx.hideLoading();
-        wx.showToast({ title: (err && err.message) || '生成失败', icon: 'none' });
-      });
+      }
+    });
   },
 
-  _copyLink: function (url) {
+  /**
+   * 咨询报告预览（DF-51，三处入口共用）：
+   * POST /credits/questions/{id}/feishu_doc/pdf → wx.downloadFile → wx.openDocument
+   * - 40401（无文档）先用旧 POST .../feishu_doc 生成，再重试一次
+   * - 下载/预览失败降级复制链接；接口失败按错误码给文案，不静默
+   * @param {object} opts { id: 根记录 id, url: 原飞书链接(降级用), onDoc: fn(url), onError: fn(body) }
+   */
+  _openReport: function (opts) {
+    var self = this;
+    opts = opts || {};
+    var rootId = opts.id || '';
+    var fallbackUrl = opts.url || '';
+    if (!rootId) {
+      // 拿不到根记录 id，退回旧的复制链接能力
+      if (fallbackUrl) this._copyLink(fallbackUrl);
+      return;
+    }
+    function degrade(url) {
+      wx.hideLoading();
+      var u = url || fallbackUrl;
+      if (u) self._copyLink(u, '预览失败，已复制链接');
+      else wx.showToast({ title: '报告准备失败，请稍后再试', icon: 'none' });
+    }
+    wx.showLoading({ title: '正在准备报告…', mask: true });
+    this._requestPdf(rootId, true, opts.onDoc).then(function (data) {
+      wx.downloadFile({
+        url: data.url,
+        timeout: 60000,
+        success: function (res) {
+          if (res.statusCode !== 200 || !res.tempFilePath) {
+            degrade(data.doc_url);
+            return;
+          }
+          wx.hideLoading();
+          wx.openDocument({
+            filePath: res.tempFilePath,
+            fileType: 'pdf',
+            showMenu: true,
+            fail: function () { degrade(data.doc_url); }
+          });
+        },
+        fail: function () { degrade(data.doc_url); }
+      });
+    }).catch(function (err) {
+      wx.hideLoading();
+      var body = (err && err.body) || null;
+      if (opts.onError) opts.onError(body);
+      wx.showToast({ title: self._reportErrorText(body), icon: 'none' });
+    });
+  },
+
+  /** 取 PDF 地址；code=40401 时先生成飞书文档再重试一次（只重试一次） */
+  _requestPdf: function (rootId, allowGenerate, onDoc) {
+    var self = this;
+    return api.request('/credits/questions/' + rootId + '/feishu_doc/pdf', {
+      method: 'POST',
+      timeout: 90000
+    }).then(function (r) {
+      if (r && r.code === 0 && r.data && r.data.url) return r.data;
+      if (r && Number(r.code) === 40401 && allowGenerate) {
+        return self._generateReportDoc(rootId).then(function (docUrl) {
+          if (onDoc) onDoc(docUrl);
+          return self._requestPdf(rootId, false, onDoc);
+        });
+      }
+      var e = new Error('pdf_failed');
+      e.body = r;
+      throw e;
+    });
+  },
+
+  /** 旧接口：POST .../feishu_doc 生成飞书文档，返回文档链接 */
+  _generateReportDoc: function (rootId) {
+    return api.request('/credits/questions/' + rootId + '/feishu_doc', {
+      method: 'POST',
+      timeout: 120000
+    }).then(function (r) {
+      if (r && r.code === 0 && r.data && r.data.url) return r.data.url;
+      var e = new Error('gen_failed');
+      e.body = r;
+      throw e;
+    });
+  },
+
+  /** 错误码 → 界面文案（不把后端正文透出） */
+  _reportErrorText: function (body) {
+    var code = Number((body && body.code) || 0);
+    if (code === 50300 || code === 40301) return '咨询报告暂不可预览';
+    if (code === 42901) return '请求过于频繁，请稍后再试';
+    return '报告准备失败，可复制链接查看';
+  },
+
+  _copyLink: function (url, title) {
     wx.setClipboardData({
       data: url,
-      success: function () { wx.showToast({ title: '链接已复制，到浏览器打开', icon: 'none' }); }
+      success: function () { wx.showToast({ title: title || '链接已复制，到浏览器打开', icon: 'none' }); }
     });
   },
 
@@ -690,14 +770,19 @@ Page({
     });
   },
 
-  /** 置顶区「查看咨询报告」：参考页为可点击链接，小程序复制链接 */
+  /** 置顶区「查看咨询报告」：小程序内预览 PDF（DF-51） */
   onPinnedFeishu: function () {
     var p = this.data.pinned;
-    if (p && p.feishuUrl) this._copyLink(p.feishuUrl);
+    if (!p || !p.feishuUrl) return;
+    this._openReport({ id: p.id, url: p.feishuUrl });
   },
 
+  /** 发送后徽标「📄 查看咨询报告 ↗」：小程序内预览 PDF（DF-51） */
   onSentFeishu: function () {
-    if (this.data.sentFeishuUrl) this._copyLink(this.data.sentFeishuUrl);
+    var url = this.data.sentFeishuUrl;
+    if (!url) return;
+    var rootId = this.rootQuestionId || (this.data.pinned && this.data.pinned.id) || '';
+    this._openReport({ id: rootId, url: url });
   },
 
   /** 回复落地后刷新置顶上下文（参考页 _xbRefreshConsultPanelAfterReply） */
