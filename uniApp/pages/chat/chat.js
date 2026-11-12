@@ -24,6 +24,12 @@ var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助�
   + '回复温柔聪慧，中文，简洁友好。'
   + '若用户是在分析页面，你可以调用奇门遁甲/八字/梅花易数排盘来辅助判断。';
 
+// FB-48：积分确认框点「取消」后走免费引导对话（不扣积分、不落问事记录）
+var GUIDANCE_PROMPT = '本轮为免费引导，未扣除积分、未做深度命理推演。'
+  + '请用温柔简洁的中文说明这一点，并针对用户的问题指出哪些信息还不够具体，'
+  + '给出 2-3 条可执行建议；若用户缺少出生信息，提示其前往「个人中心 → 我的档案」补充生日；'
+  + '若问题与证券相关，提示其先去证券页添加关注标的；不要承诺任何命理结论。';
+
 var MSG_SEQ = 0;
 
 // 与 assistant-widget.js 的 XB_AVATAR_CONFIGS 保持一致（网页版 4 个智能体头像）
@@ -2019,6 +2025,8 @@ Page({
     if (!this.rootQuestionId) {
       var ok = await this.confirmCost(text, bundle);
       if (!ok) {
+        // FB-48：取消扣费后转入免费引导对话（与计费路径隔离），不再短路 return
+        await this.freeGuidanceFlow(text);
         this.setData({ sending: false });
         return;
       }
@@ -2124,6 +2132,55 @@ Page({
       this.updateScroll();
     } finally {
       this.setData({ sending: false, typing: false });
+    }
+  },
+
+  /**
+   * FB-48：积分确认框点「取消」后走免费引导对话
+   * 与计费路径隔离：不调用 /credits/consume、不设置 rootQuestionId/questionId、
+   * 不显示「已消耗 N 积分」气泡与 sentPreview 置顶，question_id 传 null 保证不落问事记录。
+   */
+  freeGuidanceFlow: async function (text) {
+    // 用户这句作为普通消息展示，不带技能标记，不进咨询记录卡片
+    this.pushMsg('user', text, { types: [], auto: false });
+    this.setData({ typing: true, typingText: '正在整理建议…' });
+    this.updateScroll();
+    try {
+      var res = await api.request('/chat', {
+        method: 'POST',
+        timeout: 180000,
+        data: {
+          message: text,
+          system_prompt: GUIDANCE_PROMPT,
+          source: 'xiaoxuan',
+          paipan_data: {},
+          paipan_prompt_text: {},
+          target_id: null,
+          question_id: null
+        }
+      });
+      if (!res || typeof res.reply !== 'string') {
+        throw new Error((res && (res.detail || res.msg)) || '模型未返回内容');
+      }
+      this.setData({ typing: false });
+      var id = this.pushMsg('assistant', res.reply, { msgId: res.msg_id || '' });
+      this.updateScroll();
+      if (this.data.ttsOn) {
+        var item = this.findMsg(id);
+        var plain = (item && item.plain) || md.plain(res.reply);
+        this._ttsText = plain;
+        this.setData({ ttsText: plain });
+        tts.speak(plain);
+      }
+    } catch (e) {
+      console.error('[chat] 免费引导失败', e);
+      this.setData({ typing: false });
+      var msg = (e && e.message) || '请求失败';
+      if (/登录已过期/.test(msg)) {
+        this.setData({ loggedIn: false, userName: '', showLogin: true });
+      }
+      this.pushMsg('assistant', '出错了：' + msg + '。可以稍后再试一次。');
+      this.updateScroll();
     }
   },
 
