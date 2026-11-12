@@ -2271,7 +2271,21 @@ Page({
       var text = (r && r.text) || '';
       var filePath = (r && r.filePath) || '';
 
+      // FB-47：先看录音时长，<1 秒按「太短」提示，不发任何识别请求
+      var durMs = (r && r.duration) || 0;
+      var recS = this.data.recSeconds || 0;
+      if (durMs > 0 ? durMs < 1000 : recS < 1) {
+        wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
+        return;
+      }
+
       if (!text && filePath) {
+        // FB-47：音频文件过小（<100 字节）视为空音频，同样按「太短」提示，不上传 /speech/asr
+        var tooSmall = await this._asrFileTooSmall(filePath);
+        if (tooSmall) {
+          wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
+          return;
+        }
         // 有音频但没有文本（插件异常 / 兜底链路）：走原来的整段识别补救
         wx.showLoading({ title: '识别中…', mask: true });
         try {
@@ -2280,11 +2294,13 @@ Page({
           text = (res && res.text) || '';
         } catch (e) {
           wx.hideLoading();
-          wx.showModal({
-            title: '语音识别失败',
-            content: (e && e.message) || '请稍后重试，或改用文字输入',
-            showCancel: false
-          });
+          var em = (e && e.message) || '请稍后重试，或改用文字输入';
+          if (this._isAsrShortErr(em)) {
+            // FB-47：太短/没录到声音不算识别失败，轻提示即可
+            wx.showToast({ title: em, icon: 'none' });
+          } else {
+            wx.showModal({ title: '语音识别失败', content: em, showCancel: false });
+          }
           return;
         }
       }
@@ -2292,7 +2308,12 @@ Page({
       if (!text) {
         var errMsg = (r && r.error) || asr.lastError() || '';
         if (errMsg) {
-          wx.showModal({ title: '语音识别失败', content: errMsg, showCancel: false });
+          if (this._isAsrShortErr(errMsg)) {
+            // FB-47：插件 onError 录音过短类错误归入「太短」提示，不弹「语音识别失败」
+            wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
+          } else {
+            wx.showModal({ title: '语音识别失败', content: errMsg, showCancel: false });
+          }
         } else {
           wx.showToast({ title: '没听清，再说一次？', icon: 'none' });
         }
@@ -2305,6 +2326,24 @@ Page({
     } finally {
       this._stopping = false;
     }
+  },
+
+  /** FB-47：判断音频文件是否过小（<100 字节视为空音频） */
+  _asrFileTooSmall: function (filePath) {
+    return new Promise(function (resolve) {
+      try {
+        wx.getFileSystemManager().getFileInfo({
+          filePath: filePath,
+          success: function (info) { resolve((info.size || 0) < 100); },
+          fail: function () { resolve(false); }
+        });
+      } catch (e) { resolve(false); }
+    });
+  },
+
+  /** FB-47：识别「太短 / 没录到声音」类错误，避免误弹「语音识别失败」 */
+  _isAsrShortErr: function (msg) {
+    return /too short|太短|没有录到声音|没录到声音|录音时间过短/i.test(String(msg || ''));
   },
 
   /* ---------------- 登录 ---------------- */
