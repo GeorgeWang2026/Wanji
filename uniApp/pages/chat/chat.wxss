@@ -710,7 +710,11 @@
   background: rgba(255, 255, 255, .12);
 }
 
-.ctrl-ico { font-size: 38rpx; }
+.ctrl-ico { width: 44rpx; height: 44rpx; }
+
+/* 点击态对齐网页 .ctrl-btn:active（scale .92 + 底色加深），只作用于底部三按钮 */
+.ctrl-press { transform: scale(.92); background: rgba(255, 255, 255, .2); }
+.mic-press { transform: scale(.92); }
 
 .ctrl-dot {
   position: absolute;
@@ -740,7 +744,18 @@
   animation: mic-pulse 1.2s ease-out infinite;
 }
 
-.mic-ico { font-size: 48rpx; }
+.mic-ico { width: 52rpx; height: 52rpx; }
+
+.mic-btn.recording .mic-ico {
+  transform-origin: center;
+  animation: mic-shake .45s ease-in-out infinite;
+}
+
+@keyframes mic-shake {
+  0%, 100% { transform: rotate(0deg); }
+  25% { transform: rotate(-12deg); }
+  75% { transform: rotate(12deg); }
+}
 
 .press-zone { opacity: .82; transform: scale(.96); }
 

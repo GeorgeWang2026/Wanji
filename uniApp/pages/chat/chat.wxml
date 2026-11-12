@@ -175,15 +175,15 @@
 
   <!-- ============ 底部控制区 ============ -->
   <view class="controls">
-    <view class="ctrl-btn" hover-class="press-zone" bindtap="openHistory">
-      <text class="ctrl-ico">🕘</text>
+    <view class="ctrl-btn" hover-class="ctrl-press" bindtap="openHistory">
+      <image class="ctrl-ico" src="/uniApp/static/icons/chat-history.png" mode="aspectFit" />
       <view class="ctrl-dot" wx:if="{{messages.length > 0}}"></view>
     </view>
-    <view class="mic-btn {{recording ? 'recording' : ''}}" hover-class="press-zone" bindtap="onMicTap">
-      <text class="mic-ico">🎤</text>
+    <view class="mic-btn {{recording ? 'recording' : ''}}" hover-class="mic-press" bindtap="onMicTap">
+      <image class="mic-ico" src="/uniApp/static/icons/chat-mic.png" mode="aspectFit" />
     </view>
-    <view class="ctrl-btn" hover-class="press-zone" bindtap="onAccountTap">
-      <text class="ctrl-ico">👤</text>
+    <view class="ctrl-btn" hover-class="ctrl-press" bindtap="onAccountTap">
+      <image class="ctrl-ico" src="/uniApp/static/icons/chat-account.png" mode="aspectFit" />
     </view>
   </view>
 

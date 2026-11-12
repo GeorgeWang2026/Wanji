@@ -22,6 +22,8 @@ project.private.config.json
 *.png
 *.jpg
 *.jpeg
+# 小程序内置静态图标（切图）例外，需要入库
+!uniApp/static/icons/*.png
 
 # --- 密钥与凭据 ---
 .env
