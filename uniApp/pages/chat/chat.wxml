@@ -46,10 +46,12 @@
           </view>
         </view>
 
-        <view class="chat-item-question" wx:if="{{pinned.question}}">{{pinned.question}}</view>
+        <view class="chat-item-question" wx:if="{{pinned.question}}"
+              catchtap="onPinnedQuestionTap" catchlongpress="onPinnedQuestionLongPress">{{pinned.question}}</view>
 
         <view class="chat-item-followups" wx:if="{{pinned.followups.length > 0}}">
-          <view class="chat-item-followup" wx:for="{{pinned.followups}}" wx:for-item="fu" wx:key="id">
+          <view class="chat-item-followup" wx:for="{{pinned.followups}}" wx:for-item="fu" wx:key="id"
+                catchtap="onFollowupTap" catchlongpress="onFollowupLongPress" data-idx="{{index}}">
             <text class="cif-tag">追问</text>{{fu.text}}
           </view>
         </view>
@@ -275,11 +277,11 @@
       <view class="fs-back" hover-class="press-zone" catchtap="closeSkillAnalysis">
         <text class="fs-back-ico">‹</text>
       </view>
-      <text class="fs-title">深度解读</text>
+      <text class="fs-title">{{skillAnalysisTitle || '深度解读'}}</text>
     </view>
 
     <scroll-view class="skill-analysis-body fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
-      <view class="am-empty" wx:if="{{skillAnalysisState === 'loading'}}">正在生成深度解读…</view>
+      <view class="am-empty" wx:if="{{skillAnalysisState === 'loading'}}">{{skillAnalysisMsg || '正在生成深度解读…'}}</view>
       <view class="am-empty" wx:elif="{{skillAnalysisState === 'none'}}">{{skillAnalysisMsg}}</view>
       <view class="am-empty" wx:elif="{{skillAnalysisState === 'error'}}">
         {{skillAnalysisMsg || '暂无深度解读'}}
@@ -414,7 +416,7 @@
   <view class="qd-mask" wx:if="{{delOpen}}" catchtap="cancelDelete">
     <view class="qd-box" catchtap="noop">
       <view class="qd-title">确认删除</view>
-      <view class="qd-content">确定要删除这条咨询记录（含其下所有追问）吗？删除后无法恢复。</view>
+      <view class="qd-content">{{delText || '确定要删除这条咨询记录（含其下所有追问）吗？删除后无法恢复。'}}</view>
       <view class="qd-actions">
         <view class="qd-btn cancel" hover-class="qd-btn-press" bindtap="cancelDelete">取消</view>
         <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="confirmDelete">确定</view>

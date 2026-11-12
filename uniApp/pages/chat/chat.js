@@ -154,16 +154,21 @@ Page({
     /* ---- 删除确认（参考页浅色自绘确认框） ---- */
     delOpen: false,
     delIdx: -1,
+    delKind: 'record',           // record | root | followup
+    delId: '',
+    delText: '',
     /* ---- 界面状态（对齐 xiaoxuan.html 布局） ---- */
     statusBarH: 0,
     topOpen: true,
     inputOpen: false,
     showHistory: false,
-    /* ---- 深度解读全屏层（FB-44：咨询记录技能标签 → 只弹解读） ---- */
+    /* ---- 深度解读全屏层（FB-44 技能标签 / DF-54 主问题与追问，共用同一层） ---- */
     showSkillAnalysis: false,
     skillAnalysisState: '',      // loading | ready | error | none
     skillAnalysisMsg: '',
     skillAnalysisHtml: '',
+    skillAnalysisTitle: '深度解读',
+    activeAnalysisSource: '',    // analysis（analysis_result）| answer（问题记录里的 answer）
     // 咨询记录：服务端 question_records 列表（/credits/questions），页面以此为准
     historyRecords: [],
     // 本次会话按消息聚合出的临时卡片，仅用于接口未返回/失败时的即时展示
@@ -424,10 +429,10 @@ Page({
     };
   },
 
-  /** 详情里的 followups[] → .chat-item-followup（只有 id + 问题文本，与参考页一致） */
+  /** 详情里的 followups[] → .chat-item-followup（id + 问题文本 + 该条 answer） */
   _mapFollowups: function (list) {
     return (list || []).map(function (f) {
-      return { id: f.id, text: f.question || '' };
+      return { id: f.id, text: f.question || '', answer: f.answer || '' };
     });
   },
 
@@ -767,6 +772,8 @@ Page({
     this._skillRetry = { idx: (this._skillRetry || {}).idx, type: type, analysisId: analysisId };
     this.setData({
       showSkillAnalysis: true,
+      activeAnalysisSource: 'analysis',
+      skillAnalysisTitle: '深度解读',
       skillAnalysisState: 'loading',
       skillAnalysisMsg: '正在生成深度解读…',
       skillAnalysisHtml: ''
@@ -817,6 +824,11 @@ Page({
   },
 
   onSkillAnalysisRetry: function () {
+    if (this.data.activeAnalysisSource === 'answer') {
+      this._restorePromise = null;   // 详情可能失败过，重试用一次全新请求
+      this._openAnswerOrLoad(this.data.skillAnalysisTitle);
+      return;
+    }
     var r = this._skillRetry || {};
     if (r.analysisId) {
       this._openSkillAnalysis(r.type, r.analysisId);
@@ -831,6 +843,212 @@ Page({
       skillAnalysisState: '',
       skillAnalysisMsg: '',
       skillAnalysisHtml: ''
+    });
+  },
+
+  /* ---------------- DF-54：主问题 / 追问 → 全屏解读（复用 FB-44 的同一层） ---------------- */
+
+  onPinnedQuestionTap: function () {
+    if (!this.data.pinned) return;
+    this._answerTarget = { kind: 'root' };
+    this._openAnswerOrLoad('深度解读');
+  },
+
+  onFollowupTap: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var p = this.data.pinned;
+    var fu = p && (p.followups || [])[idx];
+    if (!fu) return;
+    this._answerTarget = { kind: 'followup', idx: idx };
+    this._openAnswerOrLoad('追问 · 深度解读');
+  },
+
+  /** 详情已回来直接渲染 answer；未回来则先拉详情（复用 _restoreThread），再按目标取正文 */
+  _openAnswerOrLoad: function (title) {
+    var self = this;
+    var p = this.data.pinned;
+    if (!p) return;
+    if (p.answerLoaded) {
+      this._openAnswerModal(this._targetAnswer(), title);
+      return;
+    }
+    if (this._answerLoading) return;
+    this._answerLoading = true;
+    this.setData({
+      showSkillAnalysis: true,
+      activeAnalysisSource: 'answer',
+      skillAnalysisTitle: title || '深度解读',
+      skillAnalysisState: 'loading',
+      skillAnalysisMsg: '解读加载中…',
+      skillAnalysisHtml: ''
+    });
+    if (!this._restorePromise && p.id) this._restoreThread(p.id);
+    var done = function () {
+      self._answerLoading = false;
+      if ((self.data.pinned || {}).answerLoaded) {
+        self._openAnswerModal(self._targetAnswer(), title);
+      } else {
+        self.setData({ skillAnalysisState: 'error', skillAnalysisMsg: '暂无深度解读' });
+      }
+    };
+    if (this._restorePromise) this._restorePromise.then(done).catch(done);
+    else done();
+  },
+
+  _targetAnswer: function () {
+    var p = this.data.pinned || {};
+    var t = this._answerTarget || {};
+    if (t.kind === 'followup') {
+      var fu = (p.followups || [])[t.idx];
+      return fu ? fu.answer : '';
+    }
+    return p.questionAnswer || '';
+  },
+
+  _openAnswerModal: function (text, title) {
+    var t = String(text || '').trim();
+    this.setData({
+      showSkillAnalysis: true,
+      activeAnalysisSource: 'answer',
+      skillAnalysisTitle: title || '深度解读',
+      skillAnalysisState: t ? 'ready' : 'none',
+      skillAnalysisMsg: t ? '' : '这条暂无深度解读',
+      skillAnalysisHtml: t ? md.chatHtml(t) : ''
+    });
+  },
+
+  /* ---------------- DF-54：主问题 / 追问 长按删除（同一行 tap=看解读，longpress=删） ---------------- */
+
+  onPinnedQuestionLongPress: function () {
+    var p = this.data.pinned;
+    if (!p || !p.id) return;
+    var n = (p.followups || []).length;
+    wx.vibrateShort({ type: 'medium' });
+    this.setData({
+      delOpen: true,
+      delKind: 'root',
+      delId: p.id,
+      delIdx: -1,
+      delText: n > 0
+        ? '删除主问题将同时删除其下 ' + n + ' 条追问，且无法恢复。'
+        : '确定删除这条主问题？删除后无法恢复。'
+    });
+  },
+
+  onFollowupLongPress: function (e) {
+    var idx = e.currentTarget.dataset.idx;
+    var p = this.data.pinned;
+    var fu = p && (p.followups || [])[idx];
+    if (!fu) return;
+    wx.vibrateShort({ type: 'medium' });
+    this.setData({
+      delOpen: true,
+      delKind: 'followup',
+      delId: fu.id,
+      delIdx: idx,
+      delText: '确定删除这条追问？删除后无法恢复。'
+    });
+  },
+
+  /** 删主问题：DELETE 根 id（后端级联追问），并清空置顶区与解读层 */
+  _deleteRoot: function (id) {
+    var self = this;
+    if (!id || this._deleting) return;
+    this._deleting = true;
+    wx.showLoading({ title: '删除中…', mask: true });
+    api.request('/credits/questions/' + id, { method: 'DELETE' }).then(function (res) {
+      wx.hideLoading();
+      self._deleting = false;
+      if (!res || res.code !== 0) {
+        wx.showToast({ title: (res && (res.detail || res.msg)) || '删除失败', icon: 'none' });
+        return;
+      }
+      if (String(id) === String(self.rootQuestionId)) {
+        self.rootQuestionId = null;
+        self.questionId = null;
+        self.chatMsgId = null;
+      }
+      self.threadTypes = [];
+      self._restorePromise = null;
+      var rest = (self.data.historyRecords || []).filter(function (r) {
+        return String(r.id) !== String(id) && String(r.qid) !== String(id);
+      });
+      self.setData({
+        pinned: null,
+        chips: [],
+        sentFeishuUrl: '',
+        sentVisible: false,
+        sentContent: '',
+        showSkillAnalysis: false,
+        skillAnalysisState: '',
+        skillAnalysisMsg: '',
+        skillAnalysisHtml: '',
+        // 咨询记录里同一条卡片一并移除，避免本地残留已删记录
+        historyRecords: rest,
+        historyTotal: Math.max(0, self.data.historyTotal - 1),
+        historyShown: countShown(rest),
+        sessionRecords: (self.data.sessionRecords || []).filter(function (s) {
+          return String(s.qid) !== String(id);
+        })
+      });
+      wx.showToast({ title: '已删除', icon: 'none' });
+    }).catch(function (err) {
+      wx.hideLoading();
+      self._deleting = false;
+      console.warn('[DF-54] 删除主问题失败', err);
+      wx.showToast({ title: '删除失败，请稍后重试', icon: 'none' });
+    });
+  },
+
+  /** 删单条追问：DELETE 追问 id，同步置顶区与咨询记录卡片的追问列表 */
+  _deleteFollowup: function (id) {
+    var self = this;
+    if (!id || this._deleting) return;
+    this._deleting = true;
+    wx.showLoading({ title: '删除中…', mask: true });
+    api.request('/credits/questions/' + id, { method: 'DELETE' }).then(function (res) {
+      wx.hideLoading();
+      self._deleting = false;
+      if (!res || res.code !== 0) {
+        wx.showToast({ title: (res && (res.detail || res.msg)) || '删除失败', icon: 'none' });
+        return;
+      }
+      var p = self.data.pinned;
+      var patch = {
+        // 解读层若正展示被删的这条，收起
+        showSkillAnalysis: false,
+        skillAnalysisState: '',
+        skillAnalysisMsg: '',
+        skillAnalysisHtml: ''
+      };
+      if (p) {
+        patch.pinned = {
+          id: p.id,
+          timeText: p.timeText,
+          question: p.question,
+          questionAnswer: p.questionAnswer,
+          answerLoaded: p.answerLoaded,
+          feishuUrl: p.feishuUrl,
+          followups: (p.followups || []).filter(function (f) { return String(f.id) !== String(id); })
+        };
+      }
+      patch.historyRecords = (self.data.historyRecords || []).map(function (r) {
+        if (!r.followups || !r.followups.length) return r;
+        var next = r.followups.filter(function (f) { return String(f.id) !== String(id); });
+        if (next.length === r.followups.length) return r;
+        var out = {};
+        for (var k in r) { if (Object.prototype.hasOwnProperty.call(r, k)) out[k] = r[k]; }
+        out.followups = next;
+        out.followupCount = Math.max(0, (r.followupCount || r.followups.length) - 1);
+        return out;
+      });
+      self.setData(patch);
+      wx.showToast({ title: '已删除', icon: 'none' });
+    }).catch(function (err) {
+      wx.hideLoading();
+      self._deleting = false;
+      console.warn('[DF-54] 删除追问失败', err);
+      wx.showToast({ title: '删除失败，请稍后重试', icon: 'none' });
     });
   },
 
@@ -863,15 +1081,17 @@ Page({
     wx.showToast({ title: '已衔接该记录，可直接提问', icon: 'none' });
   },
 
-  /** 列表项兜底（详情接口没回来前先展示问题与时间） */
+  /** 列表项兜底（详情接口没回来前先展示问题与时间；answer 需等详情） */
   _pinnedFromRecord: function (rec) {
     return {
       id: rec.qid || rec.id,
       timeText: fmtFullTime(rec.createdAt),
       question: rec.question || '',
+      questionAnswer: '',
+      answerLoaded: false,
       feishuUrl: rec.reportUrl || '',
       followups: (rec.followups || []).map(function (f) {
-        return { id: f.id, text: f.text || f.question || '' };
+        return { id: f.id, text: f.text || f.question || '', answer: '' };
       })
     };
   },
@@ -881,9 +1101,11 @@ Page({
       id: d.id,
       timeText: fmtFullTime(d.created_at),
       question: d.question || '',
+      questionAnswer: d.answer || '',
+      answerLoaded: true,
       feishuUrl: d.feishu_doc_url || '',
       followups: (d.followups || []).map(function (f) {
-        return { id: f.id, text: f.question || '' };
+        return { id: f.id, text: f.question || '', answer: f.answer || '' };
       })
     };
   },
@@ -979,17 +1201,33 @@ Page({
     var rec = this.data.historyRecords[idx];
     if (!rec) return;
     // 参考页为浅色自绘确认框，这里先开弹框，真正删除在 confirmDelete
-    this.setData({ delOpen: true, delIdx: idx });
+    this.setData({
+      delOpen: true,
+      delIdx: idx,
+      delKind: 'record',
+      delId: rec.id,
+      delText: '确定要删除这条咨询记录（含其下所有追问）吗？删除后无法恢复。'
+    });
   },
 
   cancelDelete: function () {
-    this.setData({ delOpen: false, delIdx: -1 });
+    this.setData({ delOpen: false, delIdx: -1, delKind: 'record', delId: '', delText: '' });
   },
 
   confirmDelete: function () {
+    var kind = this.data.delKind || 'record';
     var idx = this.data.delIdx;
+    var delId = this.data.delId;
+    this.setData({ delOpen: false, delKind: 'record', delId: '' });
+    if (kind === 'root') {
+      this._deleteRoot(delId);
+      return;
+    }
+    if (kind === 'followup') {
+      this._deleteFollowup(delId);
+      return;
+    }
     var rec = this.data.historyRecords[idx];
-    this.setData({ delOpen: false });
     if (!rec) return;
     var self = this;
     api.request('/credits/questions/' + rec.id, { method: 'DELETE' })
