@@ -34,6 +34,19 @@ var AVATARS = [
   { file: '/avatar/xiaoxuan_4.jpg', name: '时机子' }
 ];
 
+// 档案关系字典（与 qimen-1/static/yishu.js RELATION_MAP 及后端 archives._RELATIONSHIPS 一致）
+// key 上送后端，中文用于 picker 展示；数组顺序即 picker 顺序
+var RELATION_KEYS = ['self', 'spouse', 'child', 'parent', 'sibling', 'grandparent', 'grandchild',
+  'friend', 'colleague', 'classmate', 'teacher', 'student', 'other'];
+var RELATION_LABELS = {
+  self: '自己', spouse: '配偶', child: '子女', parent: '父母', sibling: '兄弟姐妹',
+  grandparent: '祖辈', grandchild: '孙辈', friend: '朋友', colleague: '同事',
+  classmate: '同学', teacher: '老师', student: '学生', other: '其他'
+};
+var RELATION_LABELS_ARR = RELATION_KEYS.map(function (k) { return RELATION_LABELS[k]; });
+var ARCH_GENDER_OPTIONS = ['请选择性别', '男', '女'];
+var ARCH_DEFAULT_RELATION_IDX = RELATION_KEYS.indexOf('other');
+
 var EXAMPLES = [
   '我这周适合谈一笔合作吗？',
   '帮我看下今年的财运走势与关键节点',
@@ -148,6 +161,18 @@ Page({
     /* ---- 个人中心（对应参考页 #profileModal） ---- */
     showProfile: false,
     userId: '',
+    /* ---- 我的档案（DF-56：内嵌全屏层，列表 + 新增/编辑，不新增页面 / 不改 app.json） ---- */
+    showArchives: false,
+    showArchiveEditor: false,
+    archives: [],
+    archivesLoading: false,
+    archSaving: false,
+    archEditing: null,            // 正在编辑的档案对象；null = 新增
+    archGenderIndex: 0,           // 0 = 未选择，1 = 男，2 = 女
+    archRelationIndex: ARCH_DEFAULT_RELATION_IDX,
+    genderOptions: ARCH_GENDER_OPTIONS,
+    relationLabels: RELATION_LABELS_ARR,
+    archForm: { nickname: '', gender: '', relationship: 'other', birth_year: '', birth_month: '', birth_day: '', birth_hour: '', birth_minute: '' },
     /* ---- 积分消耗确认（对应参考页自绘对话框） ---- */
     costOpen: false,
     costCredits: 5,
@@ -1305,9 +1330,205 @@ Page({
     this.onBalanceTap();
   },
 
-  /** 我的档案：网页版为独立档案管理，小程序无对应页面 */
+  /** 我的档案：打开列表并拉取（内嵌全屏层，不新增页面 / 不改 app.json） */
   onArchives: function () {
-    wx.showToast({ title: '档案功能暂未接入', icon: 'none' });
+    if (!api.getToken()) { this.setData({ showLogin: true }); return; }
+    this.setData({ showArchives: true });
+    this.loadArchives();
+  },
+  closeArchives: function () { this.setData({ showArchives: false }); },
+  closeArchiveEditor: function () { this.setData({ showArchiveEditor: false }); },
+
+  /** 拉取档案列表，附加展示用的关系中文与出生文案 */
+  loadArchives: function () {
+    var self = this;
+    this.setData({ archivesLoading: true });
+    api.request('/archives').then(function (res) {
+      var list = (res && res.code === 0 && res.data) ? res.data : [];
+      var mapped = list.map(function (a) {
+        return {
+          id: a.id, name: a.name, nickname: a.nickname, gender: a.gender,
+          relationship: a.relationship, is_self: !!a.is_self,
+          relationLabel: RELATION_LABELS[a.relationship] || '其他',
+          birthText: self._archBirthText(a)
+        };
+      });
+      self.setData({ archives: mapped });
+    }).catch(function (e) {
+      wx.showToast({ title: (e && e.message) || '加载失败', icon: 'none' });
+    }).then(function () {
+      self.setData({ archivesLoading: false });
+    });
+  },
+
+  _archBirthText: function (a) {
+    var parts = [];
+    if (a.birth_year) parts.push(String(a.birth_year));
+    if (a.birth_month) parts.push((a.birth_month < 10 ? '0' : '') + a.birth_month);
+    if (a.birth_day) parts.push((a.birth_day < 10 ? '0' : '') + a.birth_day);
+    var d = parts.length ? parts.join('-') : '';
+    var t = '';
+    if (a.birth_hour != null && a.birth_minute != null) {
+      t = (a.birth_hour < 10 ? '0' : '') + a.birth_hour + ':' + (a.birth_minute < 10 ? '0' : '') + a.birth_minute;
+    } else if (a.birth_hour != null) {
+      t = (a.birth_hour < 10 ? '0' : '') + a.birth_hour + ':00';
+    }
+    return (d || '出生未填') + (t ? ' ' + t : '');
+  },
+
+  /** 新增档案：清空表单 */
+  onNewArchive: function () {
+    this.setData({
+      archEditing: null,
+      archGenderIndex: 0,
+      archRelationIndex: ARCH_DEFAULT_RELATION_IDX,
+      archForm: { nickname: '', gender: '', relationship: 'other', birth_year: '', birth_month: '', birth_day: '', birth_hour: '', birth_minute: '' },
+      showArchiveEditor: true
+    });
+  },
+
+  /** 编辑档案：用列表数据回填表单 */
+  onEditArchive: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var a = this.data.archives.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!a) return;
+    var gIdx = 0;
+    if (a.gender === '男') gIdx = 1; else if (a.gender === '女') gIdx = 2;
+    var rIdx = RELATION_KEYS.indexOf(a.relationship);
+    if (rIdx < 0) rIdx = ARCH_DEFAULT_RELATION_IDX;
+    this.setData({
+      archEditing: a,
+      archGenderIndex: gIdx,
+      archRelationIndex: rIdx,
+      archForm: {
+        nickname: a.nickname || '',
+        gender: a.gender || '',
+        relationship: a.relationship || 'other',
+        birth_year: a.birth_year != null ? String(a.birth_year) : '',
+        birth_month: a.birth_month != null ? String(a.birth_month) : '',
+        birth_day: a.birth_day != null ? String(a.birth_day) : '',
+        birth_hour: a.birth_hour != null ? String(a.birth_hour) : '',
+        birth_minute: a.birth_minute != null ? String(a.birth_minute) : ''
+      },
+      showArchiveEditor: true
+    });
+  },
+
+  /** 表单输入：统一回写 archForm[field] */
+  onArchInput: function (e) {
+    var field = e.currentTarget.dataset.field;
+    var patch = {};
+    patch['archForm.' + field] = e.detail.value;
+    this.setData(patch);
+  },
+  onArchGenderChange: function (e) { this.setData({ archGenderIndex: Number(e.detail.value) }); },
+  onArchRelationChange: function (e) { this.setData({ archRelationIndex: Number(e.detail.value) }); },
+
+  /** 保存：本地校验 → POST（含 name）或 PUT（不含 name，避免覆盖 name —— 网页端缺陷 #1） */
+  onSaveArchive: function () {
+    if (this.data.archSaving) return;
+    var form = this.data.archForm;
+    var nickname = (form.nickname || '').trim();
+    if (!nickname) { wx.showToast({ title: '请输入昵称', icon: 'none' }); return; }
+    if (nickname.length > 64) { wx.showToast({ title: '昵称不能超过 64 字', icon: 'none' }); return; }
+    var gIdx = this.data.archGenderIndex;
+    if (gIdx <= 0) { wx.showToast({ title: '请选择性别', icon: 'none' }); return; }
+    var gender = ARCH_GENDER_OPTIONS[gIdx];
+    var rIdx = this.data.archRelationIndex;
+    var relKey = RELATION_KEYS[rIdx];
+    if (!relKey || RELATION_KEYS.indexOf(relKey) < 0) { wx.showToast({ title: '请选择关系', icon: 'none' }); return; }
+    var parsed = this._parseArchBirth(form);
+    if (parsed.error) { wx.showToast({ title: parsed.error, icon: 'none' }); return; }
+
+    var body = {
+      nickname: nickname,
+      gender: gender,
+      relationship: relKey,
+      birth_year: parsed.birth_year,
+      birth_month: parsed.birth_month,
+      birth_day: parsed.birth_day,
+      birth_hour: parsed.birth_hour,
+      birth_minute: parsed.birth_minute
+    };
+    if (!this.data.archEditing) { body.name = nickname; } // 新增带 name；编辑(PUT)不带 name
+
+    var self = this;
+    this.setData({ archSaving: true });
+    var req = this.data.archEditing
+      ? api.request('/archives/' + this.data.archEditing.id, { method: 'PUT', data: body })
+      : api.request('/archives', { method: 'POST', data: body });
+    req.then(function (res) {
+      if (res && res.code === 0) {
+        wx.showToast({ title: '已保存', icon: 'success' });
+        self.setData({ showArchiveEditor: false });
+        self.loadArchives();
+      } else {
+        var msg = (res && (res.detail || res.msg)) || '保存失败';
+        wx.showToast({ title: msg, icon: 'none' });
+      }
+    }).catch(function (e) {
+      wx.showToast({ title: (e && e.message) || '网络请求失败', icon: 'none' });
+    }).then(function () {
+      self.setData({ archSaving: false });
+    });
+  },
+
+  /** 解析出生字段：空→null，否则校验范围（年月齐全时校验该月真实天数） */
+  _parseArchBirth: function (form) {
+    var checks = [
+      ['birth_year', 1900, 2100, '出生年需在 1900–2100 之间'],
+      ['birth_month', 1, 12, '出生月需在 1–12 之间'],
+      ['birth_hour', 0, 23, '出生时需在 0–23 之间'],
+      ['birth_minute', 0, 59, '出生分需在 0–59 之间']
+    ];
+    var out = {};
+    for (var i = 0; i < checks.length; i++) {
+      var c = checks[i], raw = (form[c[0]] || '').trim();
+      if (raw === '') { out[c[0]] = null; continue; }
+      if (!/^\d+$/.test(raw)) { return { error: c[3] }; }
+      var n = parseInt(raw, 10);
+      if (n < c[1] || n > c[2]) { return { error: c[3] }; }
+      out[c[0]] = n;
+    }
+    var dayRaw = (form.birth_day || '').trim();
+    if (dayRaw === '') { out.birth_day = null; }
+    else {
+      if (!/^\d+$/.test(dayRaw)) { return { error: '出生日需在 1–31 之间' }; }
+      var d = parseInt(dayRaw, 10);
+      if (d < 1 || d > 31) { return { error: '出生日需在 1–31 之间' }; }
+      if (out.birth_year != null && out.birth_month != null) {
+        var dim = new Date(out.birth_year, out.birth_month, 0).getDate();
+        if (d > dim) { return { error: '该月没有 ' + d + ' 号' }; }
+      }
+      out.birth_day = d;
+    }
+    return out;
+  },
+
+  /** 删除：自己的档案不显示删除入口；二次确认后调 DELETE */
+  onDeleteArchive: function (e) {
+    var id = e.currentTarget.dataset.id;
+    var a = this.data.archives.filter(function (x) { return String(x.id) === String(id); })[0];
+    if (!a) return;
+    var self = this;
+    wx.showModal({
+      title: '删除档案',
+      content: '确定删除「' + (a.nickname || '未命名') + '」的档案吗？',
+      success: function (r) {
+        if (!r.confirm) return;
+        api.request('/archives/' + id, { method: 'DELETE' }).then(function (res) {
+          if (res && res.code === 0) {
+            wx.showToast({ title: '已删除', icon: 'success' });
+            self.loadArchives();
+          } else {
+            var msg = (res && (res.detail || res.msg)) || '删除失败';
+            wx.showToast({ title: msg, icon: 'none' });
+          }
+        }).catch(function (err) {
+          wx.showToast({ title: (err && err.message) || '网络请求失败', icon: 'none' });
+        });
+      }
+    });
   },
 
   /* ---- 头像口型动画（DF-55） ---- */

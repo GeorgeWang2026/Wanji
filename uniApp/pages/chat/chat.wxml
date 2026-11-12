@@ -342,6 +342,79 @@
       </scroll-view>
   </view>
 
+  <!-- ============ 我的档案：列表（DF-56，内嵌全屏层，不新增页面 / 不改 app.json） ============ -->
+  <view class="fs-page" wx:if="{{showArchives}}" style="padding-top:{{statusBarH}}px;">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="press-zone" catchtap="closeArchives">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">我的档案</text>
+    </view>
+    <scroll-view class="fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view wx:if="{{archives.length === 0 && !archivesLoading}}" class="archives-empty">暂无档案，点击下方「新增档案」</view>
+      <view wx:for="{{archives}}" wx:key="id" class="arch-card" bindtap="onEditArchive" data-id="{{item.id}}">
+        <view class="arch-main">
+          <text class="arch-name">{{item.nickname || '未命名'}}</text>
+          <text class="arch-sub">{{item.gender || '性别未填'}} · {{item.relationLabel}} · {{item.birthText}}</text>
+        </view>
+        <view class="arch-del" wx:if="{{!item.is_self}}" catchtap="onDeleteArchive" data-id="{{item.id}}">删除</view>
+      </view>
+      <view class="arch-add" hover-class="item-press" bindtap="onNewArchive">+ 新增档案</view>
+    </scroll-view>
+  </view>
+
+  <!-- ============ 我的档案：新增 / 编辑（DF-56） ============ -->
+  <view class="fs-page" wx:if="{{showArchiveEditor}}" style="padding-top:{{statusBarH}}px;">
+    <view class="fs-header">
+      <view class="fs-back" hover-class="press-zone" catchtap="closeArchiveEditor">
+        <text class="fs-back-ico">‹</text>
+      </view>
+      <text class="fs-title">{{archEditing ? '编辑档案' : '新增档案'}}</text>
+    </view>
+    <scroll-view class="fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+      <view class="form-row">
+        <text class="form-label">昵称</text>
+        <input class="form-input" placeholder="请输入昵称" placeholder-class="form-ph" value="{{archForm.nickname}}" bindinput="onArchInput" data-field="nickname" maxlength="64" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">性别</text>
+        <picker mode="selector" range="{{genderOptions}}" value="{{archGenderIndex}}" bindchange="onArchGenderChange">
+          <view class="form-picker">{{archGenderIndex > 0 ? genderOptions[archGenderIndex] : '请选择性别'}}</view>
+        </picker>
+      </view>
+      <view class="form-row">
+        <text class="form-label">关系</text>
+        <picker mode="selector" range="{{relationLabels}}" value="{{archRelationIndex}}" bindchange="onArchRelationChange">
+          <view class="form-picker">{{relationLabels[archRelationIndex]}}</view>
+        </picker>
+      </view>
+      <view class="form-row">
+        <text class="form-label">出生年</text>
+        <input class="form-input" type="number" placeholder="如 1990" placeholder-class="form-ph" value="{{archForm.birth_year}}" bindinput="onArchInput" data-field="birth_year" maxlength="4" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">出生月</text>
+        <input class="form-input" type="number" placeholder="1–12" placeholder-class="form-ph" value="{{archForm.birth_month}}" bindinput="onArchInput" data-field="birth_month" maxlength="2" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">出生日</text>
+        <input class="form-input" type="number" placeholder="1–31" placeholder-class="form-ph" value="{{archForm.birth_day}}" bindinput="onArchInput" data-field="birth_day" maxlength="2" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">出生时</text>
+        <input class="form-input" type="number" placeholder="0–23" placeholder-class="form-ph" value="{{archForm.birth_hour}}" bindinput="onArchInput" data-field="birth_hour" maxlength="2" />
+      </view>
+      <view class="form-row">
+        <text class="form-label">出生分</text>
+        <input class="form-input" type="number" placeholder="0–59" placeholder-class="form-ph" value="{{archForm.birth_minute}}" bindinput="onArchInput" data-field="birth_minute" maxlength="2" />
+      </view>
+      <view class="form-actions">
+        <view class="btn-cancel" hover-class="item-press" bindtap="closeArchiveEditor">取消</view>
+        <view class="btn-save {{archSaving ? 'disabled' : ''}}" hover-class="item-press" bindtap="onSaveArchive">{{archSaving ? '保存中...' : '保存'}}</view>
+      </view>
+    </scroll-view>
+  </view>
+
   <!-- ============ 登录 / 注册：全屏页面形态（左返回 + 居中标题，无 ✕） ============ -->
   <view class="auth-mask auth-full" wx:if="{{showLogin}}" style="padding-top:{{statusBarH}}px;">
     <view class="auth-sheet auth-full-sheet" catchtap="noop">

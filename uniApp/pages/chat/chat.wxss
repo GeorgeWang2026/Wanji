@@ -506,6 +506,70 @@
   transform-origin: 50% 50%;
 }
 
+/* ---- 我的档案（DF-56）：列表卡片 ---- */
+.archives-empty {
+  padding: 120rpx 40rpx;
+  text-align: center;
+  color: rgba(224, 208, 240, .5);
+  font-size: 26rpx;
+}
+.arch-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin: 20rpx 28rpx;
+  padding: 28rpx;
+  border-radius: 20rpx;
+  background: rgba(255, 255, 255, .06);
+  border: 2rpx solid rgba(255, 255, 255, .08);
+}
+.arch-main { display: flex; flex-direction: column; flex: 1; min-width: 0; }
+.arch-name { font-size: 30rpx; font-weight: 600; color: #f0e6ff; }
+.arch-sub { margin-top: 8rpx; font-size: 24rpx; color: rgba(224, 208, 240, .6); }
+.arch-del {
+  flex-shrink: 0;
+  margin-left: 20rpx;
+  padding: 10rpx 22rpx;
+  border-radius: 999rpx;
+  font-size: 24rpx;
+  color: #ff9aa8;
+  background: rgba(255, 100, 120, .12);
+}
+.arch-add {
+  margin: 28rpx;
+  padding: 26rpx;
+  text-align: center;
+  border-radius: 20rpx;
+  font-size: 28rpx;
+  color: #c9a3ff;
+  border: 2rpx dashed rgba(201, 163, 255, .45);
+}
+
+/* ---- 我的档案（DF-56）：编辑表单 ---- */
+.form-row {
+  display: flex;
+  align-items: center;
+  margin: 18rpx 28rpx;
+  padding: 22rpx 24rpx;
+  border-radius: 18rpx;
+  background: rgba(255, 255, 255, .06);
+}
+.form-label { width: 150rpx; flex-shrink: 0; font-size: 28rpx; color: #d8c8f0; }
+.form-input { flex: 1; font-size: 28rpx; color: #f0e6ff; }
+.form-ph { color: rgba(224, 208, 240, .35); }
+.form-picker { flex: 1; font-size: 28rpx; color: #f0e6ff; }
+.form-actions { display: flex; margin: 40rpx 28rpx 60rpx; }
+.btn-cancel, .btn-save {
+  flex: 1;
+  text-align: center;
+  padding: 24rpx 0;
+  border-radius: 18rpx;
+  font-size: 30rpx;
+}
+.btn-cancel { margin-right: 12rpx; color: #d8c8f0; background: rgba(255, 255, 255, .08); }
+.btn-save { margin-left: 12rpx; color: #1a0f2e; background: linear-gradient(135deg, #b388ff, #7c4dff); font-weight: 600; }
+.btn-save.disabled { opacity: .5; }
+
 .avatar-fallback {
   position: relative;
   z-index: 2;
