@@ -10,7 +10,7 @@
     "es6": true,
     "enhance": true,
     "postcss": true,
-    "minified": false,
+    "minified": true,
     "coverView": true,
     "showShadowRootInWxmlPanel": true,
     "ignoreUploadUnusedFiles": true,
@@ -39,6 +39,10 @@
         "type": "suffix"
       },
       {
+        "value": ".zip",
+        "type": "suffix"
+      },
+      {
         "value": ".git",
         "type": "folder"
       },
@@ -49,6 +53,26 @@
       {
         "value": "node_modules",
         "type": "folder"
+      },
+      {
+        "value": ".trae-html-share-packages",
+        "type": "folder"
+      },
+      {
+        "value": "2026-11-11",
+        "type": "folder"
+      },
+      {
+        "value": ".screenshots",
+        "type": "folder"
+      },
+      {
+        "value": "project.private.config.json",
+        "type": "file"
+      },
+      {
+        "value": ".gitignore",
+        "type": "file"
       }
     ],
     "include": []
