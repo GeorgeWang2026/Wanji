@@ -147,9 +147,11 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 
 | 类型 | 填写 | 用途 |
 | --- | --- | --- |
-| request 合法域名 | `https://wanji.sh.cn` | 登录、积分、`/chat`、`/gua`、`/speech/asr`（uploadFile 同源）|
-| uploadFile 合法域名 | `https://wanji.sh.cn` | `wx.uploadFile` 上传录音 |
-| downloadFile 合法域名 | `https://wanji.sh.cn` | `innerAudioContext` 播放 TTS 音频 |
+| request 合法域名 | `https://estock.space` | 登录、积分、`/chat`、`/gua`、`/speech/asr` |
+| uploadFile 合法域名 | `https://estock.space` | `wx.uploadFile` 上传录音 |
+| downloadFile 合法域名 | `https://estock.space` | `innerAudioContext` 播放 TTS 音频 / 报告 PDF 下载 |
+
+**以上三个列表都要加 `https://estock.space`**（`request` / `uploadFile` / `downloadFile` 是相互独立的列表，只配一个不够）。
 
 要求：**HTTPS + 已备案 + 不带宽口**（只能 443）。域名有变动时改两处：
 

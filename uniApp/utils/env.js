@@ -18,7 +18,8 @@ var CONFIG = {
   },
   prod: {
     // 生产环境走 Caddy 反代（见仓库根 Caddyfile），与网页版同源，接口前缀一致 /api/v1
-    API_ORIGIN: 'https://wanji.sh.cn'
+    // 注：wanji.sh.cn 备案未下，暂用 estock.space（同一服务的两个入口，接口路径一致）
+    API_ORIGIN: 'https://estock.space'
   }
 };
 
@@ -29,7 +30,7 @@ function getApiOrigin() {
   return String(saved || CONFIG[ENV].API_ORIGIN).replace(/\/+$/, '');
 }
 
-/** 完整 API 前缀，形如 https://wanji.sh.cn/api/v1 */
+/** 完整 API 前缀，形如 https://estock.space/api/v1 */
 function getApiBase() {
   return getApiOrigin() + '/api/v1';
 }

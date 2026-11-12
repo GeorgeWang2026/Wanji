@@ -379,7 +379,7 @@
       <view class="server-box">
         <view class="server-label">接口地址（真机调试可改成局域网 IP）</view>
         <view class="server-row">
-          <input class="auth-input" value="{{apiOrigin}}" bindinput="onApiOrigin" placeholder="https://wanji.sh.cn" placeholder-class="auth-ph" />
+          <input class="auth-input" value="{{apiOrigin}}" bindinput="onApiOrigin" placeholder="https://estock.space" placeholder-class="auth-ph" />
           <view class="mini-btn" bindtap="saveApiOrigin">保存</view>
         </view>
       </view>
