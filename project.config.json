@@ -67,6 +67,10 @@
         "type": "folder"
       },
       {
+        "value": "design",
+        "type": "folder"
+      },
+      {
         "value": "project.private.config.json",
         "type": "file"
       },
