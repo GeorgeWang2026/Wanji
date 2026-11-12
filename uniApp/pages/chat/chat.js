@@ -321,7 +321,7 @@ Page({
     }
     // 参考页：未登录点「咨询记录」先弹登录，登录成功后自动打开
     if (!this.data.loggedIn) {
-      this.pendingHistory = true;
+      this.pendingAction = 'history';
       this.setData({ showLogin: true });
       return;
     }
@@ -1343,7 +1343,7 @@ Page({
 
   /** 我的积分：打开混合流水全屏层（DF-57，内嵌层，不新增页面 / 不改 app.json） */
   onProfileCredits: function () {
-    if (!api.getToken()) { this.setData({ showLogin: true }); return; }
+    if (!api.getToken()) { this.pendingAction = 'credits'; this.setData({ showLogin: true }); return; }
     this.setData({ showCredits: true });
     this.loadCreditsBalance();
     this.loadLedger(false);
@@ -1490,7 +1490,7 @@ Page({
 
   /** 我的档案：打开列表并拉取（内嵌全屏层，不新增页面 / 不改 app.json） */
   onArchives: function () {
-    if (!api.getToken()) { this.setData({ showLogin: true }); return; }
+    if (!api.getToken()) { this.pendingAction = 'archives'; this.setData({ showLogin: true }); return; }
     this.setData({ showArchives: true });
     this.loadArchives();
   },
@@ -1820,9 +1820,14 @@ Page({
     } else if (role === 'assistant' && !ex.plainOnly) {
       // 回复到达：自动弹出对话记录（对应网页版的答案浮层）
       // 录音中不打断输入面板，避免把正在回填的文字藏起来
+      // FB-49：登录成功后的首条欢迎/引导消息不自动开记录页
       if (!this.data.recording) {
-        patch.showHistory = true;
-        patch.inputOpen = false;
+        if (this.skipAutoHistoryOnce) {
+          this.skipAutoHistoryOnce = false;
+        } else {
+          patch.showHistory = true;
+          patch.inputOpen = false;
+        }
       }
     }
     this.setData(patch);
@@ -1858,6 +1863,7 @@ Page({
     }
     if (!this.data.loggedIn) {
       this.pendingText = text;
+      this.pendingAction = 'send';
       this.setData({ showLogin: true });
       return;
     }
@@ -2424,6 +2430,9 @@ Page({
   },
 
   closeLogin: function () {
+    // FB-49：关闭/取消登录层即放弃之前的待办意图，避免跨会话继承
+    this.pendingAction = null;
+    this.pendingText = '';
     this.setData({ showLogin: false, authError: '', loginPwd: '', loginPwd2: '' });
   },
 
@@ -2461,17 +2470,31 @@ Page({
     });
     if (app().globalData) app().globalData.user = data;
     this.loadBalance();
-    var pending = this.pendingText;
+    // FB-49：登录成功后的首条欢迎/引导消息不自动打开咨询记录
+    this.skipAutoHistoryOnce = true;
+    // FB-49：按登录前唯一意图分发；无意图默认停在主页，不再被残留标记劫持
+    var action = this.pendingAction || null;
+    var pending = this.pendingText || '';
+    this.pendingAction = null;
     this.pendingText = '';
-    if (pending) {
+    if (action === 'send' && pending) {
       this.setData({ input: '', inputOpen: false });
       this.startFlow(pending);
       return;
     }
-    if (this.pendingHistory) {
-      this.pendingHistory = false;
+    if (action === 'history') {
       this.openHistory();
+      return;
     }
+    if (action === 'credits') {
+      this.onProfileCredits();
+      return;
+    }
+    if (action === 'archives') {
+      this.onArchives();
+      return;
+    }
+    // 默认：停在主页，不打开任何全屏层
   },
 
   doLogin: async function () {
@@ -2512,6 +2535,10 @@ Page({
 
   logout: function () {
     api.clearUser();
+    // FB-49：退出登录清空待办意图与首条消息跳过标记
+    this.pendingAction = null;
+    this.pendingText = '';
+    this.skipAutoHistoryOnce = false;
     tts.stop(true);
     this.rootQuestionId = null;
     this.questionId = null;
