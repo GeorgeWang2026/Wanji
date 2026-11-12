@@ -710,7 +710,7 @@
   background: rgba(255, 255, 255, .12);
 }
 
-.ctrl-ico { width: 44rpx; height: 44rpx; }
+.ctrl-ico { width: 44rpx; height: 44rpx; display: block; }
 
 /* 点击态对齐网页 .ctrl-btn:active（scale .92 + 底色加深），只作用于底部三按钮 */
 .ctrl-press { transform: scale(.92); background: rgba(255, 255, 255, .2); }
@@ -744,7 +744,8 @@
   animation: mic-pulse 1.2s ease-out infinite;
 }
 
-.mic-ico { width: 52rpx; height: 52rpx; }
+/* DF-53 复验：切图已裁到内容包围盒，麦克风取兜底尺寸 56rpx，抵消窄画幅带来的视觉偏小 */
+.mic-ico { width: 56rpx; height: 56rpx; display: block; }
 
 .mic-btn.recording .mic-ico {
   transform-origin: center;
