@@ -5,7 +5,7 @@
      - 底部悬浮「新增」：名称+代码，代码必填，联想候选回填
      - 复用 .fs-page/.fs-header（app.wxss）与 qd-*（复制自 chat.wxss）
      ============================================================ -->
-<view class="fs-page">
+<view class="fs-page" style="padding-top:{{statusBarH}}px;">
 
   <view class="fs-header">
     <view class="fs-back" hover-class="fs-back-press" bindtap="onBack">

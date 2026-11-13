@@ -13,6 +13,8 @@ var api = require('../../utils/api.js');
 
 Page({
   data: {
+    /* DF-69：本页 navigationStyle=custom，无原生栏兜底，需自注入状态栏高度 */
+    statusBarH: 0,
     state: 'loading',
     errMsg: '',
     list: [],
@@ -33,6 +35,16 @@ Page({
   _myStocks: [],      // 服务端原始列表（用于绑定/删除按 code 反查）
   _sugTimer: null,
   _lastLongPress: 0,
+
+  /** DF-69：注入状态栏高度，使 .fs-header 顶部起点与聊天页全屏层一致 */
+  onLoad: function () {
+    var statusBarH = 0;
+    try {
+      var info = wx.getWindowInfo ? wx.getWindowInfo() : wx.getSystemInfoSync();
+      statusBarH = (info && info.statusBarHeight) || 0;
+    } catch (e) { statusBarH = 0; }
+    this.setData({ statusBarH: statusBarH });
+  },
 
   onShow: function () {
     if (!api.getToken()) {
