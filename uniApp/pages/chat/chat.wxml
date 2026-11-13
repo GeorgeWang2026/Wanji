@@ -341,7 +341,7 @@
           </button>
           <view class="profile-info">
             <block wx:if="{{!nicknameEditing}}">
-              <view class="profile-name" hover-class="press-zone" bindtap="onEditNickname">{{profileName || '用户'}}<text class="profile-edit-ico">✎</text></view>
+              <view class="profile-name" hover-class="press-zone" bindtap="onEditNickname">{{profileName || '用户'}}<image class="profile-edit-ico" src="/uniApp/static/icons/edit-pencil.png" mode="aspectFit" /></view>
             </block>
             <block wx:else>
               <view class="nickname-edit">

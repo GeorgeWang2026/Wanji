@@ -1371,9 +1371,9 @@
   box-shadow: 0 8rpx 32rpx rgba(147, 112, 219, .35);
 }
 
-.profile-name { font-size: 32rpx; font-weight: 600; color: #f0e8ff; }
+.profile-name { display: inline-flex; align-items: center; font-size: 32rpx; font-weight: 600; color: #f0e8ff; padding: 22rpx 0; margin: -22rpx 0; }
 
-.profile-edit-ico { margin-left: 10rpx; font-size: 24rpx; color: #9b86c4; }
+.profile-edit-ico { margin-left: 12rpx; width: 28rpx; height: 28rpx; display: block; }
 
 /* DF-62：昵称就地编辑 */
 .nickname-edit { display: flex; align-items: center; }
