@@ -1823,10 +1823,11 @@ Page({
         }
         var items = (res.data.items || []).map(function (it) { return self._toLedgerItem(it); });
         var merged = append ? (self.data.ledgerItems || []).concat(items) : items;
-        // usage 与 transaction 两套 id 各自从 1 起，跨表可能重复 → 按 kind+id 去重，避免触底加载重复/跳条
+        // usage 与 transaction 两套 id 各自从 1 起，跨表可能同号且 kind 同为 consume → 按 src+kind+id 去重，
+        // 避免跨表同号被误删（原仅 kind+id 会误删一条）
         var seen = {};
         merged = merged.filter(function (r) {
-          var k = r.kind + '-' + r.id;
+          var k = (r.src || '') + '-' + r.kind + '-' + r.id;
           if (seen[k]) return false;
           seen[k] = true;
           return true;
@@ -1863,7 +1864,8 @@ Page({
     var isConsume = it.kind === 'consume';
     var q = it.root_question || it.ask || '';
     return {
-      key: it.kind + '-' + it.id,
+      key: (it.src || '') + '-' + it.kind + '-' + it.id,
+      src: it.src || '',
       kind: it.kind,
       amount: it.amount || 0,
       sign: isConsume ? '-' : '+',
