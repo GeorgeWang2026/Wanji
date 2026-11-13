@@ -110,7 +110,7 @@
   </view>
 
   <!-- 宫位详情：全屏页面形态（左返回 + 居中标题，无 ✕） -->
-  <view class="fs-page" wx:if="{{detail}}">
+  <view class="fs-page qm-detail-page" wx:if="{{detail}}">
     <view class="fs-header">
       <view class="fs-back" hover-class="fs-back-press" catchtap="closeDetail">
         <text class="fs-back-ico">‹</text>
@@ -124,9 +124,6 @@
         <text class="d-d">{{item.d}}</text>
       </view>
     </scroll-view>
-    <view class="fs-foot">
-      <view class="qm-btn qm-btn-primary" bindtap="closeDetail">知道了</view>
-    </view>
   </view>
 
   <!-- 提示词预览：全屏页面形态（左返回 + 居中标题，无 ✕） -->

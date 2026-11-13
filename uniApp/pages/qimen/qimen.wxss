@@ -222,10 +222,10 @@
 .empty { padding: 100rpx 20rpx; text-align: center; font-size: 26rpx; color: #8f7cb0; }
 
 /* 详情弹层 */
-.d-row { display: flex; flex-direction: column; padding: 12rpx 0; border-bottom: 1rpx solid rgba(147, 112, 219, .16); }
-.d-k { font-size: 22rpx; color: #e8b84a; margin-bottom: 4rpx; }
-.d-v { font-size: 26rpx; color: #efe6ff; margin-bottom: 4rpx; }
-.d-d { font-size: 24rpx; color: #a692c4; line-height: 1.7; white-space: pre-wrap; }
+.d-row { display: flex; flex-direction: column; padding: 16rpx 0; border-bottom: 1rpx solid rgba(147, 112, 219, .16); }
+.d-k { font-size: 26rpx; color: #e8b84a; margin-bottom: 4rpx; }
+.d-v { font-size: 30rpx; color: #efe6ff; line-height: 1.5; margin-bottom: 4rpx; }
+.d-d { font-size: 28rpx; color: #a692c4; line-height: 1.7; white-space: pre-wrap; }
 
 .hint-scroll { max-height: 56vh; margin-bottom: 14rpx; }
 
@@ -233,3 +233,19 @@
 
 /* 全屏页内容区（宫位详情 / 提示词预览） */
 .qm-fs-body { padding: 24rpx 32rpx; }
+
+/* DF-59：宫位详情层作用域（.qm-detail-page），不影响 chat 等其它全屏层 */
+/* 标题字号放大一档：34rpx（覆写全局 .fs-title 30rpx，禁改 app.wxss 基准） */
+.qm-detail-page .fs-title { font-size: 34rpx; }
+/* 返回热区由 56rpx 扩至 88rpx：padding 由负 margin 抵消占位，视觉圆径保持 56rpx */
+.qm-detail-page .fs-back {
+  width: 88rpx;
+  height: 88rpx;
+  margin: -16rpx;
+  background: radial-gradient(circle, rgba(255, 255, 255, .1) 0 27rpx, rgba(255, 255, 255, 0) 28rpx);
+}
+.qm-detail-page .fs-back-press {
+  background: radial-gradient(circle, rgba(255, 255, 255, .2) 0 27rpx, rgba(255, 255, 255, 0) 28rpx);
+}
+/* 详情主体底部安全区留白（原底部按钮区已移除，避免 Home 指示条遮挡末行） */
+.qm-detail-page .qm-fs-body { padding-bottom: calc(24rpx + env(safe-area-inset-bottom)); }
