@@ -55,6 +55,8 @@ var AVATARS = [
   { file: '/avatar/xiaoxuan_1.png', name: '神机子' },
   { file: '/avatar/xiaoxuan_21.png', name: '天机子' },
   { file: '/avatar/xiaoxuan_3.png', name: '灵机子' },
+  { file: '/avatar/xiaoxuan_2.gif', name: '天机子' },
+  { file: '/avatar/xiaoxuan_31.gif', name: '灵机子' },
   { file: '/avatar/xiaoxuan_4.jpg', name: '时机子' }
 ];
 
@@ -265,7 +267,6 @@ Page({
     avatarIdx: 0,
     avatarSrc: '',
     avatarErr: false,
-    usingUserAvatar: false, // DF-62：主页是否在用用户上传的头像（true 时隐藏角色切换/口型）
     /* ---- 头像口型（DF-55：播报时嘴部缩放动画，定位照抄 XB_AVATAR_CONFIGS） ---- */
     mouthRect: null,       // {left,top,width,height} 百分比；null 则不渲染口型层
     mouthSx: 1,            // 口型横向缩放
@@ -328,9 +329,6 @@ Page({
       }
     });
 
-    // DF-62：主页头像优先用本地缓存的用户头像（避免先闪角色图）
-    this._syncUserAvatar();
-
     if (!md.available) {
       this.pushMsg('assistant', '提示：Markdown 渲染库加载失败，回复将以纯文本展示。请确认工程根 markdown.js 未被小程序打包忽略。');
     }
@@ -344,8 +342,7 @@ Page({
     // FB-51：冷启动 / 切账号后按 uid 恢复未读角标（杀进程保留）
     this._syncUnread();
     this.syncChips();
-    // DF-62：回显本地缓存的用户头像，并异步用 /auth/profile 回填（登录/冷启动）
-    this._syncUserAvatar();
+    // DF-62：异步用 /auth/profile 回填昵称/资料（登录/冷启动）
     this._loadProfile();
     // DF-61：奇门页「去创建」返回时，直接打开「新增档案」编辑器
     var g = app().globalData;
@@ -382,19 +379,6 @@ Page({
 
   /* ================= DF-62：个人中心昵称 / 头像 ================= */
 
-  /** 主页头像与用户头像同步：有用户头像则用它并隐藏口型/角色切换，否则保持角色图 */
-  _syncUserAvatar: function () {
-    var u = api.readUser();
-    var av = (u && u.avatar_url) || '';
-    if (av) {
-      if (this.data.avatarSrc !== av) this._stopMouth();
-      this.setData({ usingUserAvatar: true, avatarSrc: av, avatarErr: false, mouthRect: null });
-    } else if (this.data.usingUserAvatar) {
-      this.setData({ usingUserAvatar: false });
-      this.setAvatar(this.data.avatarIdx || 0);
-    }
-  },
-
   /** GET /auth/profile 回填昵称（nickname>display_name>username）/头像并写本地缓存 */
   _loadProfile: function () {
     var self = this;
@@ -408,7 +392,6 @@ Page({
       if (nickname) patch.profileName = nickname;
       if (av) { patch.profileAvatar = av; api.setAvatarUrl(av); }
       if (Object.keys(patch).length) self.setData(patch);
-      if (av) self._syncUserAvatar();
     }).catch(function () { /* 静默：资料刷新失败不阻塞页面 */ });
   },
 
@@ -494,7 +477,6 @@ Page({
       }
       api.setAvatarUrl(abs);
       self.setData({ profileAvatar: abs });
-      self._syncUserAvatar();
       wx.showToast({ title: '头像已更新', icon: 'success' });
     }).catch(function (err) {
       wx.hideLoading();
@@ -527,9 +509,8 @@ Page({
     });
   },
 
-  /** 主页头像点击：用户头像生效时打开个人中心，否则保持原有录音行为 */
+  /** 主页头像点击：保持原有录音行为（角色头像不再被用户头像顶替） */
   onAvatarTap: function () {
-    if (this.data.usingUserAvatar) { this.openProfile(); return; }
     this.onMicTap();
   },
 

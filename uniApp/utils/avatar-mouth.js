@@ -9,10 +9,12 @@
  * ============================================================ */
 
 var MOUTH_RECT = {
-  '/avatar/xiaoxuan_1.png':  { left: 45, top: 53,   width: 10, height: 15 }, // 神机子
-  '/avatar/xiaoxuan_21.png': { left: 45, top: 60,   width: 12, height: 20 }, // 天机子
-  '/avatar/xiaoxuan_3.png':  { left: 45, top: 58,   width: 12, height: 15 }, // 灵机子
-  '/avatar/xiaoxuan_4.jpg':  { left: 42, top: 46,   width: 10, height: 15 }  // 时机子
+  '/avatar/xiaoxuan_1.png':  { left: 45, top: 53,   width: 10, height: 15,   name: '神机子' },
+  '/avatar/xiaoxuan_21.png': { left: 45, top: 60,   width: 12, height: 20,   name: '天机子' },
+  '/avatar/xiaoxuan_3.png':  { left: 45, top: 58,   width: 12, height: 15,   name: '灵机子' },
+  '/avatar/xiaoxuan_2.gif':  { left: 43, top: 65.4, width: 15, height: 10,   name: '天机子' },
+  '/avatar/xiaoxuan_31.gif': { left: 45, top: 58,   width: 12, height: 15,   name: '灵机子' },
+  '/avatar/xiaoxuan_4.jpg':  { left: 42, top: 46,   width: 10, height: 15,   name: '时机子' }
 };
 
 function getMouthRect(avatarFile) {

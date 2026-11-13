@@ -132,13 +132,13 @@
           class="mouth-overlay {{speaking ? 'on' : ''}}"
           style="left:{{mouthRect.left}}%;top:{{mouthRect.top}}%;width:{{mouthRect.width}}%;height:{{mouthRect.height}}%;"
         >
-          <image class="mouth-img" src="/uniApp/static/mouth.png" mode="aspectFit" style="transform:scale({{mouthSx}},{{mouthSy}});" />
+          <image class="mouth-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyOCAxMiIgcHJlc2VydmVBc3BlY3RSYXRpbz0ibm9uZSI+PHBhdGggZD0iTSA1IDYgUSAxNCA4IDIzIDYgUSAxNCA1IDUgNiBaIiBmaWxsPSIjYzA2YThhIiBzdHJva2U9IiM5YTRhNmEiIHN0cm9rZS13aWR0aD0iLjYiIHN0cm9rZS1saW5lam9pbj0icm91bmQiLz48L3N2Zz4=" mode="scaleToFill" style="transform:scale({{mouthSx}},{{mouthSy}});" />
         </view>
       </view>
 
-      <!-- DF-62：使用用户头像时隐藏角色左右切换（避免"头像顶点/切换角色"歧义） -->
-      <view class="avatar-nav prev" wx:if="{{!usingUserAvatar}}" hover-class="press-zone" catchtap="prevAvatar">‹</view>
-      <view class="avatar-nav next" wx:if="{{!usingUserAvatar}}" hover-class="press-zone" catchtap="nextAvatar">›</view>
+      <!-- 角色头像左右切换（恢复智能体头像列表，不再被用户头像顶替） -->
+      <view class="avatar-nav prev" hover-class="press-zone" catchtap="prevAvatar">‹</view>
+      <view class="avatar-nav next" hover-class="press-zone" catchtap="nextAvatar">›</view>
     </view>
 
     <view class="paipan-bar">
