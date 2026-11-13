@@ -2920,12 +2920,11 @@ Page({
           text = (res && res.text) || '';
         } catch (e) {
           wx.hideLoading();
-          var em = (e && e.message) || '请稍后重试，或改用文字输入';
-          if (this._isAsrShortErr(em)) {
-            // FB-47：太短/没录到声音不算识别失败，按「没听清」轻提示，可重录
-            wx.showToast({ title: '没听清，请再说一次', icon: 'none' });
-          } else {
-            wx.showModal({ title: '语音识别失败', content: em, showCancel: false });
+          var em = (e && e.message) || '';
+          // FB-47：后端对过短音频 / 静音返回的「too short」属于空结果，不是错误，静默结束；
+          // 只有真正的服务端异常（网络失败 / 接口 5xx / 未配置 ASR）才提示
+          if (!this._isAsrShortErr(em)) {
+            wx.showModal({ title: '语音识别失败', content: em || '请稍后重试', showCancel: false });
           }
           return;
         }
@@ -2933,13 +2932,8 @@ Page({
 
       var trimmed = String(text || '').trim();
       if (!trimmed) {
-        // FB-47：空/静音按「没听清」提示可重录；真实故障仍弹「语音识别失败」
-        var errMsg = (r && r.error) || asr.lastError() || '';
-        if (errMsg && !this._isAsrShortErr(errMsg)) {
-          wx.showModal({ title: '语音识别失败', content: errMsg, showCancel: false });
-        } else {
-          wx.showToast({ title: '没听清，请再说一次', icon: 'none' });
-        }
+        // FB-47：一句都没识别出来 = 空结果，不是错误。
+        // 静默复位录音态：不弹框、不发送、不写记录、不产生失败日志。
         return;
       }
 
@@ -2966,7 +2960,7 @@ Page({
     }
   },
 
-  /** FB-47：识别「太短 / 没录到声音」类错误，避免误弹「语音识别失败」 */
+  /** FB-47：识别「太短 / 没录到声音」类结果，归为空结果静默处理，绝不弹「语音识别失败」 */
   _isAsrShortErr: function (msg) {
     return /too short|太短|没听清|没有录到声音|没录到声音|录音时间过短/i.test(String(msg || ''));
   },
