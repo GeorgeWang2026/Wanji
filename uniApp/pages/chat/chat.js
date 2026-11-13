@@ -23,6 +23,7 @@ var QUOTES = require('../../data/quotes.js');   // DF-64：等待期/空闲期�
 var QUOTES_STOCK = [];
 try { QUOTES_STOCK = require('../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
 if (!Array.isArray(QUOTES_STOCK)) QUOTES_STOCK = [];
+var quickQA = require('../../utils/quick-qa.js');   // DF-81：首页快捷问题池（关联证券后自动带证券名）
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
 var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
@@ -73,11 +74,7 @@ var RELATION_LABELS_ARR = RELATION_KEYS.map(function (k) { return RELATION_LABEL
 var ARCH_GENDER_OPTIONS = ['请选择性别', '男', '女'];
 var ARCH_DEFAULT_RELATION_IDX = RELATION_KEYS.indexOf('other');
 
-var EXAMPLES = [
-  '我这周适合谈一笔合作吗？',
-  '帮我看下今年的财运走势与关键节点',
-  '最近工作变动频繁，该留还是该走？'
-];
+// DF-81：首页快捷问题改为动态池（utils/quick-qa.js），不再写死三条
 
 // 技能 key → 展示名（/credits/questions 的 usages[].tool 即这几个 key）
 var TOOL_LABELS = { qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券' };
@@ -263,7 +260,8 @@ Page({
     inputFocus: false,     // DF-64：输入框是否聚焦（空闲轮播暂停条件之一）
     ttsText: '',           // #ttsLines 字幕内容
     ttsLabel: '万机决策助手',
-    examples: EXAMPLES,
+    examples: [],          // DF-81：由 refreshQuickQAs 动态生成
+    examplesStock: false,  // DF-81：是否处于证券态（📈 前缀 + 高亮）
     avatarIdx: 0,
     avatarSrc: '',
     avatarErr: false,
@@ -354,12 +352,16 @@ Page({
     if (wantNewArchive) this._openNewArchiveFlow();
     // DF-64：回到前台若无覆盖层、在等待/空闲切换时按条件恢复空闲期文字轮播
     this._maybeStartIdleHint();
+    // DF-81：回到前台恢复快捷问题 30 秒轮换（页面生命周期驱动，避免常驻）
+    this._startQuickQATimer();
   },
 
   /** DF-63/DF-64：小程序无 onHide 需求时离开前台需暂停空闲轮播 */
   onHide: function () {
     this._appHidden = true;
     this._stopIdleHint();
+    // DF-81：离开前台清除快捷问题定时器
+    this._stopQuickQATimer();
   },
 
   /** DF-61：打开档案层并直接进入新增编辑器（未登录先弹登录，沿用 pendingAction） */
@@ -375,6 +377,8 @@ Page({
     tts.stop(true);
     if (this.recTimer) clearInterval(this.recTimer);
     if (this._mouthTimer) { clearInterval(this._mouthTimer); this._mouthTimer = null; }
+    // DF-81：销毁时清除快捷问题定时器
+    this._stopQuickQATimer();
   },
 
   noop: function () {},
@@ -668,6 +672,8 @@ Page({
    * 开关变化时重建证券池并重启当前轮播（等待期/空闲期），确保绑定后 18 秒内可出证券句。
    */
   _refreshStockLinked: function () {
+    // DF-81：与 DF-67 金句池共用同一刷新入口——绑定/解绑/onShow 时一并刷新快捷问题
+    this.refreshQuickQAs();
     var bound = this._hasBoundStock();
     // 绑定由有变无 = 用户显式解绑：清掉历史 usages 信号，避免解绑后继续出证券句
     if (this._prevBoundStock && !bound) this._usagesStock = false;
@@ -2362,8 +2368,36 @@ Page({
 
   onExample: function (e) {
     var text = e.currentTarget.dataset.text || '';
-    this.setData({ input: text, inputOpen: true, canClear: text.trim().length > 0 });
+    // DF-81：与网站一致——只填入不发送；有旧内容换行追加、光标置末尾；点击后立即换新一批
+    var existing = this.data.input || '';
+    var next = existing ? (existing + '\n' + text) : text;
+    this.setData({ input: next, inputOpen: true, inputCursor: next.length, canClear: next.trim().length > 0 });
     this._stopIdleHint();
+    this.refreshQuickQAs();
+  },
+
+  /* ================= DF-81：首页快捷问题（关联证券自动带证券名，对齐 xiaoxuan） ================= */
+
+  /** 依据当前绑定证券（globalData.paipan.stock）重建快捷问题；无绑定走通用池 */
+  refreshQuickQAs: function () {
+    var g = app().globalData || {};
+    // 绑定结构（与 chipDetail/DF-68 一致）：paipan.stock = { stock: {name,code,...}, meta:{type:'stock'} }
+    var entry = g.paipan && g.paipan.stock;
+    var s = (entry && entry.stock) || {};
+    var name = s.name || s.code || (entry ? '这只股票' : '');
+    var out = quickQA.render({ stockName: name || null, count: 4 });
+    this.setData({ examples: out.examples || [], examplesStock: !!out.examplesStock });
+  },
+
+  /** DF-81：快捷问题 30 秒轮换（onShow 启动，onHide/onUnload 清除） */
+  _startQuickQATimer: function () {
+    this._stopQuickQATimer();
+    var self = this;
+    this._quickQATimer = setInterval(function () { self.refreshQuickQAs(); }, 30000);
+  },
+
+  _stopQuickQATimer: function () {
+    if (this._quickQATimer) { clearInterval(this._quickQATimer); this._quickQATimer = null; }
   },
 
   /** DF-58：一键清空输入区（需求方定稿：不保留原文、不显示撤销、无 5 秒计时） */

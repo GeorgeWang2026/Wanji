@@ -173,7 +173,7 @@
     <!-- 展开态：向上浮在标题之上，覆盖头像/技能按钮区；catchtap 阻止点击穿透 -->
     <view class="panel-body" wx:if="{{inputOpen}}" catchtap="noop">
       <view class="quick-qas">
-        <view class="quick-qa" wx:for="{{examples}}" wx:key="*this" bindtap="onExample" data-text="{{item}}">{{item}}</view>
+        <view class="quick-qa {{examplesStock ? 'stock-themed' : ''}}" wx:for="{{examples}}" wx:key="*this" bindtap="onExample" data-text="{{item}}">{{examplesStock ? '📈 ' : ''}}{{item}}</view>
       </view>
 
       <view class="input-row">
