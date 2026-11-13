@@ -1,14 +1,29 @@
 /**
- * 把 design/quotes.md 转成小程序可 require 的数据文件 uniApp/data/quotes.js
- * 用法：node scripts/build-quotes.js
+ * 把金句源文件转成小程序可 require 的数据文件。
+ * 用法：node scripts/build-quotes.js [--src design/quotes.md] [--out uniApp/data/quotes.js]
+ *       默认生成主力池 design/quotes.md → uniApp/data/quotes.js；
+ *       证券条件池：node scripts/build-quotes.js --src design/quotes-stock.md --out uniApp/data/quotes-stock.js
  * 源文件是唯一真源；解析失败时以非 0 退出且不覆盖旧产物。
  */
 var fs = require('fs');
 var path = require('path');
 
 var ROOT = path.resolve(__dirname, '..');
-var SRC = path.join(ROOT, 'design', 'quotes.md');
-var OUT = path.join(ROOT, 'uniApp', 'data', 'quotes.js');
+var DEFAULT_SRC = 'design/quotes.md';
+var DEFAULT_OUT = 'uniApp/data/quotes.js';
+
+function argValue(name, def) {
+  var args = process.argv.slice(2);
+  for (var i = 0; i < args.length; i++) {
+    var m = new RegExp('^' + name + '=(.+)$').exec(args[i]);
+    if (m) return m[1];
+    if (args[i] === name && args[i + 1] && args[i + 1].indexOf('--') !== 0) return args[i + 1];
+  }
+  return def;
+}
+
+var SRC = path.resolve(ROOT, argValue('--src', DEFAULT_SRC));
+var OUT = path.resolve(ROOT, argValue('--out', DEFAULT_OUT));
 var LANGS = ['zh', 'en', 'la', 'fr'];
 
 function fail(msg) {
@@ -88,10 +103,17 @@ if (errors.length) {
   return;
 }
 
+var relSrc = path.relative(ROOT, SRC).split(path.sep).join('/');
+var relOut = path.relative(ROOT, OUT).split(path.sep).join('/');
+var regen = 'node scripts/build-quotes.js';
+if (relSrc !== DEFAULT_SRC || relOut !== DEFAULT_OUT) {
+  regen += ' --src ' + relSrc + ' --out ' + relOut;
+}
+
 fs.mkdirSync(path.dirname(OUT), { recursive: true });
 fs.writeFileSync(
   OUT,
-  '// 自动生成，请勿手改。源文件：design/quotes.md；重新生成：node scripts/build-quotes.js\n'
+  '// 自动生成，请勿手改。源文件：' + relSrc + '；重新生成：' + regen + '\n'
     + 'module.exports = ' + JSON.stringify(out, null, 2) + ';\n',
   'utf8'
 );

@@ -19,6 +19,10 @@ var asr = require('../../utils/asr.js');
 var paipanUtil = require('../../utils/paipan.js');
 var avatarMouth = require('../../utils/avatar-mouth.js');
 var QUOTES = require('../../data/quotes.js');   // DF-64：等待期/空闲期金句池（自动生成）
+// DF-67：证券条件池（仅当当前线程关联了证券信息卡片时并入轮播）；缺失/为空/解析失败自动降级为主力池
+var QUOTES_STOCK = [];
+try { QUOTES_STOCK = require('../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
+if (!Array.isArray(QUOTES_STOCK)) QUOTES_STOCK = [];
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
 var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
@@ -304,6 +308,9 @@ Page({
     this._hintResolve = null;
     this._hintSeq = 0;
     this._quotePool = [];
+    this._stockPool = (QUOTES_STOCK || []).slice(); // DF-67：证券池源（静态，缺失时为空数组）
+    this._stockHintPool = [];    // DF-67：等待期可用的证券池副本（每轮重置）
+    this._stockLinked = false;   // DF-67：当前线程是否关联证券（触发条件，任一条记录 usages 含 stock）
     this._hintOwner = null;      // 'waiting' | 'idle' | null（互斥）
     this._idleTimer = null;
     this._idleIdx = 0;
@@ -541,6 +548,7 @@ Page({
     this._hintActive = true;
     this._hintSeq = 0;
     this._quotePool = (QUOTES || []).slice();
+    this._stockHintPool = this._stockLinked ? (this._stockPool || []).slice() : []; // DF-67：关联证券才并入
     if (this._hintSafety) clearTimeout(this._hintSafety);
     this._hintSafety = setTimeout(function () { self._stopThinking(); }, HINT_SAFETY_MS);
     var loop = function () {
@@ -583,20 +591,33 @@ Page({
 
   /** 取下一句等待期提示语：首句 50% 金句，其后 2 思考语 : 1 金句；金句不重复、用尽只走思考语 */
   _nextHint: function () {
-    var quotes = QUOTES || [];
     var n = this._hintSeq++;
     var wantQuote = n === 0 ? (Math.random() < 0.5) : (n % 3 === 0);
-    if (wantQuote && this._quotePool && this._quotePool.length) {
-      var q = this._quotePool.splice(Math.floor(Math.random() * this._quotePool.length), 1)[0];
-      return { isQuote: true, text: q.text, author: q.author, translation: q.translation, speech: q.speech || q.text };
+    if (wantQuote) {
+      var q = this._pickHintQuote();
+      if (q) return { isQuote: true, text: q.text, author: q.author, translation: q.translation, speech: q.speech || q.text };
     }
     return { isQuote: false, text: this._genThinkingMsg() };
   },
 
-  /** DF-64：空闲期顶部金句轮播（纯文字，6 秒/句，顺序遍历） */
+  /**
+   * DF-67：从提示金句池取一句。主力池与证券池按 2:1 随机加权（证券约 1/3）并入同一序列；
+   * 证券池仅在当前线程关联证券（_stockLinked）且非空时参与；各自不重复，取尽后回退另一池。
+   */
+  _pickHintQuote: function () {
+    var main = this._quotePool || [];
+    var stock = this._stockLinked ? (this._stockHintPool || []) : [];
+    if (!main.length && !stock.length) return null;
+    var wantStock = stock.length && (!main.length || Math.random() < 1 / 3);
+    var pool = wantStock ? stock : main;
+    if (!pool.length) pool = wantStock ? main : stock;
+    if (!pool.length) return null;
+    return pool.splice(Math.floor(Math.random() * pool.length), 1)[0];
+  },
+
+  /** DF-64：空闲期顶部金句轮播（纯文字，6 秒/句，顺序遍历；DF-67：每 2 条主力插 1 条证券） */
   _startIdleHint: function () {
-    var quotes = QUOTES || [];
-    if (!quotes.length) return;
+    if (!(QUOTES || []).length) return;
     if (this._hintOwner === 'idle' && this._idleTimer) return;
     this._hintOwner = 'idle';
     this._idleIdx = 0;
@@ -604,10 +625,22 @@ Page({
   },
   _showIdleHint: function () {
     var self = this;
-    var quotes = QUOTES || [];
-    if (!quotes.length) return;
-    var q = quotes[this._idleIdx % quotes.length];
-    this._idleIdx++;
+    var main = QUOTES || [];
+    var stock = this._stockLinked ? (this._stockPool || []) : [];
+    var q;
+    var idx = this._idleIdx++;
+    if (main.length) {
+      if (stock.length && idx % 3 === 2) {
+        // DF-67：证券句并入同一序列，每 2 条主力插 1 条（约 1/3）
+        q = stock[Math.floor(idx / 3) % stock.length];
+      } else {
+        q = main[(idx - Math.floor(idx / 3)) % main.length];
+      }
+    } else if (stock.length) {
+      q = stock[idx % stock.length];
+    } else {
+      return;
+    }
     this.setData({ idleQuote: { text: q.text, author: q.author, translation: q.translation } });
     if (this._idleTimer) clearTimeout(this._idleTimer);
     this._idleTimer = setTimeout(function () { self._showIdleHint(); }, IDLE_HINT_MS);
@@ -615,6 +648,25 @@ Page({
   _stopIdleHint: function () {
     if (this._idleTimer) { clearTimeout(this._idleTimer); this._idleTimer = null; }
     if (this._hintOwner === 'idle') this._hintOwner = null;
+  },
+
+  /**
+   * DF-67：同步「当前线程是否关联证券信息卡片」——任一 question_record 的 usages[].tool === 'stock'。
+   * 判定统一为记录级信号（不按关键词、不按是否打开过证券页）；本轮等待期无法预判，最早在回复落地后生效。
+   * 后端若新增独立卡片字段（如 stock_card），改这里即可切换判定源。
+   */
+  _syncStockLinked: function (detail) {
+    var linked = false;
+    if (detail) {
+      var outs = [detail].concat(detail.followups || []);
+      outs.forEach(function (it) {
+        if (linked || !it) return;
+        (it.usages || []).forEach(function (u) {
+          if (u && u.tool === 'stock') linked = true;
+        });
+      });
+    }
+    this._stockLinked = linked;
   },
 
   /** 空闲轮播启动条件（对齐 DF-64）：未录音/未等待/无置顶/无已发送/无覆盖层/面板展开/输入为空且未聚焦/在前台 */
@@ -1531,6 +1583,7 @@ Page({
       (d.followups || []).forEach(collect);
 
       self.threadTypes = types;
+      self._syncStockLinked(d);      // DF-67：恢复该记录时按其实际 usages 判定证券条件池
       self.setData({
         pinned: self._pinnedFromDetail(d),
         sentFeishuUrl: d.feishu_doc_url || ''
@@ -1580,6 +1633,7 @@ Page({
         return;
       }
       self.threadTypes = null;       // 回到「以已绑定技能为准」
+      self._syncStockLinked(d);      // DF-67：回复落地后同步证券条件池触发标记
       self.setData({
         pinned: self._pinnedFromDetail(d),
         sentVisible: false,
@@ -2122,6 +2176,7 @@ Page({
         self.chatMsgId = null;
         self.autoMetas = [];
         self.threadTypes = [];
+        self._stockLinked = false;     // DF-67：重新开始/新会话清除证券条件池标记
         self._restorePromise = null;
         var g = app().globalData;
         if (g) g.paipan = {};
