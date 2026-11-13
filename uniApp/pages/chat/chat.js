@@ -216,7 +216,7 @@ Page({
     creditsTodayUsed: 0,
     /* ---- 积分消耗确认（对应参考页自绘对话框） ---- */
     costOpen: false,
-    costCredits: 5,
+    costCredits: paipanUtil.DEEP_READING_COST,
     costTypesText: '',
     /* ---- 删除确认（参考页浅色自绘确认框） ---- */
     delOpen: false,
@@ -1860,7 +1860,7 @@ Page({
   },
   retryLedger: function () { this.loadLedger(this.data.ledgerItems.length > 0); },
 
-  /** 消耗项点击 → 关闭积分层与个人中心 → 恢复主问题上下文 → 回到主页可直接追问（追问不扣分） */
+  /** 消耗项点击 → 关闭积分层与个人中心 → 恢复主问题上下文 → 回到主页可直接追问（追问同样计 1 分） */
   onLedgerItemTap: function (e) {
     var idx = e.currentTarget.dataset.idx;
     var item = this.data.ledgerItems[idx];
@@ -2498,15 +2498,16 @@ Page({
     var bundle = this.buildBundle();
     this.syncChips();
 
-    // 首次提问需要用户确认扣费；追问不再扣费
-    if (!this.rootQuestionId) {
-      var ok = await this.confirmCost(text, bundle);
-      if (!ok) {
-        // FB-48：取消扣费后转入免费引导对话（与计费路径隔离），不再短路 return
+    // DF-77：首次提问与追问均需确认扣费（每次 1 积分）
+    var ok = await this.confirmCost(text, bundle);
+    if (!ok) {
+      // FB-48：首个根问题取消扣费后转入免费引导对话（与计费路径隔离）；
+      //        DF-77：追问取消则留在当前状态，不进入免费流
+      if (!this.rootQuestionId) {
         await this.freeGuidanceFlow(text);
-        this.setData({ sending: false });
-        return;
       }
+      this.setData({ sending: false });
+      return;
     }
 
     // 参考页 #sentPreview：确认扣费后先把本轮问题置顶展示，回复落地后换成置顶上下文
@@ -2672,7 +2673,7 @@ Page({
 
   /**
    * 积分消耗确认（参考页自绘卡片，替代原来的 wx.showModal）
-   * 文案沿用参考页：已关联技能 + 固定 5 积分 + 两条说明
+   * 文案沿用参考页：已关联技能 + 每次 1 积分 + 两条说明
    */
   confirmCost: function (text, bundle) {
     var self = this;
@@ -3044,7 +3045,7 @@ Page({
     wx.showModal({
       title: '积分余额',
       content: '当前剩余 ' + (this.data.balance === null ? '—' : this.data.balance)
-        + ' 积分\n每次深度推演消耗 5 积分，追问不额外消耗。\n充值请前往网页版「万机」完成。',
+        + ' 积分\n每次深度解读消耗 1 积分（根问题与追问相同）。\n充值请前往网页版「万机」完成。',
       confirmText: '刷新',
       success: function (r) { if (r.confirm) self.loadBalance(); }
     });

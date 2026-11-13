@@ -55,7 +55,7 @@ G:\projects\wanji\
      正式发布请替换成你们自己的小程序 AppID。
 3. 首次打开建议检查：**详情 → 本地设置 →
    勾选「不校验合法域名、web-view（业务域名）、TLS 版本以及 HTTPS 证书」**（本地联调必需）。
-4. 进入首页即为对话页（`uniApp/pages/chat/chat`）。可先用「注册」创建账号（后端默认赠送 10 积分），
+4. 进入首页即为对话页（`uniApp/pages/chat/chat`）。可先用「注册」创建账号（后端默认赠送 10 积分，按每次深度解读 1 积分计），
    或使用网页版已有账号登录。
 
 > 编译包体说明：本工程不再需要排除网页版的 `avatar/`、`mystock/`、`ths/` 与网页脚本——
@@ -169,7 +169,7 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 | --- | --- |
 | `POST /auth/login`、`POST /auth/register` | 登录 / 注册 |
 | `GET /credits/balance` | 余额（返回体字段为 `credits`）|
-| `POST /credits/consume` | 扣费（首次提问 5 积分，带 `target_id` 的追记为 0）|
+| `POST /credits/consume` | 扣费（每次深度解读 1 积分，根问题与追问各计 1 次）|
 | `POST /chat/preview_prompt_hint` | 把盘面组装成提示词文本（免鉴权）|
 | `POST /chat` | 模型回复（需要 `Authorization: Bearer <token>`）|
 | `POST /speech/asr` | 录音识别（multipart 字段名必须是 `audio`）|
@@ -223,8 +223,8 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 ## 七、主流程（首页）行为说明
 
 1. **输入 → 发送**：登录后输入文字，点「发送」。
-2. **扣费确认**：首次提问弹 `wx.showModal` 确认消耗 **5 积分**（与后端 `DEEP_READING_COST` 一致）；
-   同一轮追问（`target_id` = 根记录）**不再弹确认、不再扣费**。
+2. **扣费确认**：每次深度解读弹确认框确认消耗 **1 积分**（与后端 `DEEP_READING_COST` 一致）；
+   同一轮追问（`target_id` = 根记录）**同样弹确认、各计 1 积分**。
 3. **起盘**：优先使用已关联的盘；没有则按当前时空自动起「奇门 + 梅花」。
 4. **提示词组装**：`POST /chat/preview_prompt_hint` → 把各类型文本作为 `paipan_prompt_text` 透传给 `/chat`。
 5. **回复渲染**：`/chat` 返回后经 `markdown.js` → `rich-text` 渲染；长回复可「复制」。

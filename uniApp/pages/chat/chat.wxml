@@ -569,7 +569,7 @@
       <view class="cost-body">
         <view class="cost-line">检测到你当前已关联 <text class="cost-gold">{{costTypesText}}</text> 信息，进行深度解读将消耗 <text class="cost-pink">{{costCredits}}</text> 积分。</view>
         <view class="cost-note">
-          <text class="cost-note-line">· 每次深度解读固定消耗 {{costCredits}} 积分（追问、追加技能信息不额外扣积分）</text>
+          <text class="cost-note-line">· 每次深度解读固定消耗 {{costCredits}} 积分（根问题与追问各计 1 次；追加技能信息不额外扣积分）</text>
           <text class="cost-note-line">· 积分不足时请先到个人中心充值</text>
         </view>
       </view>

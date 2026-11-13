@@ -10,7 +10,7 @@
 var y = require('./yishu.js');
 var api = require('./api.js');
 
-var DEEP_READING_COST = 5; // 与 backend/routers/credits.py 的 DEEP_READING_COST 保持一致
+var DEEP_READING_COST = 1; // DF-77：每次深度解读 1 积分（根问题与追问同计），与 backend/routers/credits.py 的 DEEP_READING_COST 保持一致
 
 function pad(n) { return n < 10 ? '0' + n : '' + n; }
 
