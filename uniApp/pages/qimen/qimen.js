@@ -4,6 +4,7 @@
  * ============================================================ */
 var Y = require('../../utils/yishu.js');
 var paipan = require('../../utils/paipan.js');
+var api = require('../../utils/api.js');
 
 var GONG_CELL = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 var CLS = { 4: 'c-mu', 9: 'c-huo', 2: 'c-tu', 3: 'c-mu', 5: 'center', 7: 'c-jin', 8: 'c-tu', 1: 'c-shui', 6: 'c-jin' };
@@ -36,7 +37,11 @@ Page({
     yearIdx: 0,
     monthIdx: 0,
     dayIdx: 0,
-    hourIdx: 0
+    hourIdx: 0,
+    /* DF-61：档案栏（九宫格上方）+ 关联态 */
+    archives: [],
+    activeArchiveId: '',
+    bound: false
   },
 
   onLoad: function () {
@@ -48,6 +53,12 @@ Page({
       : { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), mi: 0 };
     this._setTime(t, { silent: true });
     this.buildPan();
+  },
+
+  onShow: function () {
+    var app = getApp();
+    this.setData({ bound: !!(app.globalData.paipan && app.globalData.paipan.qimen) });
+    this.loadArchives();
   },
 
   onUnload: function () {
@@ -255,12 +266,81 @@ Page({
 
   closeHint: function () { this.setData({ showHint: false }); },
 
+  /* ---------------- DF-61：档案栏 + 信息栏「关联 / 取消 / 提示词」 ---------------- */
+
+  /** 拉取档案（复用 /archives），生成「昵称 + 出生」chip */
+  loadArchives: function () {
+    var self = this;
+    if (!api.getToken()) { this.setData({ archives: [] }); return; }
+    api.request('/archives').then(function (res) {
+      var list = (res && res.code === 0 && res.data) ? res.data : [];
+      var chips = list.map(function (a) {
+        return {
+          id: String(a.id),
+          nickname: a.nickname || a.name || ('档案' + a.id),
+          sub: self._birthText(a),
+          raw: a
+        };
+      });
+      self.setData({ archives: chips });
+    }).catch(function () { /* 档案栏加载失败不打扰用户 */ });
+  },
+
+  _birthText: function (a) {
+    if (!a || a.birth_year == null || a.birth_year === '') return '未填生日';
+    return String(a.birth_year) + '-' + p2(Number(a.birth_month) || 1) + '-' + p2(Number(a.birth_day) || 1);
+  },
+
+  /** 点档案：再点取消→回此刻；未填生日→提示；有生日→填入时间栏并自动排盘 */
+  onArchiveTap: function (e) {
+    var id = String(e.currentTarget.dataset.id);
+    if (this.data.activeArchiveId === id) {
+      this.setData({ activeArchiveId: '' });
+      this.useNow();
+      return;
+    }
+    var chip = null;
+    for (var i = 0; i < this.data.archives.length; i++) {
+      if (this.data.archives[i].id === id) { chip = this.data.archives[i]; break; }
+    }
+    if (!chip) return;
+    var a = chip.raw || {};
+    if (a.birth_year == null || a.birth_year === '') {
+      wx.showToast({ title: '该档案尚未填写出生信息', icon: 'none' });
+      return;
+    }
+    var h = (a.birth_hour == null || a.birth_hour === '') ? 12 : Number(a.birth_hour);
+    var mi = (a.birth_minute == null || a.birth_minute === '') ? 0 : Number(a.birth_minute);
+    this.setData({ activeArchiveId: id });
+    this._setTime({ y: Number(a.birth_year), m: Number(a.birth_month) || 1, d: Number(a.birth_day) || 1, h: h, mi: mi });
+    this.buildPan();
+  },
+
+  /** 空档案「去创建」：标记后回 chat 打开新增档案编辑器 */
+  onGoCreate: function () {
+    var g = getApp().globalData;
+    g._openNewArchive = true;
+    if (getCurrentPages().length > 1) {
+      wx.navigateBack();
+    } else {
+      wx.reLaunch({ url: '/uniApp/pages/chat/chat?openNewArchive=1' });
+    }
+  },
+
   onBind: function () {
-    if (!this.result) return;
+    if (!this.result || this.data.bound) return;
     var app = getApp();
     app.globalData.paipan = app.globalData.paipan || {};
     app.globalData.paipan.qimen = { payload: this.result.payload, meta: this.result.meta };
+    this.setData({ bound: true });
     wx.showToast({ title: '已关联到提问', icon: 'none' });
-    setTimeout(function () { wx.navigateBack(); }, 400);
+  },
+
+  onUnbind: function () {
+    if (!this.data.bound) return;
+    var app = getApp();
+    if (app.globalData.paipan) { delete app.globalData.paipan.qimen; }
+    this.setData({ bound: false });
+    wx.showToast({ title: '已取消关联', icon: 'none' });
   }
 });

@@ -38,6 +38,26 @@
 
 .cond-actions .qm-btn { width: 180rpx; height: 66rpx; margin-left: 16rpx; }
 
+/* DF-61：档案栏（九宫格上方，横向滚动 chip） */
+.arch-bar { margin-bottom: 18rpx; }
+.arch-scroll { white-space: nowrap; width: 100%; }
+.arch-chip {
+  display: inline-block;
+  vertical-align: top;
+  min-width: 150rpx;
+  padding: 10rpx 18rpx;
+  margin-right: 12rpx;
+  border-radius: 14rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+.arch-chip.on { background: rgba(232, 184, 74, .18); border-color: rgba(232, 184, 74, .7); }
+.arch-nick { font-size: 24rpx; color: #e8dff5; }
+.arch-chip.on .arch-nick { color: #ffd979; }
+.arch-sub { font-size: 20rpx; color: #9f8ac0; margin-top: 2rpx; }
+.arch-empty { display: flex; justify-content: center; }
+.arch-empty .qm-btn { width: 240rpx; }
+
 /* 起局信息 */
 .qinfo {
   padding: 18rpx 20rpx;
@@ -64,6 +84,19 @@
 }
 
 .badge-ju { color: #ff8fb5; background: rgba(255, 143, 181, .12); border-color: rgba(255, 143, 181, .3); }
+
+/* DF-61：信息栏右侧「关联 / 取消 / 提示词」按钮 */
+.qinfo-btns { display: flex; margin-left: auto; }
+.qinfo-btn {
+  font-size: 22rpx;
+  color: #cbb6ee;
+  padding: 4rpx 16rpx;
+  margin-left: 10rpx;
+  border-radius: 10rpx;
+  border: 1rpx solid rgba(147, 112, 219, .5);
+  background: rgba(147, 112, 219, .12);
+}
+.qinfo-btn.off { color: #6d6185; border-color: rgba(120, 100, 150, .3); background: transparent; }
 
 /* 九宫格 */
 .grid {
@@ -175,11 +208,6 @@
 .bot .gn { color: #6a5a85; font-weight: 500; }
 
 .tip { font-size: 22rpx; color: #8f7cb0; margin: 16rpx 0 10rpx; }
-
-.actions { display: flex; margin-top: 14rpx; }
-
-.actions .qm-btn { flex: 1; margin-right: 16rpx; }
-.actions .qm-btn:last-child { margin-right: 0; }
 
 .empty { padding: 100rpx 20rpx; text-align: center; font-size: 26rpx; color: #8f7cb0; }
 

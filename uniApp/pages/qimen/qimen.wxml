@@ -25,6 +25,25 @@
     </view>
   </view>
 
+  <!-- DF-61：档案栏（九宫格上方）；无档案时居中「去创建」 -->
+  <view class="arch-bar">
+    <scroll-view wx:if="{{archives.length}}" class="arch-scroll" scroll-x>
+      <view
+        class="arch-chip {{item.id === activeArchiveId ? 'on' : ''}}"
+        wx:for="{{archives}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onArchiveTap"
+      >
+        <view class="arch-nick">{{item.nickname}}</view>
+        <view class="arch-sub">{{item.sub}}</view>
+      </view>
+    </scroll-view>
+    <view class="arch-empty" wx:else>
+      <view class="qm-btn qm-btn-primary" bindtap="onGoCreate">去创建</view>
+    </view>
+  </view>
+
   <block wx:if="{{built}}">
     <!-- 起局信息 -->
     <view class="qinfo">
@@ -37,6 +56,11 @@
         <text class="qinfo-label">定局</text>
         <text class="qinfo-val">{{info.yuan}} · {{info.dun}}</text>
         <text class="badge badge-ju">{{info.ju}} 局</text>
+        <view class="qinfo-btns">
+          <view class="qinfo-btn {{bound ? 'off' : ''}}" bindtap="onBind">关联</view>
+          <view class="qinfo-btn {{bound ? '' : 'off'}}" bindtap="onUnbind">取消</view>
+          <view class="qinfo-btn" bindtap="previewPrompt">提示词</view>
+        </view>
       </view>
       <view class="qinfo-row">
         <text class="qinfo-label">值符</text>
@@ -80,12 +104,6 @@
     </view>
 
     <view class="tip">点击任一宫位，查看该宫八神 / 九星 / 八门 / 天盘干的释义</view>
-
-    <!-- 关联操作 -->
-    <view class="actions">
-      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
-      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
-    </view>
   </block>
 
   <view class="empty" wx:else>

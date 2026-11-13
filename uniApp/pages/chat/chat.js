@@ -249,7 +249,8 @@ Page({
   },
 
   /* ---------------- 生命周期 ---------------- */
-  onLoad: function () {
+  onLoad: function (options) {
+    this._pendingNewArchive = !!(options && options.openNewArchive);
     var u = api.readUser();
     var statusBarH = 0;
     try {
@@ -294,6 +295,19 @@ Page({
     var u = api.readUser();
     this.setData({ loggedIn: !!u, userName: u ? u.name : '', userId: u ? String(u.uid || '') : '' });
     this.syncChips();
+    // DF-61：奇门页「去创建」返回时，直接打开「新增档案」编辑器
+    var g = app().globalData;
+    var wantNewArchive = this._pendingNewArchive || (g && g._openNewArchive);
+    this._pendingNewArchive = false;
+    if (g) g._openNewArchive = false;
+    if (wantNewArchive) this._openNewArchiveFlow();
+  },
+
+  /** DF-61：打开档案层并直接进入新增编辑器（未登录先弹登录，沿用 pendingAction） */
+  _openNewArchiveFlow: function () {
+    if (!api.getToken()) { this.pendingAction = 'archives'; this.setData({ showLogin: true }); return; }
+    this.onArchives();
+    this.onNewArchive();
   },
 
   onUnload: function () {
