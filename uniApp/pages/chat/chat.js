@@ -313,7 +313,9 @@ Page({
     this._quotePool = [];
     this._stockPool = (QUOTES_STOCK || []).slice(); // DF-67：证券池源（静态，缺失时为空数组）
     this._stockHintPool = [];    // DF-67：等待期可用的证券池副本（每轮重置）
-    this._stockLinked = false;   // DF-67：当前线程是否关联证券（触发条件，任一条记录 usages 含 stock）
+    this._stockLinked = false;   // DF-67：当前是否启用证券条件池（绑定存在 OR usages 含 stock）
+    this._usagesStock = false;   // DF-67：线程 usages 是否含 stock（历史信号）
+    this._prevBoundStock = false; // DF-67：上一次同步时的绑定状态（用于识别显式解绑）
     this._hintOwner = null;      // 'waiting' | 'idle' | null（互斥）
     this._idleTimer = null;
     this._idleIdx = 0;
@@ -651,7 +653,35 @@ Page({
         });
       });
     }
+    this._usagesStock = linked;
+    this._refreshStockLinked();
+  },
+
+  /** DF-67：当前是否绑定了证券信息卡片（免费流无 usages 时靠它触发） */
+  _hasBoundStock: function () {
+    var g = app().globalData || {};
+    return !!(g.paipan && g.paipan.stock);
+  },
+
+  /**
+   * DF-67：重算证券条件池开关——「当前绑定存在 OR 线程 usages 含 stock」。
+   * 开关变化时重建证券池并重启当前轮播（等待期/空闲期），确保绑定后 18 秒内可出证券句。
+   */
+  _refreshStockLinked: function () {
+    var bound = this._hasBoundStock();
+    // 绑定由有变无 = 用户显式解绑：清掉历史 usages 信号，避免解绑后继续出证券句
+    if (this._prevBoundStock && !bound) this._usagesStock = false;
+    this._prevBoundStock = bound;
+    var linked = !!(this._usagesStock || bound);
+    if (linked === this._stockLinked) return;
     this._stockLinked = linked;
+    this._stockHintPool = linked ? (this._stockPool || []).slice() : [];
+    if (this._hintOwner === 'waiting') {
+      this._startThinking();
+    } else if (this._hintOwner === 'idle') {
+      this._stopIdleHint();
+      this._startIdleHint();
+    }
   },
 
   /** 空闲轮播启动条件（对齐 DF-64）：未录音/未等待/无置顶/无已发送/无覆盖层/面板展开/输入为空且未聚焦/在前台 */
@@ -2164,6 +2194,9 @@ Page({
         self.autoMetas = [];
         self.threadTypes = [];
         self._stockLinked = false;     // DF-67：重新开始/新会话清除证券条件池标记
+        self._usagesStock = false;
+        self._prevBoundStock = false;
+        self._stockHintPool = [];
         self._restorePromise = null;
         var g = app().globalData;
         if (g) g.paipan = {};
@@ -2421,6 +2454,7 @@ Page({
       chips = this.autoMetas.map(this._chipOfAuto, this);
     }
     this.setData({ chips: chips, skillActive: active });
+    this._refreshStockLinked(); // DF-67：绑定/解绑后即时同步证券条件池并重启轮播
   },
 
   _chipOfAuto: function (meta) {
