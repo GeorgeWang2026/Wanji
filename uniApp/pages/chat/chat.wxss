@@ -809,8 +809,6 @@
 
 .rec-count { font-size: 22rpx; color: #6a5a85; }
 
-.rec-undo { font-size: 22rpx; color: #b8a8d8; margin-left: auto; }
-
 /* ================= 底部控制区 ================= */
 .controls {
   flex: 0 0 auto;

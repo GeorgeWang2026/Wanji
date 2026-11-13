@@ -143,9 +143,8 @@ Page({
   data: {
     messages: [],
     input: '',
-    inputCursor: -1,       // DF-58：撤销恢复用光标位置
+    inputCursor: -1,       // DF-58：输入框光标位置
     canClear: false,       // DF-58：输入框是否有可清空内容
-    showUndoClear: false,  // DF-58：清空后是否显示「撤销」
     sending: false,
     typing: false,
     typingText: '正在起盘…',
@@ -1857,12 +1856,7 @@ Page({
   onInput: function (e) {
     this._inputCursor = (e.detail && typeof e.detail.cursor === 'number') ? e.detail.cursor : -1;
     var v = e.detail.value;
-    var patch = { input: v, inputCursor: -1, canClear: (v || '').trim().length > 0 };
-    if (this.data.showUndoClear) {
-      patch.showUndoClear = false;
-      this._clearUndoTimer();
-    }
-    this.setData(patch);
+    this.setData({ input: v, inputCursor: -1, canClear: (v || '').trim().length > 0 });
   },
 
   onExample: function (e) {
@@ -1870,33 +1864,11 @@ Page({
     this.setData({ input: text, inputOpen: true, canClear: text.trim().length > 0 });
   },
 
-  /** DF-58：一键清空输入区，并给出 5 秒撤销入口 */
+  /** DF-58：一键清空输入区（需求方定稿：不保留原文、不显示撤销、无 5 秒计时） */
   clearInput: function () {
-    var text = this.data.input || '';
-    if (!text.trim()) return;
-    this._clearText = text;
-    this._clearCursor = (this._inputCursor != null && this._inputCursor >= 0) ? this._inputCursor : text.length;
-    this.setData({ input: '', inputCursor: 0, canClear: false, showUndoClear: true });
+    if (!(this.data.input || '').trim()) return;
+    this.setData({ input: '', inputCursor: 0, canClear: false });
     wx.showToast({ title: '已清空', icon: 'none' });
-    this._clearUndoTimer();
-    var self = this;
-    this._undoTimer = setTimeout(function () {
-      self._undoTimer = null;
-      self.setData({ showUndoClear: false });
-    }, 5000);
-  },
-
-  /** DF-58：撤销清空，恢复原文与光标位置 */
-  undoClear: function () {
-    this._clearUndoTimer();
-    var text = this._clearText || '';
-    var cursor = (this._clearCursor != null && this._clearCursor >= 0) ? this._clearCursor : text.length;
-    this._clearText = '';
-    this.setData({ input: text, inputCursor: cursor, canClear: text.trim().length > 0, showUndoClear: false });
-  },
-
-  _clearUndoTimer: function () {
-    if (this._undoTimer) { clearTimeout(this._undoTimer); this._undoTimer = null; }
   },
 
   onSendTap: function () {
@@ -1938,8 +1910,7 @@ Page({
   },
 
   _doSend: function (text) {
-    this.setData({ input: '', inputOpen: false, canClear: false, showUndoClear: false });
-    this._clearUndoTimer();
+    this.setData({ input: '', inputOpen: false, canClear: false });
     this.startFlow(text);
   },
 

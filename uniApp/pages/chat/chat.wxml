@@ -184,7 +184,6 @@
       <view class="input-foot">
         <text class="rec-hint" wx:if="{{recording}}">正在聆听 {{recSeconds}}s，再点麦克风结束</text>
         <text class="rec-count" wx:elif="{{input.length >= 900}}">{{input.length}}/1000</text>
-        <text class="rec-undo" wx:if="{{showUndoClear}}" hover-class="press-zone" bindtap="undoClear">撤销</text>
       </view>
     </view>
   </view>
