@@ -209,7 +209,9 @@
   <view class="controls">
     <view class="ctrl-btn" hover-class="ctrl-press" bindtap="openHistory">
       <image class="ctrl-ico" src="/uniApp/static/icons/chat-history.png" mode="aspectFit" />
-      <view class="ctrl-dot" wx:if="{{messages.length > 0}}"></view>
+      <!-- FB-51：咨询记录未读数字角标（原 ctrl-dot 红点升级；计数为未读回复条数，>99 显示 99+） -->
+      <view wx:if="{{historyUnread > 0}}"
+            style="position:absolute;top:2rpx;right:2rpx;min-width:30rpx;height:30rpx;padding:0 6rpx;box-sizing:border-box;border-radius:15rpx;background:#ff6478;color:#fff;font-size:20rpx;line-height:30rpx;text-align:center;box-shadow:0 0 8rpx rgba(255,100,120,.9);">{{historyUnread > 99 ? '99+' : historyUnread}}</view>
     </view>
     <view class="mic-btn {{recording ? 'recording' : ''}}" hover-class="mic-press" bindtap="onMicTap">
       <image class="mic-ico" src="/uniApp/static/icons/chat-mic.png" mode="aspectFit" />

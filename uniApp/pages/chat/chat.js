@@ -229,6 +229,8 @@ Page({
     topOpen: true,
     inputOpen: false,
     showHistory: false,
+    /* FB-51：咨询记录未读回复数（数字角标，来自 storage 「unread_replies:<uid>」） */
+    historyUnread: 0,
     /* ---- 深度解读全屏层（FB-44 技能标签 / DF-54 主问题与追问，共用同一层） ---- */
     showSkillAnalysis: false,
     skillAnalysisState: '',      // loading | ready | error | none
@@ -339,6 +341,8 @@ Page({
     this._appHidden = false;
     var u = api.readUser();
     this.setData({ loggedIn: !!u, userName: u ? u.name : '', userId: u ? String(u.uid || '') : '' });
+    // FB-51：冷启动 / 切账号后按 uid 恢复未读角标（杀进程保留）
+    this._syncUnread();
     this.syncChips();
     // DF-62：回显本地缓存的用户头像，并异步用 /auth/profile 回填（登录/冷启动）
     this._syncUserAvatar();
@@ -722,6 +726,8 @@ Page({
     // 先用本次会话的本地聚合占位，随后以服务端列表为准
     this.buildHistory();
     this.setData({ showHistory: true, inputOpen: false, scrollTo: '' });
+    // FB-51：进入咨询记录页即整体清零未读角标
+    this._clearUnread();
     this._stopIdleHint();
     this.loadHistory(false);
   },
@@ -2241,24 +2247,57 @@ Page({
     if (role === 'user') {
       patch.lastQuestion = text;
     } else if (role === 'assistant' && !ex.plainOnly) {
-      // 回复到达：自动弹出对话记录（对应网页版的答案浮层）
-      // 录音中不打断输入面板，避免把正在回填的文字藏起来
-      // FB-49：登录成功后的首条欢迎/引导消息不自动开记录页
-      if (!this.data.recording) {
-        if (this.skipAutoHistoryOnce) {
-          this.skipAutoHistoryOnce = false;
-        } else {
-          patch.showHistory = true;
+      // FB-51：回复到达不再无条件弹咨询记录页，改为按「归属」分流。
+      // 归属键 = 本轮请求携带的 question_id（由调用方写入 item.qid）；
+      // 与当前面板根 id（付费 rootQuestionId / 免费 freeQuestionId）相等 → 属于当前根：
+      //   展开顶部咨询面板直接看回复（录音中不打断输入面板，避免藏起正在回填的文字）。
+      // 不等 → 属于其他问题：不展开、不播报，仅在咨询记录按钮累加未读数字角标。
+      // 缺失 question_id → 按其他处理且不计数（不猜测归属，仅 console 记录）。
+      var curRoot = this.rootQuestionId || this.freeQuestionId || '';
+      var rqid = ex.qid || '';
+      if (rqid && curRoot && String(rqid) === String(curRoot)) {
+        if (!this.data.recording) {
+          patch.topOpen = true;
           patch.inputOpen = false;
         }
+      } else if (rqid) {
+        this._addUnread(rqid);
+      } else {
+        console.warn('[chat] FB-51：回复未携带 question_id，按其他处理且不计未读');
       }
     }
     this.setData(patch);
     this.buildHistory();
-    // 记录页已自动打开时，以服务端列表为准刷新一次
-    if (patch.showHistory && this.data.loggedIn) this.loadHistory(false);
     return id;
   },
+
+  /* ---------------- FB-51：咨询记录未读角标（storage 按 uid 隔离） ---------------- */
+  _unreadKey: function () { return 'unread_replies:' + (this.data.userId || ''); },
+  _readUnread: function () {
+    try {
+      var v = wx.getStorageSync(this._unreadKey());
+      if (v && typeof v === 'object' && typeof v.total === 'number') {
+        return { total: v.total, byQid: (v.byQid && typeof v.byQid === 'object') ? v.byQid : {} };
+      }
+    } catch (e) { /* 忽略读取异常，按未读 0 处理 */ }
+    return { total: 0, byQid: {} };
+  },
+  _writeUnread: function (u) {
+    try { wx.setStorageSync(this._unreadKey(), u); } catch (e) { /* 忽略写入异常 */ }
+    this.setData({ historyUnread: u.total || 0 });
+  },
+  /** 把 storage 未读同步到界面（登录 / 切账号 / 进页面时调用） */
+  _syncUnread: function () { this.setData({ historyUnread: this._readUnread().total || 0 }); },
+  /** 其他问题的回复到达：按 qid 累加未读（每条 +1，同 qid 累加） */
+  _addUnread: function (qid) {
+    var u = this._readUnread();
+    var k = String(qid || '');
+    u.byQid[k] = (u.byQid[k] || 0) + 1;
+    u.total = (u.total || 0) + 1;
+    this._writeUnread(u);
+  },
+  /** 进入咨询记录页：未读整体清零 */
+  _clearUnread: function () { this._writeUnread({ total: 0, byQid: {} }); },
 
   updateScroll: function () {
     this.setData({ scrollTo: 'anchor-bottom' });
@@ -2326,7 +2365,8 @@ Page({
   },
 
   _doSend: function (text) {
-    this.setData({ input: '', inputOpen: false, canClear: false });
+    // FB-51：发送后保持顶部咨询面板展开（会话区 / 已发送内容可见）
+    this.setData({ input: '', inputOpen: false, topOpen: true, canClear: false });
     this.startFlow(text);
   },
 
@@ -2587,7 +2627,10 @@ Page({
 
       this._stopThinking();
       this.setData({ typing: false });
-      var id = this.pushMsg('assistant', res.reply, { msgId: res.msg_id || '' });
+      var id = this.pushMsg('assistant', res.reply, {
+        msgId: res.msg_id || '',
+        qid: this.questionId || this.rootQuestionId || ''   // FB-51：归属键 = 本轮 question_id
+      });
       this.updateScroll();
 
       // 4) 自动播报（默认开启；长按音量图标关闭后不再自动播）
@@ -2648,7 +2691,10 @@ Page({
       }
       this._stopThinking();
       this.setData({ typing: false });
-      var id = this.pushMsg('assistant', res.reply, { msgId: res.msg_id || '' });
+      var id = this.pushMsg('assistant', res.reply, {
+        msgId: res.msg_id || '',
+        qid: this.freeQuestionId || ''   // FB-51：免费路径归属键（DF-72 提供 freeQuestionId）
+      });
       this.updateScroll();
       if (this.data.ttsOn) {
         var item = this.findMsg(id);
@@ -2939,8 +2985,8 @@ Page({
     });
     if (app().globalData) app().globalData.user = data;
     this.loadBalance();
-    // FB-49：登录成功后的首条欢迎/引导消息不自动打开咨询记录
-    this.skipAutoHistoryOnce = true;
+    // FB-51：登录 / 切账号后按 uid 恢复未读角标
+    this._syncUnread();
     // FB-49：按登录前唯一意图分发；无意图默认停在主页，不再被残留标记劫持
     var action = this.pendingAction || null;
     var pending = this.pendingText || '';
@@ -3004,10 +3050,11 @@ Page({
 
   logout: function () {
     api.clearUser();
-    // FB-49：退出登录清空待办意图与首条消息跳过标记
+    // FB-49：退出登录清空待办意图
     this.pendingAction = null;
     this.pendingText = '';
-    this.skipAutoHistoryOnce = false;
+    // FB-51：退出登录清除本账号未读角标
+    this._clearUnread();
     tts.stop(true);
     this.rootQuestionId = null;
     this.questionId = null;
