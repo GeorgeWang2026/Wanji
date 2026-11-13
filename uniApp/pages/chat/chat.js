@@ -1916,6 +1916,28 @@ Page({
       this.setData({ showLogin: true });
       return;
     }
+    this._maybeSendShort(text);
+  },
+
+  /** FB-47：短内容（1-3 字）先弹一次「是否发送」确认，避免误发/静默丢弃 */
+  _maybeSendShort: function (text) {
+    var self = this;
+    if (text.length >= 1 && text.length <= 3) {
+      wx.showModal({
+        title: '内容较短，确定发送吗？',
+        showCancel: true,
+        confirmText: '发送',
+        cancelText: '取消',
+        success: function (res) {
+          if (res.confirm) self._doSend(text);
+        }
+      });
+      return;
+    }
+    this._doSend(text);
+  },
+
+  _doSend: function (text) {
     this.setData({ input: '', inputOpen: false, canClear: false, showUndoClear: false });
     this._clearUndoTimer();
     this.startFlow(text);
@@ -2384,21 +2406,8 @@ Page({
       var text = (r && r.text) || '';
       var filePath = (r && r.filePath) || '';
 
-      // FB-47：先看录音时长，<1 秒按「太短」提示，不发任何识别请求
-      var durMs = (r && r.duration) || 0;
-      var recS = this.data.recSeconds || 0;
-      if (durMs > 0 ? durMs < 1000 : recS < 1) {
-        wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
-        return;
-      }
-
+      // FB-47：不再因时长 <1s / 文件过小直接判失败，先尽量拿到识别文本（短按也可能识别出内容）
       if (!text && filePath) {
-        // FB-47：音频文件过小（<100 字节）视为空音频，同样按「太短」提示，不上传 /speech/asr
-        var tooSmall = await this._asrFileTooSmall(filePath);
-        if (tooSmall) {
-          wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
-          return;
-        }
         // 有音频但没有文本（插件异常 / 兜底链路）：走原来的整段识别补救
         wx.showLoading({ title: '识别中…', mask: true });
         try {
@@ -2409,8 +2418,8 @@ Page({
           wx.hideLoading();
           var em = (e && e.message) || '请稍后重试，或改用文字输入';
           if (this._isAsrShortErr(em)) {
-            // FB-47：太短/没录到声音不算识别失败，轻提示即可
-            wx.showToast({ title: em, icon: 'none' });
+            // FB-47：太短/没录到声音不算识别失败，按「没听清」轻提示，可重录
+            wx.showToast({ title: '没听清，请再说一次', icon: 'none' });
           } else {
             wx.showModal({ title: '语音识别失败', content: em, showCancel: false });
           }
@@ -2418,40 +2427,39 @@ Page({
         }
       }
 
-      if (!text) {
+      var trimmed = String(text || '').trim();
+      if (!trimmed) {
+        // FB-47：空/静音按「没听清」提示可重录；真实故障仍弹「语音识别失败」
         var errMsg = (r && r.error) || asr.lastError() || '';
-        if (errMsg) {
-          if (this._isAsrShortErr(errMsg)) {
-            // FB-47：插件 onError 录音过短类错误归入「太短」提示，不弹「语音识别失败」
-            wx.showToast({ title: '说话时间太短，请说 1 秒以上', icon: 'none' });
-          } else {
-            wx.showModal({ title: '语音识别失败', content: errMsg, showCancel: false });
-          }
+        if (errMsg && !this._isAsrShortErr(errMsg)) {
+          wx.showModal({ title: '语音识别失败', content: errMsg, showCancel: false });
         } else {
-          wx.showToast({ title: '没听清，再说一次？', icon: 'none' });
+          wx.showToast({ title: '没听清，请再说一次', icon: 'none' });
         }
         return;
       }
 
       // 最终结果整体覆盖中间结果，避免重复拼接
-      this.setData({ input: text, inputOpen: true, canClear: true });
-      wx.showToast({ title: '已填入，确认后发送', icon: 'none' });
+      this.setData({ input: trimmed, inputOpen: true, canClear: true });
+
+      // FB-47：识别出的短内容（1-3 字）同样先弹确认，取消则停在输入态
+      if (trimmed.length <= 3) {
+        var self = this;
+        wx.showModal({
+          title: '内容较短，确定发送吗？',
+          showCancel: true,
+          confirmText: '发送',
+          cancelText: '取消',
+          success: function (res) {
+            if (res.confirm) self._doSend(trimmed);
+          }
+        });
+      } else {
+        wx.showToast({ title: '已填入，确认后发送', icon: 'none' });
+      }
     } finally {
       this._stopping = false;
     }
-  },
-
-  /** FB-47：判断音频文件是否过小（<100 字节视为空音频） */
-  _asrFileTooSmall: function (filePath) {
-    return new Promise(function (resolve) {
-      try {
-        wx.getFileSystemManager().getFileInfo({
-          filePath: filePath,
-          success: function (info) { resolve((info.size || 0) < 100); },
-          fail: function () { resolve(false); }
-        });
-      } catch (e) { resolve(false); }
-    });
   },
 
   /** FB-47：识别「太短 / 没录到声音」类错误，避免误弹「语音识别失败」 */
