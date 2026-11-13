@@ -58,7 +58,9 @@ Page({
   onShow: function () {
     var app = getApp();
     this.setData({ bound: !!(app.globalData.paipan && app.globalData.paipan.qimen) });
-    this.loadArchives();
+    var self = this;
+    // DF-61：档案加载完成后再消费 chat「新增档案」标记，避免竞态
+    this.loadArchives().then(function (chips) { self._consumeNewArchive(chips); });
   },
 
   onUnload: function () {
@@ -114,9 +116,10 @@ Page({
     this._buildTimer = setTimeout(function () { self.buildPan(); }, 300);
   },
 
-  /** 「此刻」：一键回到当前时间并立即排盘 */
+  /** 「此刻」：一键回到当前时间并立即排盘（并清除档案选中） */
   useNow: function () {
     var d = new Date();
+    this.setData({ activeArchiveId: '' });
     this._setTime({ y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: 0 });
     this.buildPan();
   },
@@ -268,11 +271,11 @@ Page({
 
   /* ---------------- DF-61：档案栏 + 信息栏「关联 / 取消 / 提示词」 ---------------- */
 
-  /** 拉取档案（复用 /archives），生成「昵称 + 出生」chip */
+  /** 拉取档案（复用 /archives），生成「昵称 + 出生」chip；返回 chips 供新增档案联动 */
   loadArchives: function () {
     var self = this;
-    if (!api.getToken()) { this.setData({ archives: [] }); return; }
-    api.request('/archives').then(function (res) {
+    if (!api.getToken()) { this.setData({ archives: [] }); return Promise.resolve([]); }
+    return api.request('/archives').then(function (res) {
       var list = (res && res.code === 0 && res.data) ? res.data : [];
       var chips = list.map(function (a) {
         return {
@@ -283,7 +286,51 @@ Page({
         };
       });
       self.setData({ archives: chips });
-    }).catch(function () { /* 档案栏加载失败不打扰用户 */ });
+      return chips;
+    }).catch(function () { /* 档案栏加载失败不打扰用户 */ return []; });
+  },
+
+  /**
+   * DF-61：消费 chat 新增档案后写入的标记（优先按 id、其次按出生字段组匹配），
+   * 命中则自动选中该档案并排盘；匹配不到只刷新不选中；标记读取后立即清除。
+   */
+  _consumeNewArchive: function (chips) {
+    var g = getApp().globalData;
+    var id = g._newArchiveId;
+    var key = g._newArchiveKey;
+    if (!id && !key) return;
+    g._newArchiveId = null;
+    g._newArchiveKey = null;
+    chips = chips || this.data.archives || [];
+    var hit = null;
+    var i;
+    if (id) {
+      for (i = 0; i < chips.length; i++) {
+        if (chips[i].id === String(id)) { hit = chips[i]; break; }
+      }
+    }
+    if (!hit && key) {
+      for (i = 0; i < chips.length; i++) {
+        var a = chips[i].raw || {};
+        if (String(a.nickname || '') === String(key.nickname || '') &&
+            String(a.birth_year || '') === String(key.birth_year || '') &&
+            String(a.birth_month || '') === String(key.birth_month || '') &&
+            String(a.birth_day || '') === String(key.birth_day || '') &&
+            String(a.birth_hour || '') === String(key.birth_hour || '') &&
+            String(a.birth_minute || '') === String(key.birth_minute || '')) { hit = chips[i]; break; }
+      }
+    }
+    if (!hit) return;
+    var raw = hit.raw || {};
+    if (raw.birth_year == null || raw.birth_year === '') {
+      this.setData({ activeArchiveId: hit.id });
+      return;
+    }
+    var h = (raw.birth_hour == null || raw.birth_hour === '') ? 12 : Number(raw.birth_hour);
+    var mi = (raw.birth_minute == null || raw.birth_minute === '') ? 0 : Number(raw.birth_minute);
+    this.setData({ activeArchiveId: hit.id });
+    this._setTime({ y: Number(raw.birth_year), m: Number(raw.birth_month) || 1, d: Number(raw.birth_day) || 1, h: h, mi: mi });
+    this.buildPan();
   },
 
   _birthText: function (a) {

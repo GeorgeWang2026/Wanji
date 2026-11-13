@@ -2067,6 +2067,26 @@ Page({
       if (res && res.code === 0) {
         wx.showToast({ title: '已保存', icon: 'success' });
         self.setData({ showArchiveEditor: false });
+        // DF-61：新增档案后写标记，待奇门页 onShow 消费并自动选中排盘
+        if (!self.data.archEditing) {
+          var g = app().globalData;
+          var d = (res && res.data) || {};
+          var nid = (d.id != null) ? d.id : ((d.archive && d.archive.id != null) ? d.archive.id : null);
+          if (nid != null) {
+            g._newArchiveId = String(nid);
+            g._newArchiveKey = null;
+          } else {
+            g._newArchiveId = null;
+            g._newArchiveKey = {
+              nickname: nickname,
+              birth_year: parsed.birth_year,
+              birth_month: parsed.birth_month,
+              birth_day: parsed.birth_day,
+              birth_hour: parsed.birth_hour,
+              birth_minute: parsed.birth_minute
+            };
+          }
+        }
         self.loadArchives();
       } else {
         var msg = (res && (res.detail || res.msg)) || '保存失败';

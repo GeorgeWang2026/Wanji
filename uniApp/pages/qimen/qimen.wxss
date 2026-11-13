@@ -34,13 +34,24 @@
 .picker.p4 .pick-val { font-size: 24rpx; padding: 0 4rpx; overflow: hidden; white-space: nowrap; }
 .pick-u { font-size: 20rpx; color: #9f8ac0; margin-left: 2rpx; }
 
-.cond-actions { display: flex; justify-content: flex-end; margin-top: 16rpx; }
+/* DF-61：「此刻」改为时间行内图标按钮（可见 56×68rpx，热区 ≥88×88rpx） */
+.now-btn { flex: 0 0 auto; padding: 16rpx; margin: -16rpx; }
+.now-btn-inner {
+  width: 56rpx;
+  height: 68rpx;
+  border-radius: 14rpx;
+  background: rgba(147, 112, 219, .14);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.now-ico { width: 44rpx; height: 44rpx; display: block; }
+.now-btn-press .now-btn-inner { background: rgba(147, 112, 219, .28); }
 
-.cond-actions .qm-btn { width: 180rpx; height: 66rpx; margin-left: 16rpx; }
-
-/* DF-61：档案栏（九宫格上方，横向滚动 chip） */
-.arch-bar { margin-bottom: 18rpx; }
-.arch-scroll { white-space: nowrap; width: 100%; }
+/* DF-61：档案栏（九宫格上方，横向滚动 chip + 右侧固定「＋ 新增」） */
+.arch-bar { margin-bottom: 18rpx; display: flex; align-items: center; }
+.arch-scroll { white-space: nowrap; flex: 1 1 auto; min-width: 0; }
 .arch-chip {
   display: inline-block;
   vertical-align: top;
@@ -55,7 +66,21 @@
 .arch-nick { font-size: 24rpx; color: #e8dff5; }
 .arch-chip.on .arch-nick { color: #ffd979; }
 .arch-sub { font-size: 20rpx; color: #9f8ac0; margin-top: 2rpx; }
-.arch-empty { display: flex; justify-content: center; }
+.arch-add {
+  flex: 0 0 auto;
+  margin-left: 12rpx;
+  height: 56rpx;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  border-radius: 14rpx;
+  font-size: 22rpx;
+  color: #cbb6ee;
+  background: rgba(147, 112, 219, .06);
+  border: 1rpx dashed rgba(147, 112, 219, .5);
+}
+.arch-empty { display: flex; justify-content: center; flex: 1; }
 .arch-empty .qm-btn { width: 240rpx; }
 
 /* 起局信息 */
@@ -85,18 +110,24 @@
 
 .badge-ju { color: #ff8fb5; background: rgba(255, 143, 181, .12); border-color: rgba(255, 143, 181, .3); }
 
-/* DF-61：信息栏右侧「关联 / 取消 / 提示词」按钮 */
+/* DF-61：信息栏右侧「关联 / 取消 / 提示词」按钮（关联/取消两态互斥、同宽同高） */
 .qinfo-btns { display: flex; margin-left: auto; }
 .qinfo-btn {
+  min-width: 96rpx;
+  height: 44rpx;
+  padding: 0 20rpx;
+  margin-left: 10rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: center;
   font-size: 22rpx;
   color: #cbb6ee;
-  padding: 4rpx 16rpx;
-  margin-left: 10rpx;
-  border-radius: 10rpx;
+  border-radius: 8rpx;
   border: 1rpx solid rgba(147, 112, 219, .5);
   background: rgba(147, 112, 219, .12);
 }
-.qinfo-btn.off { color: #6d6185; border-color: rgba(120, 100, 150, .3); background: transparent; }
+.qinfo-btn-cancel { color: #d8b0b0; border-color: rgba(220, 120, 120, .45); }
 
 /* 九宫格 */
 .grid {

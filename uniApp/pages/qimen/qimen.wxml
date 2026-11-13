@@ -19,9 +19,12 @@
       <picker class="picker p4" mode="selector" range="{{hours}}" value="{{hourIdx}}" bindchange="onHourChange">
         <view class="pick-val">{{hours[hourIdx]}}<text class="pick-u">时</text></view>
       </picker>
-    </view>
-    <view class="cond-actions">
-      <view class="qm-btn qm-btn-ghost" bindtap="useNow">此刻</view>
+      <!-- DF-61：此刻 —— 时间行内图标按钮（时钟 + 逆时针回环） -->
+      <view class="now-btn" hover-class="now-btn-press" bindtap="useNow">
+        <view class="now-btn-inner">
+          <image class="now-ico" src="/uniApp/static/icons/qm-now.png" mode="aspectFit" />
+        </view>
+      </view>
     </view>
   </view>
 
@@ -39,7 +42,9 @@
         <view class="arch-sub">{{item.sub}}</view>
       </view>
     </scroll-view>
-    <view class="arch-empty" wx:else>
+    <!-- DF-61：档案非空时右侧固定「＋ 新增」入口（滚动区外，滚动不动） -->
+    <view class="arch-add" wx:if="{{archives.length}}" bindtap="onGoCreate">＋ 新增</view>
+    <view class="arch-empty" wx:if="{{!archives.length}}">
       <view class="qm-btn qm-btn-primary" bindtap="onGoCreate">去创建</view>
     </view>
   </view>
@@ -57,8 +62,8 @@
         <text class="qinfo-val">{{info.yuan}} · {{info.dun}}</text>
         <text class="badge badge-ju">{{info.ju}} 局</text>
         <view class="qinfo-btns">
-          <view class="qinfo-btn {{bound ? 'off' : ''}}" bindtap="onBind">关联</view>
-          <view class="qinfo-btn {{bound ? '' : 'off'}}" bindtap="onUnbind">取消</view>
+          <view class="qinfo-btn" wx:if="{{!bound}}" bindtap="onBind">关联</view>
+          <view class="qinfo-btn qinfo-btn-cancel" wx:if="{{bound}}" bindtap="onUnbind">取消</view>
           <view class="qinfo-btn" bindtap="previewPrompt">提示词</view>
         </view>
       </view>
