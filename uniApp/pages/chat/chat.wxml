@@ -27,8 +27,8 @@
       <view class="pc-empty-hint" id="pcEmptyHint" wx:if="{{!pinned && !sentVisible}}">
         <block wx:if="{{idleQuote}}">
           <text class="idle-quote-text">{{idleQuote.text}}</text>
+          <text class="idle-quote-translation" wx:if="{{idleQuote.translation}}">{{idleQuote.translation}}</text>
           <text class="idle-quote-author">—— {{idleQuote.author}}</text>
-          <text class="idle-quote-translation" wx:if="{{idleQuote.translation}}">译文：{{idleQuote.translation}}</text>
         </block>
         <block wx:else>请先在下方用语音或文字输入你想咨询的问题</block>
       </view>
@@ -78,8 +78,8 @@
           <view class="thinking-marquee" wx:if="{{typing}}">
             <block wx:if="{{hintQuote}}">
               <text class="quote-text">{{hintQuote.text}}</text>
+              <text class="quote-translation" wx:if="{{hintQuote.translation}}">{{hintQuote.translation}}</text>
               <text class="quote-author">—— {{hintQuote.author}}</text>
-              <text class="quote-translation" wx:if="{{hintQuote.translation}}">译文：{{hintQuote.translation}}</text>
             </block>
             <block wx:else><text class="dot-flash">●</text> {{typingText}}</block>
           </view>
