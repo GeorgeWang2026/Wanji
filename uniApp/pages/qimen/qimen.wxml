@@ -4,20 +4,24 @@
      ============================================================ -->
 <view class="page">
 
-  <!-- 起局条件 -->
+  <!-- 起局条件：年/月/日/时 四输入一排，改动即自动排盘（DF-60） -->
   <view class="cond">
-    <view class="cond-row">
-      <text class="cond-label">公历</text>
-      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
-        <view class="pick-val">{{date}}</view>
+    <view class="cond-row cond-row4">
+      <picker class="picker p4" mode="selector" range="{{years}}" value="{{yearIdx}}" bindchange="onYearChange">
+        <view class="pick-val">{{years[yearIdx]}}<text class="pick-u">年</text></view>
       </picker>
-      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
-        <view class="pick-val">{{time}}</view>
+      <picker class="picker p4" mode="selector" range="{{months}}" value="{{monthIdx}}" bindchange="onMonthChange">
+        <view class="pick-val">{{months[monthIdx]}}<text class="pick-u">月</text></view>
+      </picker>
+      <picker class="picker p4" mode="selector" range="{{days}}" value="{{dayIdx}}" bindchange="onDayChange">
+        <view class="pick-val">{{days[dayIdx]}}<text class="pick-u">日</text></view>
+      </picker>
+      <picker class="picker p4" mode="selector" range="{{hours}}" value="{{hourIdx}}" bindchange="onHourChange">
+        <view class="pick-val">{{hours[hourIdx]}}<text class="pick-u">时</text></view>
       </picker>
     </view>
     <view class="cond-actions">
       <view class="qm-btn qm-btn-ghost" bindtap="useNow">此刻</view>
-      <view class="qm-btn qm-btn-primary" bindtap="buildPan">起局</view>
     </view>
   </view>
 
@@ -57,23 +61,19 @@
           <view class="center-tag" wx:if="{{item.centerTag}}">{{item.centerTag}}</view>
         </block>
         <block wx:else>
-          <view class="badges">
+          <view class="hlbadges">
             <text class="hb {{b.cls}}" wx:for="{{item.badges}}" wx:for-item="b" wx:key="t">{{b.t}}</text>
           </view>
-          <view class="row-top">
-            <text class="tg" style="color:{{item.tgColor}}">{{item.tg}}</text>
+          <view class="top">
+            <text class="tg">{{item.tg}}</text>
             <text class="shen">{{item.shen}}</text>
-          </view>
-          <view class="row-mid">
             <text class="xing">{{item.xing}}</text>
-            <text class="men">{{item.men}}</text>
           </view>
-          <view class="row-bot">
-            <text class="dg" style="color:{{item.dgColor}}">{{item.dg}}</text>
-            <text class="gname">{{item.gname}}</text>
-          </view>
-          <view class="flags">
-            <text class="flag" wx:for="{{item.flags}}" wx:for-item="f" wx:key="*this">{{f}}</text>
+          <view class="mid">{{item.men}}</view>
+          <view class="flags">{{item.flagsText}}</view>
+          <view class="bot">
+            <text class="di">{{item.dg}}</text>
+            <text class="gn">{{item.gname}}</text>
           </view>
         </block>
       </view>
@@ -89,7 +89,7 @@
   </block>
 
   <view class="empty" wx:else>
-    <text>选择时间后点「起局」，即可排出奇门九宫盘。</text>
+    <text>调整年 / 月 / 日 / 时后将自动排出奇门九宫盘。</text>
   </view>
 
   <!-- 宫位详情：全屏页面形态（左返回 + 居中标题，无 ✕） -->
