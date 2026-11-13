@@ -11,6 +11,7 @@ var env = require('./env.js');
 var TOKEN_KEY = 'qimen_token';
 var UID_KEY = 'qimen_uid';
 var UNAME_KEY = 'qimen_uname';
+var UAVATAR_KEY = 'qimen_uavatar';   // DF-62：用户头像 URL 本地缓存（主页/个人中心回显用）
 
 function getToken() {
   try { return wx.getStorageSync(TOKEN_KEY) || ''; } catch (e) { return ''; }
@@ -23,7 +24,8 @@ function readUser() {
     return {
       token: token,
       uid: wx.getStorageSync(UID_KEY) || '',
-      name: wx.getStorageSync(UNAME_KEY) || ''
+      name: wx.getStorageSync(UNAME_KEY) || '',
+      avatar_url: wx.getStorageSync(UAVATAR_KEY) || ''
     };
   } catch (e) { return null; }
 }
@@ -34,8 +36,22 @@ function saveUser(data) {
     wx.setStorageSync(TOKEN_KEY, data.token || '');
     wx.setStorageSync(UID_KEY, String(data.user_id || ''));
     wx.setStorageSync(UNAME_KEY, data.display_name || data.username || '');
+    if (data.avatar_url) wx.setStorageSync(UAVATAR_KEY, data.avatar_url);
   } catch (e) { /* 忽略 */ }
   return readUser();
+}
+
+/** DF-62：更新本地缓存昵称（个人中心改昵称成功后调用，保证主页/个人中心一致） */
+function setCachedName(name) {
+  try { wx.setStorageSync(UNAME_KEY, name || ''); } catch (e) { /* 忽略 */ }
+}
+
+/** DF-62：更新本地缓存头像 URL（上传/回填成功后调用） */
+function setAvatarUrl(url) {
+  try {
+    if (url) wx.setStorageSync(UAVATAR_KEY, url);
+    else wx.removeStorageSync(UAVATAR_KEY);
+  } catch (e) { /* 忽略 */ }
 }
 
 function clearUser() {
@@ -43,6 +59,7 @@ function clearUser() {
     wx.removeStorageSync(TOKEN_KEY);
     wx.removeStorageSync(UID_KEY);
     wx.removeStorageSync(UNAME_KEY);
+    wx.removeStorageSync(UAVATAR_KEY);
   } catch (e) { /* 忽略 */ }
 }
 
@@ -135,6 +152,8 @@ module.exports = {
   getToken: getToken,
   readUser: readUser,
   saveUser: saveUser,
+  setCachedName: setCachedName,
+  setAvatarUrl: setAvatarUrl,
   clearUser: clearUser,
   request: request,
   login: login,

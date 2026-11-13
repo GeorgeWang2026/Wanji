@@ -125,6 +125,32 @@
   text-align: center;
 }
 
+/* DF-64：空闲期顶部金句轮播（纯文字，200ms 淡入） */
+.idle-quote-text {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #d7cdec;
+  animation: quote-fade .2s ease;
+}
+.idle-quote-author {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #9b86c4;
+  text-align: right;
+}
+.idle-quote-translation {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, .5);
+}
+@keyframes quote-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
 /* 参考页 #pinnedContext 展开后是 display:block（inline style），子块靠自身 margin 排布 */
 .pinned-context {
   display: block;
@@ -287,6 +313,27 @@
 }
 
 .thinking-marquee { color: #c9bce2; }
+
+/* DF-64：等待期金句（原文 + 作者右对齐 + 译文） */
+.quote-text {
+  display: block;
+  font-size: 28rpx;
+  line-height: 1.6;
+  color: #e3d8f5;
+}
+.quote-author {
+  display: block;
+  margin-top: 8rpx;
+  font-size: 24rpx;
+  color: #9b86c4;
+  text-align: right;
+}
+.quote-translation {
+  display: block;
+  margin-top: 6rpx;
+  font-size: 24rpx;
+  color: rgba(255, 255, 255, .5);
+}
 
 .dot-flash {
   color: #9370db;
@@ -1306,7 +1353,49 @@
   box-shadow: 0 8rpx 32rpx rgba(147, 112, 219, .35);
 }
 
+/* DF-62：头像可点选更换（button open-type=chooseAvatar），需清掉按钮默认样式 */
+.profile-avatar-btn {
+  width: 104rpx;
+  height: 104rpx;
+  margin: 0 28rpx 0 0;
+  padding: 0;
+  line-height: 1;
+  background: transparent;
+  border: none;
+}
+.profile-avatar-btn::after { border: none; }
+.profile-avatar-img {
+  width: 104rpx;
+  height: 104rpx;
+  border-radius: 50%;
+  box-shadow: 0 8rpx 32rpx rgba(147, 112, 219, .35);
+}
+
 .profile-name { font-size: 32rpx; font-weight: 600; color: #f0e8ff; }
+
+.profile-edit-ico { margin-left: 10rpx; font-size: 24rpx; color: #9b86c4; }
+
+/* DF-62：昵称就地编辑 */
+.nickname-edit { display: flex; align-items: center; }
+.nickname-input {
+  flex: 1;
+  min-width: 0;
+  height: 60rpx;
+  padding: 0 16rpx;
+  font-size: 28rpx;
+  color: #f0e8ff;
+  background: rgba(147, 112, 219, .14);
+  border: 1rpx solid rgba(147, 112, 219, .35);
+  border-radius: 12rpx;
+}
+.nickname-btn {
+  margin-left: 12rpx;
+  padding: 8rpx 18rpx;
+  font-size: 26rpx;
+  border-radius: 12rpx;
+}
+.nickname-btn.ok { color: #fff; background: #9370db; }
+.nickname-btn.cancel { color: #c0aee0; background: rgba(147, 112, 219, .2); }
 
 .profile-info { flex: 1; min-width: 0; }
 

@@ -23,8 +23,15 @@
     </view>
 
     <view class="panel-body {{topOpen ? 'open' : ''}}">
-      <!-- 未提交问题时的默认提示（对应参考页 #pcEmptyHint） -->
-      <view class="pc-empty-hint" id="pcEmptyHint" wx:if="{{!pinned && !sentVisible}}">请先在下方用语音或文字输入你想咨询的问题</view>
+      <!-- 未提交问题时的默认提示（对应参考页 #pcEmptyHint）；DF-64：空闲期在此轮播金句 -->
+      <view class="pc-empty-hint" id="pcEmptyHint" wx:if="{{!pinned && !sentVisible}}">
+        <block wx:if="{{idleQuote}}">
+          <text class="idle-quote-text">{{idleQuote.text}}</text>
+          <text class="idle-quote-author">—— {{idleQuote.author}}</text>
+          <text class="idle-quote-translation" wx:if="{{idleQuote.translation}}">译文：{{idleQuote.translation}}</text>
+        </block>
+        <block wx:else>请先在下方用语音或文字输入你想咨询的问题</block>
+      </view>
 
       <!-- 置顶上下文（对应参考页 #pinnedContext）：_renderChatRoot 平铺后的结构
            header(您的问题 + 时间 + 查看咨询报告) → 技能标签 → 问题正文 → 追问列表 -->
@@ -68,7 +75,14 @@
       <!-- 语音字幕区（对应参考页 #ttsLines / #ttsBody） -->
       <view class="tts-lines" id="ttsLines" wx:if="{{typing || ttsText}}">
         <view class="tts-body" id="ttsBody">
-          <view class="thinking-marquee" wx:if="{{typing}}"><text class="dot-flash">●</text> {{typingText}}</view>
+          <view class="thinking-marquee" wx:if="{{typing}}">
+            <block wx:if="{{hintQuote}}">
+              <text class="quote-text">{{hintQuote.text}}</text>
+              <text class="quote-author">—— {{hintQuote.author}}</text>
+              <text class="quote-translation" wx:if="{{hintQuote.translation}}">译文：{{hintQuote.translation}}</text>
+            </block>
+            <block wx:else><text class="dot-flash">●</text> {{typingText}}</block>
+          </view>
           <block wx:else>
             <text class="sr-label">{{ttsLabel}}</text>
             <text class="sr-text">{{ttsText}}</text>
@@ -102,7 +116,7 @@
       <view class="pulse-ring {{recording ? 'active' : ''}}"></view>
       <view class="avatar-ring {{(recording || typing || speaking) ? '' : 'idle'}}"></view>
 
-      <view class="avatar-stage" bindtap="onMicTap">
+      <view class="avatar-stage" bindtap="onAvatarTap">
         <image
           wx:if="{{!avatarErr}}"
           class="avatar-img"
@@ -122,8 +136,9 @@
         </view>
       </view>
 
-      <view class="avatar-nav prev" hover-class="press-zone" catchtap="prevAvatar">‹</view>
-      <view class="avatar-nav next" hover-class="press-zone" catchtap="nextAvatar">›</view>
+      <!-- DF-62：使用用户头像时隐藏角色左右切换（避免"头像顶点/切换角色"歧义） -->
+      <view class="avatar-nav prev" wx:if="{{!usingUserAvatar}}" hover-class="press-zone" catchtap="prevAvatar">‹</view>
+      <view class="avatar-nav next" wx:if="{{!usingUserAvatar}}" hover-class="press-zone" catchtap="nextAvatar">›</view>
     </view>
 
     <view class="paipan-bar">
@@ -174,6 +189,8 @@
             cursor-spacing="30"
             show-confirm-bar="{{false}}"
             bindinput="onInput"
+            bindfocus="onInputFocus"
+            bindblur="onInputBlur"
             bindconfirm="onSendTap"
           />
           <view class="rec-clear" wx:if="{{canClear && !recording}}" hover-class="press-zone" catchtap="clearInput">×</view>
@@ -314,10 +331,24 @@
       </view>
 
       <scroll-view class="modal-body profile-body fs-body" scroll-y enhanced="{{true}}" show-scrollbar="{{false}}">
+        <!-- DF-62：头像可点选更换（open-type=chooseAvatar），昵称就地编辑 -->
         <view class="profile-hero">
-          <view class="profile-avatar">✦</view>
+          <button class="profile-avatar-btn" open-type="chooseAvatar" bindchooseavatar="onChooseAvatar" hover-class="none">
+            <image wx:if="{{profileAvatar}}" class="profile-avatar-img" src="{{profileAvatar}}" mode="aspectFill" />
+            <view wx:else class="profile-avatar">✦</view>
+          </button>
           <view class="profile-info">
-            <view class="profile-name">{{userName || '用户'}}</view>
+            <block wx:if="{{!nicknameEditing}}">
+              <view class="profile-name" hover-class="press-zone" bindtap="onEditNickname">{{profileName || '用户'}}<text class="profile-edit-ico">✎</text></view>
+            </block>
+            <block wx:else>
+              <view class="nickname-edit">
+                <input class="nickname-input" type="nickname" value="{{nicknameDraft}}" placeholder="请输入昵称"
+                       maxlength="64" confirm-type="done" bindinput="onNicknameInput" bindconfirm="onSaveNickname" />
+                <view class="nickname-btn ok" hover-class="press-zone" bindtap="onSaveNickname">确定</view>
+                <view class="nickname-btn cancel" hover-class="press-zone" bindtap="onCancelNickname">取消</view>
+              </view>
+            </block>
             <view class="profile-sub">ID: {{userId || '-'}}</view>
           </view>
         </view>

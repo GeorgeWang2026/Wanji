@@ -18,6 +18,7 @@ var tts = require('../../utils/tts.js');
 var asr = require('../../utils/asr.js');
 var paipanUtil = require('../../utils/paipan.js');
 var avatarMouth = require('../../utils/avatar-mouth.js');
+var QUOTES = require('../../data/quotes.js');   // DF-64：等待期/空闲期金句池（自动生成）
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
 var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
@@ -35,6 +36,15 @@ var MSG_SEQ = 0;
 // FB-47：判空/过短阈值（按 trim 后字符数）；集中定义，便于统一调整
 var SHORT_TEXT_MIN = 1;
 var SHORT_TEXT_MAX = 3;
+
+// DF-63：等待期思考提示语三组词库（照抄 xiaoxuan.html _THINK_VERBS/_THINK_OBJS/_THINK_TAILS，各 6 条，组合 216）
+var THINK_VERBS = ['正在推演', '正在思考', '正在分析', '正在琢磨', '正在揣摩', '正在洞察'];
+var THINK_OBJS = ['你的问题', '其中的趋势', '这件事的走向', '潜在的变量', '背后的格局', '关键的节点'];
+var THINK_TAILS = ['，请稍候', '，请稍待片刻', '，很快就好', '，稍等一下', '，正在为你准备', '，请耐心等待'];
+var HINT_GAP_MS = 300;                       // 提示语句间间隔（对齐网站 2431-2448）
+var HINT_SAFETY_MS = 5 * 60 * 1000;          // 等待期安全上限 5 分钟（对齐网站 _awaitingReplySafety）
+var HINT_TEXT_ONLY_MS = 2000;                // ttsOn=false 时按字数兜底的基础时长
+var IDLE_HINT_MS = 6000;                     // DF-64：空闲期纯文字轮播节奏（6 秒/句）
 
 // 与 assistant-widget.js 的 XB_AVATAR_CONFIGS 保持一致（网页版 4 个智能体头像）
 var AVATARS = [
@@ -173,6 +183,10 @@ Page({
     /* ---- 个人中心（对应参考页 #profileModal） ---- */
     showProfile: false,
     userId: '',
+    profileName: '',          // DF-62：昵称（nickname > display_name > username）
+    profileAvatar: '',        // DF-62：头像 URL（空则显示占位符）
+    nicknameEditing: false,   // DF-62：昵称就地编辑态
+    nicknameDraft: '',        // DF-62：昵称编辑草稿
     /* ---- 我的档案（DF-56：内嵌全屏层，列表 + 新增/编辑，不新增页面 / 不改 app.json） ---- */
     showArchives: false,
     showArchiveEditor: false,
@@ -236,12 +250,16 @@ Page({
     sentVisible: false,    // #sentPreview
     sentContent: '',
     sentFeishuUrl: '',
+    hintQuote: null,       // DF-64：等待期当前金句 { text, author, translation }；思考语时为 null
+    idleQuote: null,       // DF-64：空闲期顶部轮播金句 { text, author, translation }
+    inputFocus: false,     // DF-64：输入框是否聚焦（空闲轮播暂停条件之一）
     ttsText: '',           // #ttsLines 字幕内容
     ttsLabel: '万机决策助手',
     examples: EXAMPLES,
     avatarIdx: 0,
     avatarSrc: '',
     avatarErr: false,
+    usingUserAvatar: false, // DF-62：主页是否在用用户上传的头像（true 时隐藏角色切换/口型）
     /* ---- 头像口型（DF-55：播报时嘴部缩放动画，定位照抄 XB_AVATAR_CONFIGS） ---- */
     mouthRect: null,       // {left,top,width,height} 百分比；null 则不渲染口型层
     mouthSx: 1,            // 口型横向缩放
@@ -266,6 +284,7 @@ Page({
       loggedIn: !!u,
       userName: u ? u.name : '',
       userId: u ? String(u.uid || '') : '',
+      profileName: u ? u.name : '',
       apiOrigin: env.getApiOrigin(),
       ttsOn: !(g0 && g0.ttsOn === false),
       statusBarH: statusBarH,
@@ -277,13 +296,31 @@ Page({
     this.chatMsgId = null;      // 上一条回复的 chat_messages.id（作为追问的 target_id）
     this.autoMetas = [];        // 本轮兜底自动起的盘
     this._ttsText = '';         // 最近一条被播报的文本（暂停后恢复用）
+    // DF-63/DF-64：等待期提示语轮播状态（单一实例，全页唯一）
+    this._hintActive = false;
+    this._hintEpoch = 0;
+    this._hintTimer = null;
+    this._hintSafety = null;
+    this._hintResolve = null;
+    this._hintSeq = 0;
+    this._quotePool = [];
+    this._hintOwner = null;      // 'waiting' | 'idle' | null（互斥）
+    this._idleTimer = null;
+    this._idleIdx = 0;
 
     var self = this;
     tts.setStateCallback(function (state) {
       var speaking = state === 'playing';
       self.setData({ speaking: speaking });
       if (speaking) { self._startMouth(); } else { self._stopMouth(); }
+      // DF-63：一句等待提示语播完 → 释放挂起的 promise，推进下一句
+      if (state === 'end' && self._hintResolve) {
+        var r = self._hintResolve; self._hintResolve = null; r();
+      }
     });
+
+    // DF-62：主页头像优先用本地缓存的用户头像（避免先闪角色图）
+    this._syncUserAvatar();
 
     if (!md.available) {
       this.pushMsg('assistant', '提示：Markdown 渲染库加载失败，回复将以纯文本展示。请确认工程根 markdown.js 未被小程序打包忽略。');
@@ -292,15 +329,27 @@ Page({
   },
 
   onShow: function () {
+    this._appHidden = false;
     var u = api.readUser();
     this.setData({ loggedIn: !!u, userName: u ? u.name : '', userId: u ? String(u.uid || '') : '' });
     this.syncChips();
+    // DF-62：回显本地缓存的用户头像，并异步用 /auth/profile 回填（登录/冷启动）
+    this._syncUserAvatar();
+    this._loadProfile();
     // DF-61：奇门页「去创建」返回时，直接打开「新增档案」编辑器
     var g = app().globalData;
     var wantNewArchive = this._pendingNewArchive || (g && g._openNewArchive);
     this._pendingNewArchive = false;
     if (g) g._openNewArchive = false;
     if (wantNewArchive) this._openNewArchiveFlow();
+    // DF-64：回到前台若无覆盖层、在等待/空闲切换时按条件恢复空闲期文字轮播
+    this._maybeStartIdleHint();
+  },
+
+  /** DF-63/DF-64：小程序无 onHide 需求时离开前台需暂停空闲轮播 */
+  onHide: function () {
+    this._appHidden = true;
+    this._stopIdleHint();
   },
 
   /** DF-61：打开档案层并直接进入新增编辑器（未登录先弹登录，沿用 pendingAction） */
@@ -311,6 +360,8 @@ Page({
   },
 
   onUnload: function () {
+    this._stopThinking();
+    this._stopIdleHint();
     tts.stop(true);
     if (this.recTimer) clearInterval(this.recTimer);
     if (this._mouthTimer) { clearInterval(this._mouthTimer); this._mouthTimer = null; }
@@ -318,9 +369,276 @@ Page({
 
   noop: function () {},
 
+  /* ================= DF-62：个人中心昵称 / 头像 ================= */
+
+  /** 主页头像与用户头像同步：有用户头像则用它并隐藏口型/角色切换，否则保持角色图 */
+  _syncUserAvatar: function () {
+    var u = api.readUser();
+    var av = (u && u.avatar_url) || '';
+    if (av) {
+      if (this.data.avatarSrc !== av) this._stopMouth();
+      this.setData({ usingUserAvatar: true, avatarSrc: av, avatarErr: false, mouthRect: null });
+    } else if (this.data.usingUserAvatar) {
+      this.setData({ usingUserAvatar: false });
+      this.setAvatar(this.data.avatarIdx || 0);
+    }
+  },
+
+  /** GET /auth/profile 回填昵称（nickname>display_name>username）/头像并写本地缓存 */
+  _loadProfile: function () {
+    var self = this;
+    if (!api.getToken()) return;
+    api.request('/auth/profile').then(function (res) {
+      var d = (res && (res.data || res.profile)) || res || {};
+      if (d && d.profile) d = d.profile;
+      var nickname = d.nickname || d.display_name || d.username || '';
+      var av = d.avatar_url || '';
+      var patch = {};
+      if (nickname) patch.profileName = nickname;
+      if (av) { patch.profileAvatar = av; api.setAvatarUrl(av); }
+      if (Object.keys(patch).length) self.setData(patch);
+      if (av) self._syncUserAvatar();
+    }).catch(function () { /* 静默：资料刷新失败不阻塞页面 */ });
+  },
+
+  /** 选择头像回调（button open-type=chooseAvatar） */
+  onChooseAvatar: function (e) {
+    var path = e && e.detail && e.detail.avatarUrl;
+    if (!path) return;
+    var self = this;
+    this._checkAvatarSize(path).then(function (ok) { if (ok) self._uploadAvatar(path); });
+  },
+
+  /** 上传前先本地判大小（>2MB 直接提示，避免白传） */
+  _checkAvatarSize: function (path) {
+    return new Promise(function (resolve) {
+      try {
+        wx.getFileSystemManager().getFileInfo({
+          filePath: path,
+          success: function (r) {
+            if (r && r.size > 2 * 1024 * 1024) {
+              wx.showToast({ title: '图片需小于 2MB', icon: 'none' });
+              resolve(false);
+            } else { resolve(true); }
+          },
+          fail: function () { resolve(true); }
+        });
+      } catch (err) { resolve(true); }
+    });
+  },
+
+  /** 上传头像 → PUT /auth/profile 保存绝对 URL → 刷新个人中心与主页头像 */
+  _uploadAvatar: function (path) {
+    var self = this;
+    var token = api.getToken();
+    if (!token) { this.pendingAction = 'profile'; this.setData({ showLogin: true }); return; }
+    wx.showLoading({ title: '上传中…', mask: true });
+    wx.uploadFile({
+      url: env.getApiBase() + '/upload/avatar',
+      filePath: path,
+      name: 'file',
+      header: { Authorization: 'Bearer ' + token },
+      timeout: 60000,
+      success: function (res) {
+        var body = res.data;
+        try { body = JSON.parse(body); } catch (err) { /* 保持原文 */ }
+        if (res.statusCode === 401) {
+          wx.hideLoading();
+          api.clearUser();
+          self.setData({ loggedIn: false, userName: '', showProfile: false, showLogin: true });
+          wx.showToast({ title: '登录已过期，请重新登录', icon: 'none' });
+          return;
+        }
+        var rel = body && (body.url || (body.data && body.data.url));
+        if (res.statusCode === 200 && rel) {
+          var abs = /^https?:\/\//i.test(rel) ? rel : env.getApiOrigin() + rel;
+          self._saveAvatarUrl(abs);
+          return;
+        }
+        wx.hideLoading();
+        var st = res.statusCode;
+        var detail = body && (body.detail || body.msg);
+        var tip = detail
+          || (st === 413 ? '图片超过 2MB，请换一张更小的'
+            : st === 501 ? '服务端头像目录不可写，请稍后重试'
+              : st === 400 ? '图片格式不支持，请选择 JPG/PNG'
+                : ('上传失败（' + st + '），请重试'));
+        wx.showToast({ title: tip, icon: 'none' });
+      },
+      fail: function () {
+        wx.hideLoading();
+        wx.showToast({ title: '上传失败，请检查网络后重试', icon: 'none' });
+      }
+    });
+  },
+
+  /** PUT /auth/profile 保存头像 URL，成功后立即回显 + 写缓存（失败保持旧头像） */
+  _saveAvatarUrl: function (abs) {
+    var self = this;
+    api.request('/auth/profile', { method: 'PUT', data: { avatar_url: abs } }).then(function (res) {
+      wx.hideLoading();
+      if (res && res.code !== undefined && res.code !== 0) {
+        wx.showToast({ title: (res.detail || res.msg) || '保存失败，请重试', icon: 'none' });
+        return;
+      }
+      api.setAvatarUrl(abs);
+      self.setData({ profileAvatar: abs });
+      self._syncUserAvatar();
+      wx.showToast({ title: '头像已更新', icon: 'success' });
+    }).catch(function (err) {
+      wx.hideLoading();
+      wx.showToast({ title: (err && err.message) || '保存失败，请重试', icon: 'none' });
+    });
+  },
+
+  /** 昵称就地编辑 */
+  onEditNickname: function () {
+    this._nicknameDraft = this.data.profileName || '';
+    this.setData({ nicknameEditing: true, nicknameDraft: this.data.profileName || '' });
+  },
+  onNicknameInput: function (e) { this._nicknameDraft = e.detail.value; },
+  onCancelNickname: function () { this.setData({ nicknameEditing: false, nicknameDraft: '' }); },
+  onSaveNickname: function () {
+    var self = this;
+    var val = String((this._nicknameDraft != null ? this._nicknameDraft : this.data.nicknameDraft) || '').trim();
+    if (!val) { wx.showToast({ title: '昵称不能为空', icon: 'none' }); return; }
+    if (val.length > 64) { wx.showToast({ title: '昵称不能超过 64 个字', icon: 'none' }); return; }
+    api.request('/auth/profile', { method: 'PUT', data: { nickname: val } }).then(function (res) {
+      if (res && res.code !== undefined && res.code !== 0) {
+        wx.showToast({ title: (res.detail || res.msg) || '保存失败，请重试', icon: 'none' });
+        return;
+      }
+      api.setCachedName(val);
+      self.setData({ profileName: val, nicknameEditing: false, nicknameDraft: '', userName: val });
+      wx.showToast({ title: '昵称已更新', icon: 'success' });
+    }).catch(function (err) {
+      wx.showToast({ title: (err && err.message) || '保存失败，请重试', icon: 'none' });
+    });
+  },
+
+  /** 主页头像点击：用户头像生效时打开个人中心，否则保持原有录音行为 */
+  onAvatarTap: function () {
+    if (this.data.usingUserAvatar) { this.openProfile(); return; }
+    this.onMicTap();
+  },
+
+  /* ================= DF-63：等待期提示语轮播 + 统一停止 ================= */
+
+  _genThinkingMsg: function () {
+    var v = THINK_VERBS[Math.floor(Math.random() * THINK_VERBS.length)];
+    var o = THINK_OBJS[Math.floor(Math.random() * THINK_OBJS.length)];
+    var t = THINK_TAILS[Math.floor(Math.random() * THINK_TAILS.length)];
+    return v + o + t;
+  },
+
+  /** 启动等待期提示语轮播：先停旧链，epoch+1，5 分钟安全上限 */
+  _startThinking: function () {
+    var self = this;
+    this._stopThinking();
+    this._stopIdleHint();
+    this._hintOwner = 'waiting';
+    var epoch = ++this._hintEpoch;
+    this._hintActive = true;
+    this._hintSeq = 0;
+    this._quotePool = (QUOTES || []).slice();
+    if (this._hintSafety) clearTimeout(this._hintSafety);
+    this._hintSafety = setTimeout(function () { self._stopThinking(); }, HINT_SAFETY_MS);
+    var loop = function () {
+      if (!self._hintActive || epoch !== self._hintEpoch) return;
+      var hint = self._nextHint();
+      self.setData({
+        typingText: hint.text,
+        hintQuote: hint.isQuote ? { text: hint.text, author: hint.author, translation: hint.translation } : null
+      });
+      var speech = self.data.ttsOn ? (hint.speech || hint.text) : '';
+      self._hintSpeak(speech).then(function () {
+        if (!self._hintActive || epoch !== self._hintEpoch) return;
+        self._hintTimer = setTimeout(loop, HINT_GAP_MS);
+      });
+    };
+    loop();
+  },
+
+  /** 停止等待期轮播：清 timer / 释放挂起 promise / epoch+1，防止旧回调继续推进 */
+  _stopThinking: function () {
+    this._hintActive = false;
+    this._hintEpoch = (this._hintEpoch || 0) + 1;
+    if (this._hintTimer) { clearTimeout(this._hintTimer); this._hintTimer = null; }
+    if (this._hintSafety) { clearTimeout(this._hintSafety); this._hintSafety = null; }
+    if (this._hintResolve) { var r = this._hintResolve; this._hintResolve = null; r(); }
+    if (this._hintOwner === 'waiting') this._hintOwner = null;
+  },
+
+  /** 播报一句提示：有文本走 TTS（等 'end' 后推进），无文本按 2000ms/句兜底 */
+  _hintSpeak: function (text) {
+    var self = this;
+    return new Promise(function (resolve) {
+      if (!text) { setTimeout(resolve, HINT_TEXT_ONLY_MS); return; }
+      self._hintResolve = resolve;
+      tts.speak(text);
+    });
+  },
+
+  /* ================= DF-64：金句轮播 / 空闲期文字轮播 ================= */
+
+  /** 取下一句等待期提示语：首句 50% 金句，其后 2 思考语 : 1 金句；金句不重复、用尽只走思考语 */
+  _nextHint: function () {
+    var quotes = QUOTES || [];
+    var n = this._hintSeq++;
+    var wantQuote = n === 0 ? (Math.random() < 0.5) : (n % 3 === 0);
+    if (wantQuote && this._quotePool && this._quotePool.length) {
+      var q = this._quotePool.splice(Math.floor(Math.random() * this._quotePool.length), 1)[0];
+      return { isQuote: true, text: q.text, author: q.author, translation: q.translation, speech: q.speech || q.text };
+    }
+    return { isQuote: false, text: this._genThinkingMsg() };
+  },
+
+  /** DF-64：空闲期顶部金句轮播（纯文字，6 秒/句，顺序遍历） */
+  _startIdleHint: function () {
+    var quotes = QUOTES || [];
+    if (!quotes.length) return;
+    if (this._hintOwner === 'idle' && this._idleTimer) return;
+    this._hintOwner = 'idle';
+    this._idleIdx = 0;
+    this._showIdleHint();
+  },
+  _showIdleHint: function () {
+    var self = this;
+    var quotes = QUOTES || [];
+    if (!quotes.length) return;
+    var q = quotes[this._idleIdx % quotes.length];
+    this._idleIdx++;
+    this.setData({ idleQuote: { text: q.text, author: q.author, translation: q.translation } });
+    if (this._idleTimer) clearTimeout(this._idleTimer);
+    this._idleTimer = setTimeout(function () { self._showIdleHint(); }, IDLE_HINT_MS);
+  },
+  _stopIdleHint: function () {
+    if (this._idleTimer) { clearTimeout(this._idleTimer); this._idleTimer = null; }
+    if (this._hintOwner === 'idle') this._hintOwner = null;
+  },
+
+  /** 空闲轮播启动条件（对齐 DF-64）：未录音/未等待/无置顶/无已发送/无覆盖层/面板展开/输入为空且未聚焦/在前台 */
+  _maybeStartIdleHint: function () {
+    var d = this.data;
+    if (this._appHidden) return;
+    if (this._hintOwner === 'waiting' || d.typing || d.recording) return;
+    if (d.pinned || d.sentVisible) return;
+    if (d.showLogin || d.showProfile || d.showHistory || d.showArchives || d.showArchiveEditor || d.showCredits || d.showSkillAnalysis) return;
+    if (!d.topOpen) return;
+    if (d.inputFocus || (d.input || '').trim().length) return;
+    this._startIdleHint();
+  },
+
+  onInputFocus: function () { this.setData({ inputFocus: true }); this._stopIdleHint(); },
+  onInputBlur: function () { this.setData({ inputFocus: false }); this._maybeStartIdleHint(); },
+
+
   /* ---------------- 界面交互（面板 / 头像 / 记录） ---------------- */
   toggleTop: function () {
-    this.setData({ topOpen: !this.data.topOpen });
+    var open = !this.data.topOpen;
+    this.setData({ topOpen: open });
+    if (open) { this._maybeStartIdleHint(); }
+    else { this._stopIdleHint(); }
   },
 
   toggleInput: function () {
@@ -352,6 +670,7 @@ Page({
     // 先用本次会话的本地聚合占位，随后以服务端列表为准
     this.buildHistory();
     this.setData({ showHistory: true, inputOpen: false, scrollTo: '' });
+    this._stopIdleHint();
     this.loadHistory(false);
   },
 
@@ -364,6 +683,7 @@ Page({
       scrollTo: '',
       showProfile: backToProfile && this.data.loggedIn
     });
+    if (!(backToProfile && this.data.loggedIn)) this._maybeStartIdleHint();
   },
 
   /** 咨询记录条目折叠/展开（参考页 toggleChatItem：点 header / 问题行切换 .expanded） */
@@ -853,6 +1173,7 @@ Page({
       skillAnalysisMsg: '正在生成深度解读…',
       skillAnalysisHtml: ''
     });
+    this._stopIdleHint();
     api.request('/chat/analysis_result/' + analysisId, { timeout: 60000 }).then(function (j) {
       delete self._skillInflight[key];
       var text = self._analysisText(j);
@@ -919,6 +1240,7 @@ Page({
       skillAnalysisMsg: '',
       skillAnalysisHtml: ''
     });
+    this._maybeStartIdleHint();
   },
 
   /* ---------------- DF-54：主问题 / 追问 → 全屏解读（复用 FB-44 的同一层） ---------------- */
@@ -1352,11 +1674,23 @@ Page({
       wx.showToast({ title: '录音中，结束后再打开', icon: 'none' });
       return;
     }
-    this.setData({ showProfile: true, inputOpen: false });
+    var cu = api.readUser();
+    this.setData({
+      showProfile: true,
+      inputOpen: false,
+      nicknameEditing: false,
+      profileName: this.data.profileName || this.data.userName || '',
+      profileAvatar: (cu && cu.avatar_url) || this.data.profileAvatar || ''
+    });
+    this._stopIdleHint();
     this.loadBalance();
+    this._loadProfile();
   },
 
-  closeProfile: function () { this.setData({ showProfile: false }); },
+  closeProfile: function () {
+    this.setData({ showProfile: false, nicknameEditing: false });
+    this._maybeStartIdleHint();
+  },
 
   onProfileHistory: function () {
     this.setData({ showProfile: false });
@@ -1369,10 +1703,11 @@ Page({
   onProfileCredits: function () {
     if (!api.getToken()) { this.pendingAction = 'credits'; this.setData({ showLogin: true }); return; }
     this.setData({ showCredits: true });
+    this._stopIdleHint();
     this.loadCreditsBalance();
     this.loadLedger(false);
   },
-  closeCredits: function () { this.setData({ showCredits: false }); },
+  closeCredits: function () { this.setData({ showCredits: false }); this._maybeStartIdleHint(); },
 
   /** 拉取余额与今日已消耗（沿用 /credits/balance，口径与网页一致） */
   loadCreditsBalance: function () {
@@ -1516,9 +1851,10 @@ Page({
   onArchives: function () {
     if (!api.getToken()) { this.pendingAction = 'archives'; this.setData({ showLogin: true }); return; }
     this.setData({ showArchives: true });
+    this._stopIdleHint();
     this.loadArchives();
   },
-  closeArchives: function () { this.setData({ showArchives: false }); },
+  closeArchives: function () { this.setData({ showArchives: false }); this._maybeStartIdleHint(); },
   closeArchiveEditor: function () { this.setData({ showArchiveEditor: false }); },
 
   /** 拉取档案列表，附加展示用的关系中文与出生文案 */
@@ -1813,6 +2149,9 @@ Page({
         });
         tts.stop(true);
         self._ttsText = '';
+        // DF-63/DF-64：重新开始后清空提示语轮播，并在空闲态按条件恢复顶部轮播
+        self._stopThinking();
+        self._maybeStartIdleHint();
       }
     });
   },
@@ -1875,11 +2214,14 @@ Page({
     this._inputCursor = (e.detail && typeof e.detail.cursor === 'number') ? e.detail.cursor : -1;
     var v = e.detail.value;
     this.setData({ input: v, inputCursor: -1, canClear: (v || '').trim().length > 0 });
+    // DF-64：输入框有文字时暂停空闲期金句轮播
+    if ((v || '').trim().length) this._stopIdleHint();
   },
 
   onExample: function (e) {
     var text = e.currentTarget.dataset.text || '';
     this.setData({ input: text, inputOpen: true, canClear: text.trim().length > 0 });
+    this._stopIdleHint();
   },
 
   /** DF-58：一键清空输入区（需求方定稿：不保留原文、不显示撤销、无 5 秒计时） */
@@ -1887,6 +2229,7 @@ Page({
     if (!(this.data.input || '').trim()) return;
     this.setData({ input: '', inputCursor: 0, canClear: false });
     wx.showToast({ title: '已清空', icon: 'none' });
+    this._maybeStartIdleHint();
   },
 
   onSendTap: function () {
@@ -2036,8 +2379,7 @@ Page({
   // 单击：正在播 → 暂停这一条；已暂停/空闲 → 从头恢复上一条；已关闭 → 重新开启
   onTtsIcon: function () {
     if (this.data.speaking) {
-      tts.stop();
-      this.setData({ speaking: false });
+      this.stopSpeaking('pause');
       wx.showToast({ title: '已暂停播报', icon: 'none' });
       return;
     }
@@ -2058,10 +2400,23 @@ Page({
   // 长按：彻底关闭自动播报（本轮及后续新回复都不再自动播）
   onTtsOff: function () {
     if (!this.data.ttsOn) return;
-    tts.stop();
+    this.stopSpeaking('off');
     if (app().globalData) app().globalData.ttsOn = false;
-    this.setData({ ttsOn: false, speaking: false });
+    this.setData({ ttsOn: false });
     wx.showToast({ title: '已关闭自动播报', icon: 'none' });
+  },
+
+  /**
+   * DF-63：统一停止播报（单击暂停 / 长按关闭 / 开始录音 / 重新发送 / 离开页面 均走这里）
+   * 语义（对齐网站）：停止等待期提示语轮播（置 hintActive=false、epoch+1、清 timer）、
+   * 立即停 TTS、复位口型，避免残留回调继续推进提示语。
+   */
+  stopSpeaking: function (reason) {
+    this._stopThinking();
+    tts.stop();
+    this.setData({ speaking: false, typing: false });
+    this._stopMouth();
+    return reason;
   },
 
   // 最近一条真正回复的纯文本（恢复播报用）
@@ -2107,12 +2462,13 @@ Page({
       types: bundle.types,
       auto: !!(this.autoMetas && this.autoMetas.length)
     });
-    this.setData({ typing: true, typingText: '正在起盘…' });
+    this.setData({ typing: true });
+    // DF-63：启动等待期随机提示语轮播（含 TTS）
+    this._startThinking();
     this.updateScroll();
 
     try {
       // 1) 让后端把盘面组装成提示词文本（网页版同款接口）
-      this.setData({ typingText: '正在组装盘面…' });
       var promptRes = { texts: {}, hint: '' };
       try {
         promptRes = await paipanUtil.fetchPromptText(bundle.paipanData);
@@ -2121,7 +2477,6 @@ Page({
       }
 
       // 2) 扣积分（幂等 client_id）
-      this.setData({ typingText: '正在推演…' });
       var clientId = 'wx' + Date.now() + Math.floor(Math.random() * 1000);
       var consume = await api.request('/credits/consume', {
         method: 'POST',
@@ -2174,6 +2529,7 @@ Page({
       }
       if (res.msg_id) this.chatMsgId = res.msg_id;
 
+      this._stopThinking();
       this.setData({ typing: false });
       var id = this.pushMsg('assistant', res.reply, { msgId: res.msg_id || '' });
       this.updateScroll();
@@ -2190,6 +2546,7 @@ Page({
       this._refreshPanel(this.rootQuestionId);
     } catch (e) {
       console.error('[chat] 流程失败', e);
+      this._stopThinking();
       this.setData({ typing: false, sentVisible: false });
       var msg = (e && e.message) || '请求失败';
       if (/登录已过期/.test(msg)) {
@@ -2199,6 +2556,7 @@ Page({
       this.updateScroll();
     } finally {
       this.setData({ sending: false, typing: false });
+      this._maybeStartIdleHint();
     }
   },
 
@@ -2208,9 +2566,12 @@ Page({
    * 不显示「已消耗 N 积分」气泡与 sentPreview 置顶，question_id 传 null 保证不落问事记录。
    */
   freeGuidanceFlow: async function (text) {
+    // DF-63：免费路径同样展示「已发送」卡片（定稿口径）
+    this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '' });
     // 用户这句作为普通消息展示，不带技能标记，不进咨询记录卡片
     this.pushMsg('user', text, { types: [], auto: false });
-    this.setData({ typing: true, typingText: '正在整理建议…' });
+    this.setData({ typing: true });
+    this._startThinking();
     this.updateScroll();
     try {
       var res = await api.request('/chat', {
@@ -2229,6 +2590,7 @@ Page({
       if (!res || typeof res.reply !== 'string') {
         throw new Error((res && (res.detail || res.msg)) || '模型未返回内容');
       }
+      this._stopThinking();
       this.setData({ typing: false });
       var id = this.pushMsg('assistant', res.reply, { msgId: res.msg_id || '' });
       this.updateScroll();
@@ -2241,7 +2603,8 @@ Page({
       }
     } catch (e) {
       console.error('[chat] 免费引导失败', e);
-      this.setData({ typing: false });
+      this._stopThinking();
+      this.setData({ typing: false, sentVisible: false });
       var msg = (e && e.message) || '请求失败';
       if (/登录已过期/.test(msg)) {
         this.setData({ loggedIn: false, userName: '', showLogin: true });
@@ -2249,6 +2612,7 @@ Page({
       this.pushMsg('assistant', '出错了：' + msg + '。可以稍后再试一次。');
       this.updateScroll();
     }
+    this._maybeStartIdleHint();
   },
 
   /**
@@ -2331,6 +2695,7 @@ Page({
 
   /* ---------------- 语音输入 ---------------- */
   onMicTap: function () {
+    this.stopSpeaking('record');
     if (this.data.recording) this.stopRecord();
     else this.startRecord();
   },
@@ -2355,6 +2720,7 @@ Page({
       });
       // 录音开始即展开输入面板（向上浮层），让用户边录边看到回填区域
       this.setData({ recording: true, recSeconds: 0, inputOpen: true, topOpen: false });
+      this._stopIdleHint();
       if (this.recTimer) clearInterval(this.recTimer);
       this.recTimer = setInterval(function () {
         var s = self.data.recSeconds + 1;
