@@ -5,21 +5,13 @@
 var Y = require('../../utils/yishu.js');
 var paipan = require('../../utils/paipan.js');
 var api = require('../../utils/api.js');
+/* DF-82：时间栏参数（年/月/日/时/分）与梅花同源，统一走 timebar */
+var TB = require('../../utils/timebar.js');
 
 var GONG_CELL = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 var CLS = { 4: 'c-mu', 9: 'c-huo', 2: 'c-tu', 3: 'c-mu', 5: 'center', 7: 'c-jin', 8: 'c-tu', 1: 'c-shui', 6: 'c-jin' };
 
 function p2(n) { return n < 10 ? '0' + n : '' + n; }
-
-/** DF-60：当月天数（m 为 1-12） */
-function daysInMonth(y, m) { return new Date(y, m, 0).getDate(); }
-
-/** DF-60：年份下拉范围 1900-2100 */
-function buildYearRange() {
-  var arr = [];
-  for (var y = 1900; y <= 2100; y++) arr.push(String(y));
-  return arr;
-}
 
 Page({
   data: {
@@ -29,15 +21,14 @@ Page({
     detail: null,
     hint: '',
     showHint: false,
-    /* DF-60：时间栏（年/月/日/时 四个下拉，改完自动重排，无「起局」按钮） */
+    /* DF-60/DF-82：时间栏（年/月/日/时(HH:mm) 四格一排，改完自动重排，无「起局」按钮） */
     years: [],
     months: [],
     days: [],
-    hours: [],
+    time: '',
     yearIdx: 0,
     monthIdx: 0,
     dayIdx: 0,
-    hourIdx: 0,
     /* DF-61：档案栏（九宫格上方）+ 关联态 */
     archives: [],
     activeArchiveId: '',
@@ -45,12 +36,12 @@ Page({
   },
 
   onLoad: function () {
-    this.years = buildYearRange();
+    this.years = TB.yearRange();
     var saved = wx.getStorageSync('qimen_last_time');
     var now = new Date();
     var t = (saved && saved.y)
-      ? { y: saved.y, m: saved.m, d: saved.d, h: saved.h, mi: 0 }
-      : { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), mi: 0 };
+      ? { y: saved.y, m: saved.m, d: saved.d, h: saved.h, mi: (typeof saved.mi === 'number' ? saved.mi : 0) }
+      : { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), mi: now.getMinutes() };
     this._setTime(t, { silent: true });
     this.buildPan();
   },
@@ -69,38 +60,39 @@ Page({
 
   noop: function () {},
 
-  /* ---------------- DF-60：时间栏（四输入自动排盘） ---------------- */
+  /* ---------------- DF-60 / DF-82：时间栏（年/月/日 + 时含分 自动排盘） ---------------- */
 
-  /** 写入当前时间（年/月/日/时 + 分钟），刷新下拉选项与索引；日越界自动钳制到月末 */
+  /** 写入当前时间（年/月/日/时/分），刷新下拉选项与索引；日越界自动钳制到月末 */
   _setTime: function (t, opts) {
     opts = opts || {};
-    var y = t.y, m = t.m, d = t.d, h = t.h, mi = t.mi || 0;
-    var dim = daysInMonth(y, m);
-    var clamped = false;
-    if (d > dim) { d = dim; clamped = true; }
-    if (d < 1) d = 1;
-    this.time = { y: y, m: m, d: d, h: h, mi: mi };
-    this._buildRanges(y, m);
-    this.setData({ yearIdx: y - 1900, monthIdx: m - 1, dayIdx: d - 1, hourIdx: h });
-    wx.setStorageSync('qimen_last_time', { y: y, m: m, d: d, h: h });
-    if (clamped && !opts.silent) {
-      wx.showToast({ title: '已按当月天数调整到 ' + d + ' 日', icon: 'none' });
+    var n = TB.normalize(t);
+    this.time = { y: n.y, m: n.m, d: n.d, h: n.h, mi: n.mi };
+    this._buildRanges(n.y, n.m);
+    /* DF-82：时与分合并为一个时间控件，显示 HH:mm */
+    this.setData({ yearIdx: n.y - 1900, monthIdx: n.m - 1, dayIdx: n.d - 1, time: p2(n.h) + ':' + p2(n.mi) });
+    /* DF-82：缓存扩展 mi，旧缓存无 mi 已在 onLoad 兜底为 0 */
+    wx.setStorageSync('qimen_last_time', { y: n.y, m: n.m, d: n.d, h: n.h, mi: n.mi });
+    if (n.clampedDay && !opts.silent) {
+      wx.showToast({ title: '已按当月天数调整到 ' + n.d + ' 日', icon: 'none' });
     }
   },
 
   _buildRanges: function (y, m) {
-    var days = [], months = [], hours = [], i;
-    var dim = daysInMonth(y, m);
-    for (i = 1; i <= dim; i++) days.push(p2(i));
-    for (i = 1; i <= 12; i++) months.push(p2(i));
-    for (i = 0; i < 24; i++) hours.push(p2(i));
-    this.setData({ years: this.years, months: months, days: days, hours: hours });
+    this.setData({
+      years: this.years,
+      months: TB.monthOptions(),
+      days: TB.dayOptions(y, m)
+    });
   },
 
   onYearChange: function (e) { this._onFieldChange({ y: 1900 + Number(e.detail.value) }); },
   onMonthChange: function (e) { this._onFieldChange({ m: Number(e.detail.value) + 1 }); },
   onDayChange: function (e) { this._onFieldChange({ d: Number(e.detail.value) + 1 }); },
-  onHourChange: function (e) { this._onFieldChange({ h: Number(e.detail.value) }); },
+  /** DF-82：时间控件一次给出 HH:mm，时与分同时写入 */
+  onTimeChange: function (e) {
+    var parts = String(e.detail.value || '').split(':');
+    this._onFieldChange({ h: Number(parts[0]), mi: Number(parts[1]) });
+  },
 
   _onFieldChange: function (patch) {
     var t = { y: this.time.y, m: this.time.m, d: this.time.d, h: this.time.h, mi: this.time.mi };
@@ -116,11 +108,11 @@ Page({
     this._buildTimer = setTimeout(function () { self.buildPan(); }, 300);
   },
 
-  /** 「此刻」：一键回到当前时间并立即排盘（并清除档案选中） */
+  /** 「此刻」：一键回到当前时间（含当前分钟）并立即排盘（并清除档案选中） */
   useNow: function () {
     var d = new Date();
     this.setData({ activeArchiveId: '' });
-    this._setTime({ y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: 0 });
+    this._setTime({ y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes() });
     this.buildPan();
   },
 

@@ -69,6 +69,45 @@
 
 .ph { color: #7d6b9c; }
 
+/* DF-82：时间栏与奇门同源——年/月/日/时（含分）四格一排，窄屏（320）也不换行 */
+.cond-row4 { flex-wrap: nowrap; }
+.picker.p4 { flex: 1 1 0; min-width: 0; margin-right: 8rpx; }
+/* 时间行下拉高度与奇门一致（68rpx），单位后缀与两位补零同源 */
+.picker.p4 .pick-val { height: 68rpx; line-height: 68rpx; font-size: 24rpx; padding: 0 4rpx; overflow: hidden; white-space: nowrap; }
+.pick-u { font-size: 20rpx; color: #9f8ac0; margin-left: 2rpx; }
+
+/* DF-82：时间行「当前时间」图标（与奇门同图 qm-now.png、同显示尺寸 44×44rpx、同热区 ≥100rpx） */
+.now-btn { flex: 0 0 auto; padding: 16rpx; margin: -16rpx; }
+.now-btn-inner {
+  width: 56rpx;
+  height: 68rpx;
+  border-radius: 14rpx;
+  background: rgba(147, 112, 219, .14);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.now-ico { width: 44rpx; height: 44rpx; display: block; }
+.now-btn-press .now-btn-inner { background: rgba(147, 112, 219, .28); }
+
+/* DF-82：数字起卦「随机」按钮（可见 66rpx 与输入框对齐，热区高度 ≥88rpx，不与输入框重叠） */
+.rand-btn { flex: 0 0 auto; padding: 11rpx 0; margin: -11rpx 0; }
+.rand-btn-inner {
+  height: 66rpx;
+  line-height: 66rpx;
+  padding: 0 22rpx;
+  box-sizing: border-box;
+  border-radius: 14rpx;
+  font-size: 24rpx;
+  color: #cbb6ee;
+  text-align: center;
+  white-space: nowrap;
+  background: rgba(147, 112, 219, .14);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+.rand-btn-press .rand-btn-inner { background: rgba(147, 112, 219, .28); }
+
 .num-tip { font-size: 22rpx; color: #8f7cb0; margin-top: 10rpx; }
 
 .cond-actions { display: flex; justify-content: flex-end; margin-bottom: 20rpx; }

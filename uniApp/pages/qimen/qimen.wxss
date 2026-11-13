@@ -15,10 +15,9 @@
 
 .picker { flex: 1; margin-right: 14rpx; }
 
-/* DF-60：年/月/日/时 四输入等分一排，窄屏（320）也不换行 */
+/* DF-60/DF-82：年/月/日/时（含分）四格一排，窄屏（320）也不换行 */
 .cond-row4 { flex-wrap: nowrap; }
 .picker.p4 { flex: 1 1 0; min-width: 0; margin-right: 8rpx; }
-.picker.p4:last-child { margin-right: 0; }
 
 .pick-val {
   height: 68rpx;

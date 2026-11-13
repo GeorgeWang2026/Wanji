@@ -12,26 +12,45 @@
     </view>
   </view>
 
-  <!-- 时间起卦 -->
+  <!-- 时间起卦：年/月/日/时（含分）四格一排 + 右端「当前时间」图标（DF-82，与奇门同源） -->
   <view class="cond" wx:if="{{mode === 'time'}}">
-    <view class="cond-row">
-      <text class="cond-label">时间</text>
-      <picker mode="date" value="{{date}}" bindchange="onDateChange" class="picker">
-        <view class="pick-val">{{date}}</view>
+    <view class="cond-row cond-row4">
+      <picker class="picker p4" mode="selector" range="{{years}}" value="{{yearIdx}}" bindchange="onYearChange">
+        <view class="pick-val">{{years[yearIdx]}}<text class="pick-u">年</text></view>
       </picker>
-      <picker mode="time" value="{{time}}" bindchange="onTimeChange" class="picker">
+      <picker class="picker p4" mode="selector" range="{{months}}" value="{{monthIdx}}" bindchange="onMonthChange">
+        <view class="pick-val">{{months[monthIdx]}}<text class="pick-u">月</text></view>
+      </picker>
+      <picker class="picker p4" mode="selector" range="{{days}}" value="{{dayIdx}}" bindchange="onDayChange">
+        <view class="pick-val">{{days[dayIdx]}}<text class="pick-u">日</text></view>
+      </picker>
+      <!-- DF-82：时与分同一个时间控件一次填完（HH:mm） -->
+      <picker class="picker p4" mode="time" value="{{time}}" bindchange="onTimeChange">
         <view class="pick-val">{{time}}</view>
       </picker>
+      <view class="now-btn" hover-class="now-btn-press" bindtap="useNow">
+        <view class="now-btn-inner">
+          <image class="now-ico" src="/uniApp/static/icons/qm-now.png" mode="aspectFit" />
+        </view>
+      </view>
     </view>
   </view>
 
-  <!-- 数字起卦 -->
+  <!-- 数字起卦：上/下卦数各一个「随机」按钮（DF-82） -->
   <view class="cond" wx:if="{{mode === 'num'}}">
     <view class="cond-row">
       <text class="cond-label">上卦数</text>
-      <input class="num-input" type="number" value="{{n1}}" bindinput="onN1" placeholder="1-8" placeholder-class="ph" />
-      <text class="cond-label cond-label-2">下卦数</text>
-      <input class="num-input" type="number" value="{{n2}}" bindinput="onN2" placeholder="1-8" placeholder-class="ph" />
+      <input class="num-input" type="number" value="{{n1}}" bindinput="onN1" placeholder="1-99" placeholder-class="ph" />
+      <view class="rand-btn" hover-class="rand-btn-press" bindtap="onRandomN1">
+        <view class="rand-btn-inner">随机</view>
+      </view>
+    </view>
+    <view class="cond-row">
+      <text class="cond-label">下卦数</text>
+      <input class="num-input" type="number" value="{{n2}}" bindinput="onN2" placeholder="1-99" placeholder-class="ph" />
+      <view class="rand-btn" hover-class="rand-btn-press" bindtap="onRandomN2">
+        <view class="rand-btn-inner">随机</view>
+      </view>
     </view>
     <view class="num-tip">动爻按「两数之和 ÷ 6 取余」确定（古法）。</view>
   </view>

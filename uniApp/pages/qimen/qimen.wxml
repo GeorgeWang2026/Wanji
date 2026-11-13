@@ -4,7 +4,7 @@
      ============================================================ -->
 <view class="page">
 
-  <!-- 起局条件：年/月/日/时 四输入一排，改动即自动排盘（DF-60） -->
+  <!-- 起局条件：年/月/日/时（含分）四格一排，改动即自动排盘（DF-60 / DF-82） -->
   <view class="cond">
     <view class="cond-row cond-row4">
       <picker class="picker p4" mode="selector" range="{{years}}" value="{{yearIdx}}" bindchange="onYearChange">
@@ -16,8 +16,9 @@
       <picker class="picker p4" mode="selector" range="{{days}}" value="{{dayIdx}}" bindchange="onDayChange">
         <view class="pick-val">{{days[dayIdx]}}<text class="pick-u">日</text></view>
       </picker>
-      <picker class="picker p4" mode="selector" range="{{hours}}" value="{{hourIdx}}" bindchange="onHourChange">
-        <view class="pick-val">{{hours[hourIdx]}}<text class="pick-u">时</text></view>
+      <!-- DF-82：时与分同一个时间控件一次填完（HH:mm） -->
+      <picker class="picker p4" mode="time" value="{{time}}" bindchange="onTimeChange">
+        <view class="pick-val">{{time}}</view>
       </picker>
       <!-- DF-61：此刻 —— 时间行内图标按钮（时钟 + 逆时针回环） -->
       <view class="now-btn" hover-class="now-btn-press" bindtap="useNow">
@@ -111,7 +112,7 @@
   </block>
 
   <view class="empty" wx:else>
-    <text>调整年 / 月 / 日 / 时后将自动排出奇门九宫盘。</text>
+    <text>调整年 / 月 / 日 / 时后（时精确到分钟）将自动排出奇门九宫盘。</text>
   </view>
 
   <!-- 宫位详情：全屏页面形态（左返回 + 居中标题，无 ✕） -->
