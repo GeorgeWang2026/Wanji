@@ -1371,9 +1371,20 @@
   box-shadow: 0 8rpx 32rpx rgba(147, 112, 219, .35);
 }
 
-.profile-name { display: inline-flex; align-items: center; font-size: 32rpx; font-weight: 600; color: #f0e8ff; padding: 22rpx 0; margin: -22rpx 0; }
-
-.profile-edit-ico { margin-left: 12rpx; width: 28rpx; height: 28rpx; display: block; }
+.profile-name { display: inline-flex; align-items: center; max-width: 100%; font-size: 32rpx; font-weight: 600; color: #f0e8ff; padding: 22rpx 0; margin: -22rpx 0; }
+/* DF-62：昵称文字可收缩换行，保证图标不会单独掉到下一行 */
+.profile-name-txt { flex: 0 1 auto; min-width: 0; }
+/* DF-62：图标包 88rpx 独立热区，负 margin 抵消行高与间距（视觉间距仍为 12rpx） */
+.profile-edit-hit {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 88rpx;
+  height: 88rpx;
+  margin: -28rpx -28rpx -28rpx -16rpx;
+}
+.profile-edit-ico { width: 32rpx; height: 32rpx; display: block; }
 
 /* DF-62：昵称就地编辑 */
 .nickname-edit { display: flex; align-items: center; }

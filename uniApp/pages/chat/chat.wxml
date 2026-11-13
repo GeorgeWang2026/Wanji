@@ -341,7 +341,13 @@
           </button>
           <view class="profile-info">
             <block wx:if="{{!nicknameEditing}}">
-              <view class="profile-name" hover-class="press-zone" bindtap="onEditNickname">{{profileName || '用户'}}<image class="profile-edit-ico" src="/uniApp/static/icons/edit-pencil.png" mode="aspectFit" /></view>
+              <view class="profile-name" hover-class="press-zone" bindtap="onEditNickname">
+                <text class="profile-name-txt">{{profileName || '用户'}}</text>
+                <!-- DF-62：图标外包 88rpx 热区（负 margin 抵消行高），整行仍可点 -->
+                <view class="profile-edit-hit">
+                  <image class="profile-edit-ico" src="/uniApp/static/icons/edit-pencil.png" mode="aspectFit" />
+                </view>
+              </view>
             </block>
             <block wx:else>
               <view class="nickname-edit">
