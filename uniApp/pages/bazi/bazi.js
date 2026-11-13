@@ -4,6 +4,8 @@
  * ============================================================ */
 var Y = require('../../utils/yishu.js');
 var paipan = require('../../utils/paipan.js');
+/* DF-85：档案栏公共逻辑（与奇门页共用一套，见 utils/archives.js） */
+var ARCH = require('../../utils/archives.js');
 
 function p2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -26,7 +28,10 @@ Page({
     yun: {},
     dayun: [],
     hint: '',
-    showHint: false
+    showHint: false,
+    /* DF-85：档案栏（输入行上方）+ 选中态 */
+    archives: [],
+    activeArchiveId: ''
   },
 
   onLoad: function () {
@@ -45,6 +50,17 @@ Page({
     this.buildPan();
   },
 
+  onShow: function () {
+    var self = this;
+    // DF-85：刷新档案列表并消费 chat「新增档案」标记（命中即自动选中并排盘）
+    ARCH.loadArchives(this).then(function (chips) {
+      ARCH.consumeNewArchive(self, chips, {
+        applyArchive: function (raw) { self._applyArchiveFields(raw); },
+        rebuild: function () { self.buildPan(); }
+      });
+    });
+  },
+
   onUnload: function () {
     if (this._rebuildTimer) {
       clearTimeout(this._rebuildTimer);
@@ -54,26 +70,89 @@ Page({
 
   noop: function () {},
 
+  /* ---------------- DF-85：档案栏（公共逻辑见 utils/archives.js） ---------------- */
+
+  /** 点档案：再点取消→回此刻；未填生日→提示；有生日→回填（含性别）并立即排盘 */
+  onArchiveTap: function (e) {
+    var self = this;
+    ARCH.onArchiveTap(this, e.currentTarget.dataset.id, {
+      applyArchive: function (raw) { self._applyArchiveFields(raw); },
+      useNow: function () { self.useNow(); },
+      rebuild: function () { self.buildPan(); }
+    });
+  },
+
+  /** 空档案「去创建」：标记后回 chat 打开新增档案编辑器 */
+  onGoCreate: function () { ARCH.goCreate(); },
+
+  /** 把档案出生字段写入五格（年/月/日/时(含分)/性别）；档案无性别按「男」回填 */
+  _applyArchiveFields: function (raw) {
+    var years = this.data.years;
+    var y = Number(raw.birth_year);
+    var m = Number(raw.birth_month) || 1;
+    var d = Number(raw.birth_day) || 1;
+    var h = (raw.birth_hour == null || raw.birth_hour === '') ? 12 : Number(raw.birth_hour);
+    var mi = (raw.birth_minute == null || raw.birth_minute === '') ? 0 : Number(raw.birth_minute);
+    var yIdx = years.indexOf(y);
+    if (yIdx < 0) yIdx = this.data.yearIdx;
+    var mIdx = this.data.months.indexOf(m);
+    if (mIdx < 0) mIdx = 0;
+    var days = this._daysInMonth(years[yIdx], m);
+    var dIdx = d - 1;
+    if (dIdx < 0) dIdx = 0;
+    if (dIdx > days.length - 1) dIdx = days.length - 1;
+    var gIdx = (raw.gender === '女') ? 1 : 0;   /* 无性别或非「女」按「男」 */
+    this.setData({
+      yearIdx: yIdx,
+      monthIdx: mIdx,
+      days: days,
+      dayIdx: dIdx,
+      time: p2(h) + ':' + p2(mi),
+      genderIdx: gIdx
+    });
+  },
+
+  /** 再点已选中档案取消时：时间回到此刻并立即排盘；性别保持当前值 */
+  useNow: function () {
+    var d = new Date();
+    var years = this.data.years;
+    var yIdx = years.indexOf(d.getFullYear());
+    if (yIdx < 0) yIdx = this.data.yearIdx;
+    var mIdx = d.getMonth();
+    var days = this._daysInMonth(years[yIdx], mIdx + 1);
+    var dIdx = d.getDate() - 1;
+    if (dIdx > days.length - 1) dIdx = days.length - 1;
+    this.setData({
+      activeArchiveId: '',
+      yearIdx: yIdx,
+      monthIdx: mIdx,
+      days: days,
+      dayIdx: dIdx,
+      time: p2(d.getHours()) + ':' + p2(d.getMinutes())
+    });
+    this.buildPan();
+  },
+
   onYearChange: function (e) { this._applyDate({ yearIdx: Number(e.detail.value) }); },
   onMonthChange: function (e) { this._applyDate({ monthIdx: Number(e.detail.value) }); },
 
   onDayChange: function (e) {
     var idx = Number(e.detail.value);
     if (idx === this.data.dayIdx) return;
-    this.setData({ dayIdx: idx });
+    this.setData({ dayIdx: idx, activeArchiveId: '' });
     this._scheduleRebuild();
   },
 
   onTimeChange: function (e) {
     if (e.detail.value === this.data.time) return;
-    this.setData({ time: e.detail.value });
+    this.setData({ time: e.detail.value, activeArchiveId: '' });
     this._scheduleRebuild();
   },
 
   onGenderChange: function (e) {
     var idx = Number(e.detail.value);
     if (idx === this.data.genderIdx) return;
-    this.setData({ genderIdx: idx });
+    this.setData({ genderIdx: idx, activeArchiveId: '' });
     this._scheduleRebuild();
   },
 
@@ -97,6 +176,7 @@ Page({
     patch.monthIdx = monthIdx;
     patch.days = days;
     patch.dayIdx = dayIdx;
+    patch.activeArchiveId = '';   /* DF-85：手改年/月即视为偏离档案，静默取消选中 */
     this.setData(patch);
     this._scheduleRebuild();
   },

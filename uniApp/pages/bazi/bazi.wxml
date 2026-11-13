@@ -4,6 +4,27 @@
      ============================================================ -->
 <view class="page">
 
+  <!-- DF-85：档案栏（页面最上方、输入行之上）；无档案时居中「去创建」 -->
+  <view class="arch-bar">
+    <scroll-view wx:if="{{archives.length}}" class="arch-scroll" scroll-x>
+      <view
+        class="arch-chip {{item.id === activeArchiveId ? 'on' : ''}}"
+        wx:for="{{archives}}"
+        wx:key="id"
+        data-id="{{item.id}}"
+        bindtap="onArchiveTap"
+      >
+        <view class="arch-nick">{{item.nickname}}</view>
+        <view class="arch-sub">{{item.sub}}</view>
+      </view>
+    </scroll-view>
+    <!-- 档案非空时右侧固定「＋ 新增」入口（滚动区外，滚动不动） -->
+    <view class="arch-add" wx:if="{{archives.length}}" bindtap="onGoCreate">＋ 新增</view>
+    <view class="arch-empty" wx:if="{{!archives.length}}">
+      <view class="qm-btn qm-btn-primary" bindtap="onGoCreate">去创建</view>
+    </view>
+  </view>
+
   <!-- DF-52：年/月/日/时/性别 五格一排，改完自动排盘；窄屏横向滑动兜底 -->
   <view class="cond">
     <scroll-view scroll-x class="cond-scroll" show-scrollbar="{{false}}">

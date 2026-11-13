@@ -176,3 +176,39 @@ view, text, scroll-view, button, input, textarea {
   color: #e8e0f0;
   font-size: 28rpx;
 }
+
+/* ---------- DF-61/DF-85：档案栏（奇门 / 八字共用一套，全仓仅此一份定义） ---------- */
+/* 规则一律限定在 .arch-bar 作用域内：chat 页的「我的档案」列表也用到 .arch-sub/.arch-add，
+   限定后不会渗入 chat（页级 chat.wxss 亦保持不变），类名与数值仍与奇门原值逐项一致。 */
+.arch-bar { margin-bottom: 18rpx; display: flex; align-items: center; }
+.arch-bar .arch-scroll { white-space: nowrap; flex: 1 1 auto; min-width: 0; }
+.arch-bar .arch-chip {
+  display: inline-block;
+  vertical-align: top;
+  min-width: 150rpx;
+  padding: 10rpx 18rpx;
+  margin-right: 12rpx;
+  border-radius: 14rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 1rpx solid rgba(147, 112, 219, .3);
+}
+.arch-bar .arch-chip.on { background: rgba(232, 184, 74, .18); border-color: rgba(232, 184, 74, .7); }
+.arch-bar .arch-nick { font-size: 24rpx; color: #e8dff5; }
+.arch-bar .arch-chip.on .arch-nick { color: #ffd979; }
+.arch-bar .arch-sub { font-size: 20rpx; color: #9f8ac0; margin-top: 2rpx; }
+.arch-bar .arch-add {
+  flex: 0 0 auto;
+  margin-left: 12rpx;
+  height: 56rpx;
+  padding: 0 20rpx;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  border-radius: 14rpx;
+  font-size: 22rpx;
+  color: #cbb6ee;
+  background: rgba(147, 112, 219, .06);
+  border: 1rpx dashed rgba(147, 112, 219, .5);
+}
+.arch-bar .arch-empty { display: flex; justify-content: center; flex: 1; }
+.arch-bar .arch-empty .qm-btn { width: 240rpx; }
