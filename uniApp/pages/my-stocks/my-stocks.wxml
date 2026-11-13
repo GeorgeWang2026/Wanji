@@ -1,0 +1,118 @@
+<!-- ============================================================
+     我的证券（DF-69，原生全屏页，替代 DF-68 的弹层列表）
+     - 列表：名称 / 代码·大盘·板块 / 涨跌幅（红正绿负）/ 级别，最右「查看」
+     - 点行＝关联到当前提问并返回首页；长按行＝确认删除
+     - 底部悬浮「新增」：名称+代码，代码必填，联想候选回填
+     - 复用 .fs-page/.fs-header（app.wxss）与 qd-*（复制自 chat.wxss）
+     ============================================================ -->
+<view class="fs-page">
+
+  <view class="fs-header">
+    <view class="fs-back" hover-class="fs-back-press" bindtap="onBack">
+      <text class="fs-back-ico">‹</text>
+    </view>
+    <text class="fs-title">我的证券</text>
+  </view>
+
+  <view class="fs-body ms-body">
+    <scroll-view class="ms-scroll" scroll-y>
+
+      <view class="ms-hint" wx:if="{{state === 'loading'}}">加载中…</view>
+
+      <block wx:elif="{{state === 'error'}}">
+        <view class="ms-hint ms-error">加载失败：{{errMsg}}</view>
+        <view class="ms-retry" hover-class="ms-retry-press" bindtap="loadList">点击重试</view>
+      </block>
+
+      <view class="ms-hint" wx:elif="{{state === 'empty'}}">暂无股票，点下方「新增」添加</view>
+
+      <block wx:else>
+        <view
+          class="stock-pick-item"
+          wx:for="{{list}}"
+          wx:key="code"
+          hover-class="sp-item-press"
+          data-code="{{item.code}}"
+          data-name="{{item.name}}"
+          bindtap="onPick"
+          catchlongpress="onLongPress"
+        >
+          <view class="spi-main">
+            <view class="spi-name">{{item.name}}</view>
+            <view class="spi-sub">{{item.code}}{{item.sub ? ' · ' + item.sub : ''}}</view>
+          </view>
+          <view class="spi-side">
+            <view class="spi-zdf {{item.zdfCls}}">{{item.zdfText}}</view>
+            <view class="spi-grade">{{item.grade}}</view>
+          </view>
+          <view
+            class="spi-view"
+            hover-class="spi-view-press"
+            data-code="{{item.code}}"
+            data-name="{{item.name}}"
+            catchtap="onView"
+            catchlongpress="noop"
+          >查看</view>
+        </view>
+      </block>
+
+    </scroll-view>
+
+    <view class="ms-add" hover-class="ms-add-press" bindtap="openAdd">＋ 新增</view>
+  </view>
+
+  <!-- ============ 新增股票弹窗 ============ -->
+  <view class="qd-mask" wx:if="{{showAdd}}" catchtap="closeAdd">
+    <view class="qd-box ms-add-box" catchtap="noop">
+      <view class="qd-title">新增股票</view>
+      <view class="qd-content">
+        <view class="ms-field">
+          <text class="ms-label">股票名称</text>
+          <input class="ms-input" value="{{addName}}" placeholder="如：贵州茅台" placeholder-class="ms-ph"
+                 bindinput="onAddName" />
+        </view>
+        <view class="ms-field">
+          <text class="ms-label">股票代码</text>
+          <input class="ms-input" value="{{addCode}}" placeholder="如：600519" placeholder-class="ms-ph"
+                 bindinput="onAddCode" />
+        </view>
+        <view class="ms-sug" wx:if="{{sugs.length}}">
+          <view class="ms-sug-item" wx:for="{{sugs}}" wx:key="code"
+                hover-class="ms-sug-press" data-index="{{index}}" bindtap="pickSug">
+            <text class="ms-sug-name">{{item.name}}</text>
+            <text class="ms-sug-code">{{item.code}}</text>
+          </view>
+        </view>
+        <view class="ms-form-err" wx:if="{{addErr}}">{{addErr}}</view>
+      </view>
+      <view class="qd-actions">
+        <view class="qd-btn cancel" hover-class="qd-btn-press" bindtap="closeAdd">取消</view>
+        <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="saveAdd">保存</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 长按删除确认 ============ -->
+  <view class="qd-mask" wx:if="{{showDel}}" catchtap="cancelDel">
+    <view class="qd-box" catchtap="noop">
+      <view class="qd-title">删除确认</view>
+      <view class="qd-content">确定从列表中删除「{{delName}}」（{{delCode}}）吗？</view>
+      <view class="qd-actions">
+        <view class="qd-btn cancel" hover-class="qd-btn-press" bindtap="cancelDel">取消</view>
+        <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="confirmDel">确定</view>
+      </view>
+    </view>
+  </view>
+
+  <!-- ============ 未登录（兜底，正常入口已在首页拦截） ============ -->
+  <view class="qd-mask" wx:if="{{needLogin}}">
+    <view class="qd-box" catchtap="noop">
+      <view class="qd-title">需要登录</view>
+      <view class="qd-content">请先登录后再管理我的证券。</view>
+      <view class="qd-actions">
+        <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="onBack">返回</view>
+      </view>
+    </view>
+  </view>
+
+</view>

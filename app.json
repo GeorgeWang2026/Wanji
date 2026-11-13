@@ -5,7 +5,8 @@
     "uniApp/pages/bazi/bazi",
     "uniApp/pages/meihua/meihua",
     "uniApp/pages/gua/gua",
-    "uniApp/pages/stock/stock"
+    "uniApp/pages/stock/stock",
+    "uniApp/pages/my-stocks/my-stocks"
   ],
   "window": {
     "navigationBarBackgroundColor": "#1a0f2e",

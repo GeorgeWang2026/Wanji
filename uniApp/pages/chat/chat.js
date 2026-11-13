@@ -2550,6 +2550,12 @@ Page({
 
   openPaipan: function (e) {
     var type = e.currentTarget.dataset.type;
+    // DF-69：证券按钮改为进入「我的证券」全屏列表页（未登录先弹登录，登录后进入）
+    if (type === 'stock') {
+      if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }
+      wx.navigateTo({ url: '/uniApp/pages/my-stocks/my-stocks' });
+      return;
+    }
     wx.navigateTo({ url: '/uniApp/pages/' + type + '/' + type });
   },
 
@@ -3084,6 +3090,10 @@ Page({
     }
     if (action === 'archives') {
       this.onArchives();
+      return;
+    }
+    if (action === 'stock') {
+      wx.navigateTo({ url: '/uniApp/pages/my-stocks/my-stocks' });
       return;
     }
     // 默认：停在主页，不打开任何全屏层

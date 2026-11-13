@@ -1,0 +1,234 @@
+/* ============================================================
+   我的证券（DF-69）样式
+   - .fs-page/.fs-header/.fs-back/.fs-title/.fs-body 来自 app.wxss（全局）
+   - qd-*（确认/弹窗）与 stock-pick-item/spi-* 复制自 chat.wxss，
+     避免改 app.wxss 影响其他页面
+   ============================================================ */
+
+.ms-body {
+  position: relative;
+  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+}
+
+.ms-scroll {
+  height: 100%;
+  box-sizing: border-box;
+  padding: 16rpx 24rpx calc(180rpx + env(safe-area-inset-bottom));
+}
+
+.ms-hint {
+  padding: 120rpx 40rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: rgba(224, 208, 240, .55);
+}
+
+.ms-error { color: #ff8a9a; }
+
+.ms-retry {
+  margin-top: 8rpx;
+  padding: 20rpx;
+  text-align: center;
+  font-size: 26rpx;
+  color: #c9a3ff;
+}
+.ms-retry-press { opacity: .7; }
+
+/* ---------- 底部悬浮「新增」 ---------- */
+.ms-add {
+  position: fixed;
+  left: 24rpx;
+  right: 24rpx;
+  bottom: calc(24rpx + env(safe-area-inset-bottom));
+  height: 88rpx;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 44rpx;
+  font-size: 30rpx;
+  font-weight: 600;
+  color: #fff;
+  letter-spacing: 2rpx;
+  background: linear-gradient(135deg, #7a3b1d, #b85a2c);
+  box-shadow: 0 16rpx 40rpx rgba(0, 0, 0, .45);
+}
+.ms-add-press { opacity: .85; }
+
+/* ---------- 列表项（复制自 chat.wxss 的 DF-68 弹层样式） ---------- */
+.stock-pick-item {
+  display: flex;
+  align-items: center;
+  gap: 20rpx;
+  padding: 24rpx;
+  margin-bottom: 16rpx;
+  border-radius: 24rpx;
+  background: rgba(255, 255, 255, .05);
+  border: 1rpx solid rgba(255, 255, 255, .08);
+}
+
+.sp-item-press { background: rgba(80, 190, 150, .15); border-color: rgba(80, 190, 150, .4); }
+
+.stock-pick-item .spi-main { flex: 1; min-width: 0; }
+
+.stock-pick-item .spi-name {
+  font-size: 28rpx;
+  font-weight: 600;
+  color: #e8dff5;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-pick-item .spi-sub {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: #8a75b0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stock-pick-item .spi-side { flex-shrink: 0; text-align: right; }
+
+.stock-pick-item .spi-zdf { font-size: 28rpx; font-weight: 700; }
+.stock-pick-item .spi-zdf.up { color: #ff7b8a; }
+.stock-pick-item .spi-zdf.down { color: #3ddc97; }
+.stock-pick-item .spi-zdf.flat { color: #8a75b0; }
+
+.stock-pick-item .spi-grade { margin-top: 4rpx; font-size: 20rpx; color: #8a75b0; }
+
+/* 最右「查看」：阻止冒泡，点击不进关联 */
+.spi-view {
+  flex-shrink: 0;
+  margin-left: 12rpx;
+  padding: 12rpx 24rpx;
+  border-radius: 32rpx;
+  font-size: 24rpx;
+  color: #c9a3ff;
+  border: 1rpx solid rgba(201, 163, 255, .45);
+  background: rgba(201, 163, 255, .08);
+}
+.spi-view-press { background: rgba(201, 163, 255, .2); }
+
+/* ---------- qd-* 弹窗（复制自 chat.wxss） ---------- */
+.qd-mask {
+  position: fixed;
+  left: 0;
+  right: 0;
+  top: 0;
+  bottom: 0;
+  z-index: 1200;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 40rpx;
+  background: rgba(0, 0, 0, .5);
+}
+
+.qd-box {
+  width: 100%;
+  max-width: 840rpx;
+  padding: 56rpx 64rpx;
+  border-radius: 24rpx;
+  background: #fff;
+  box-shadow: 0 16rpx 64rpx rgba(0, 0, 0, .18);
+}
+
+.qd-title {
+  margin-bottom: 28rpx;
+  font-size: 32rpx;
+  font-weight: 700;
+  color: #7a3b1d;
+}
+
+.qd-content {
+  margin-bottom: 44rpx;
+  font-size: 27rpx;
+  line-height: 1.7;
+  color: #3b2f1d;
+  word-break: break-word;
+}
+
+.qd-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 20rpx;
+}
+
+.qd-btn {
+  padding: 16rpx 36rpx;
+  border-radius: 16rpx;
+  font-size: 26rpx;
+}
+
+.qd-btn.cancel {
+  color: #8a7a5f;
+  background: #fff;
+  border: 3rpx solid #d8ccb0;
+}
+
+.qd-btn.ok {
+  padding: 16rpx 40rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #7a3b1d, #b85a2c);
+}
+
+.qd-btn-press { opacity: .8; }
+
+/* ---------- 新增弹窗表单 ---------- */
+.ms-add-box { max-width: 800rpx; }
+
+.ms-field {
+  display: flex;
+  align-items: center;
+  margin-bottom: 24rpx;
+}
+
+.ms-label {
+  width: 150rpx;
+  flex: 0 0 auto;
+  font-size: 26rpx;
+  color: #8a7a5f;
+}
+
+.ms-input {
+  flex: 1;
+  height: 72rpx;
+  padding: 0 20rpx;
+  font-size: 28rpx;
+  color: #3b2f1d;
+  border: 2rpx solid #e2d8c2;
+  border-radius: 12rpx;
+  background: #faf7f1;
+}
+
+.ms-ph { color: #b8a98c; }
+
+.ms-sug {
+  margin: -12rpx 0 24rpx 150rpx;
+  max-height: 420rpx;
+  overflow-y: auto;
+  border: 2rpx solid #e2d8c2;
+  border-radius: 12rpx;
+  background: #fff;
+}
+
+.ms-sug-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 20rpx 24rpx;
+  border-bottom: 1rpx solid #f0e9db;
+}
+.ms-sug-item:last-child { border-bottom: none; }
+.ms-sug-press { background: #f6efe2; }
+
+.ms-sug-name { font-size: 26rpx; color: #3b2f1d; }
+.ms-sug-code { font-size: 24rpx; color: #9a8a6a; }
+
+.ms-form-err {
+  margin-bottom: 24rpx;
+  font-size: 24rpx;
+  color: #c0392b;
+}
