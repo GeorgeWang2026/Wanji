@@ -32,6 +32,10 @@ var GUIDANCE_PROMPT = '本轮为免费引导，未扣除积分、未做深度命
 
 var MSG_SEQ = 0;
 
+// FB-47：判空/过短阈值（按 trim 后字符数）；集中定义，便于统一调整
+var SHORT_TEXT_MIN = 1;
+var SHORT_TEXT_MAX = 3;
+
 // 与 assistant-widget.js 的 XB_AVATAR_CONFIGS 保持一致（网页版 4 个智能体头像）
 var AVATARS = [
   { file: '/avatar/xiaoxuan_1.png', name: '神机子' },
@@ -1894,7 +1898,7 @@ Page({
   /** FB-47：短内容（1-3 字）先弹一次「是否发送」确认，避免误发/静默丢弃 */
   _maybeSendShort: function (text) {
     var self = this;
-    if (text.length >= 1 && text.length <= 3) {
+    if (text.length >= SHORT_TEXT_MIN && text.length <= SHORT_TEXT_MAX) {
       wx.showModal({
         title: '内容较短，确定发送吗？',
         showCancel: true,
@@ -2414,7 +2418,7 @@ Page({
       this.setData({ input: trimmed, inputOpen: true, canClear: true });
 
       // FB-47：识别出的短内容（1-3 字）同样先弹确认，取消则停在输入态
-      if (trimmed.length <= 3) {
+      if (trimmed.length <= SHORT_TEXT_MAX) {
         var self = this;
         wx.showModal({
           title: '内容较短，确定发送吗？',
@@ -2435,7 +2439,7 @@ Page({
 
   /** FB-47：识别「太短 / 没录到声音」类错误，避免误弹「语音识别失败」 */
   _isAsrShortErr: function (msg) {
-    return /too short|太短|没有录到声音|没录到声音|录音时间过短/i.test(String(msg || ''));
+    return /too short|太短|没听清|没有录到声音|没录到声音|录音时间过短/i.test(String(msg || ''));
   },
 
   /* ---------------- 登录 ---------------- */

@@ -329,7 +329,7 @@ function recognize(filePath, lang) {
 /** 把后端各降级路径的错误转成用户能看懂的一句话 */
 function formatAsrError(status, detail) {
   var d = String(detail || '');
-  if (status === 400 && /too short/i.test(d)) return '没有录到声音，请靠近麦克风说 1 秒以上';
+  if (status === 400 && /too short/i.test(d)) return '没听清，请再说一次';
   if (status === 501) return '服务端未配置语音识别（缺少 ASR 密钥）';
   if (/暂时|网络/.test(d)) return d;
   if (status === 502) return '语音识别服务暂时不可用，请稍后重试或改用文字输入';
