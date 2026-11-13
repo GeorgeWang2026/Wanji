@@ -150,8 +150,7 @@
 }
 
 .center-txt { font-size: 24rpx; color: #8a75b0; text-align: center; font-weight: 600; }
-.center-sub { font-size: 22rpx; color: #8a75b0; text-align: center; font-weight: 600; }
-.center-tag { font-size: 18rpx; color: #b8860b; text-align: center; margin-top: 4rpx; }
+.center-tag { font-size: 18rpx; color: #b8860b; text-align: center; margin-top: 6rpx; }
 
 /* 值符/值使/时干 角标 */
 .hlbadges {
@@ -180,11 +179,11 @@
 .hb.zs { background: #3a7a3a; }
 .hb.hg { background: #2a5a8a; }
 
-/* 每宫内容：天盘干 + 八神 + 九星 */
-.top { display: flex; justify-content: space-between; gap: 4rpx; font-size: 20rpx; color: #a090c0; flex-shrink: 0; }
-.top .tg { color: #e8dff5; font-weight: 700; }
-.top .shen { color: #a090c0; }
-.top .xing { color: #a090c0; }
+/* 每宫内容：天盘干 + 八神 + 九星（各层独立配色，对齐网站分层） */
+.top { display: flex; justify-content: space-between; gap: 4rpx; font-size: 20rpx; color: #a090c0; flex-shrink: 0; white-space: nowrap; }
+.top .tg { color: #e8b84a; font-weight: 700; }   /* 天盘干：金 */
+.top .shen { color: #c9a0ff; }                    /* 八神：紫 */
+.top .xing { color: #7fd0c0; }                    /* 九星：青 */
 
 /* 八门（大字居中） */
 .mid {
@@ -192,19 +191,30 @@
   font-size: 40rpx;
   font-weight: 700;
   line-height: 1.2;
-  color: #e8dff5;
+  color: #ff9d7a;                                  /* 八门：赤 */
   flex: 1;
   display: flex;
   align-items: center;
   justify-content: center;
 }
 
-/* 特殊标记（空/马/墓/库等） */
-.flags { text-align: center; color: #d06070; font-size: 18rpx; min-height: 22rpx; font-weight: 600; flex-shrink: 0; }
+/* 格局标记（空/马/墓/库等）徽标 */
+.flags { text-align: center; min-height: 22rpx; flex-shrink: 0; }
+.flag-badge {
+  display: inline-block;
+  font-size: 18rpx;
+  line-height: 1.4;
+  padding: 0 10rpx;
+  border-radius: 14rpx;
+  color: #ffb3c0;
+  background: rgba(208, 96, 112, .22);
+  font-weight: 600;
+  white-space: nowrap;
+}
 
 /* 地盘干 + 宫位 */
 .bot { display: flex; justify-content: space-between; gap: 4rpx; flex-shrink: 0; font-size: 20rpx; margin-top: auto; }
-.bot .di { color: #a090c0; font-weight: 500; }
+.bot .di { color: #8fa8e0; font-weight: 500; }   /* 地盘干：蓝 */
 .bot .gn { color: #6a5a85; font-weight: 500; }
 
 .tip { font-size: 22rpx; color: #8f7cb0; margin: 16rpx 0 10rpx; }

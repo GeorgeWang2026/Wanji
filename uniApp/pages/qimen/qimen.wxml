@@ -80,8 +80,7 @@
         data-index="{{index}}"
       >
         <block wx:if="{{item.g === 5}}">
-          <view class="center-txt">中五</view>
-          <view class="center-sub">寄坤</view>
+          <view class="center-txt">中五 · 寄坤</view>
           <view class="center-tag" wx:if="{{item.centerTag}}">{{item.centerTag}}</view>
         </block>
         <block wx:else>
@@ -94,7 +93,7 @@
             <text class="xing">{{item.xing}}</text>
           </view>
           <view class="mid">{{item.men}}</view>
-          <view class="flags">{{item.flagsText}}</view>
+          <view class="flags" wx:if="{{item.flagsText}}"><text class="flag-badge">{{item.flagsText}}</text></view>
           <view class="bot">
             <text class="di">{{item.dg}}</text>
             <text class="gn">{{item.gname}}</text>
