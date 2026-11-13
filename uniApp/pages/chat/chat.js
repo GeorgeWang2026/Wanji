@@ -1055,7 +1055,8 @@ Page({
    * 咨询报告预览（DF-51，三处入口共用）：
    * POST /credits/questions/{id}/feishu_doc/pdf → wx.downloadFile → wx.openDocument
    * - 40401（无文档）先用旧 POST .../feishu_doc 生成，再重试一次
-   * - 下载/预览失败降级复制链接；接口失败按错误码给文案，不静默
+   * - downloadFile 失败不静默降级：提示检查合法域名；仅预览失败才降级复制链接
+   * - 接口失败按错误码给文案（含 code / 飞书 log_id），并打 console.error
    * @param {object} opts { id: 根记录 id, url: 原飞书链接(降级用), onDoc: fn(url), onError: fn(body) }
    */
   _openReport: function (opts) {
@@ -1081,7 +1082,8 @@ Page({
         timeout: 60000,
         success: function (res) {
           if (res.statusCode !== 200 || !res.tempFilePath) {
-            degrade(data.doc_url);
+            wx.hideLoading();
+            wx.showToast({ title: '下载失败（HTTP ' + res.statusCode + '）', icon: 'none' });
             return;
           }
           wx.hideLoading();
@@ -1092,11 +1094,16 @@ Page({
             fail: function () { degrade(data.doc_url); }
           });
         },
-        fail: function () { degrade(data.doc_url); }
+        fail: function (err) {
+          wx.hideLoading();
+          console.error('[pdf] downloadFile fail', err);
+          wx.showToast({ title: '下载失败：请检查 downloadFile 合法域名', icon: 'none' });
+        }
       });
     }).catch(function (err) {
       wx.hideLoading();
       var body = (err && err.body) || null;
+      console.error('[pdf]', body || err);
       if (opts.onError) opts.onError(body);
       wx.showToast({ title: self._reportErrorText(body), icon: 'none' });
     });
@@ -1135,12 +1142,17 @@ Page({
     });
   },
 
-  /** 错误码 → 界面文案（不把后端正文透出） */
+  /** 错误码 → 界面文案（不把后端正文透出；带出 code 与飞书 log_id 便于定位） */
   _reportErrorText: function (body) {
     var code = Number((body && body.code) || 0);
-    if (code === 50300 || code === 40301) return '咨询报告暂不可预览';
-    if (code === 42901) return '请求过于频繁，请稍后再试';
-    return '报告准备失败，可复制链接查看';
+    var detail = String((body && body.detail) || '');
+    var m = detail.match(/log_id=([A-Za-z0-9_-]+)/);
+    var tail = '（' + (code ? ('错误码 ' + code) : '无错误码') + (m ? ('，log_id ' + m[1]) : '') + '）';
+    if (code === 50300) return '咨询报告暂不可预览' + tail;
+    if (code === 40301) return '飞书导出权限未开通，请联系管理员' + tail;
+    if (code === 50202) return '报告导出失败，请稍后重试' + tail;
+    if (code === 42901) return '请求过于频繁，请稍后再试' + tail;
+    return '报告准备失败，可复制链接查看' + tail;
   },
 
   _copyLink: function (url, title) {
