@@ -14,13 +14,28 @@ var queue = [];
 var ctx = null;
 var playing = false;
 var stateCb = null;
+var listeners = [];   // 自由对话通道：按句取播报文本做回声判据（不抢占 stateCb）
 var seq = 0; // 每次 speak/stop 递增，用于丢弃过期的回调
 
 function setStateCallback(fn) { stateCb = fn; }
 
+/** 追加状态监听（可多个），返回移除函数 */
+function addStateListener(fn) {
+  if (typeof fn !== 'function') return function () {};
+  listeners.push(fn);
+  return function () {
+    var i = listeners.indexOf(fn);
+    if (i >= 0) listeners.splice(i, 1);
+  };
+}
+
 function notify(state, extra) {
+  var payload = extra || {};
   if (typeof stateCb === 'function') {
-    try { stateCb(state, extra || {}); } catch (e) { /* 忽略 */ }
+    try { stateCb(state, payload); } catch (e) { /* 忽略 */ }
+  }
+  for (var i = 0; i < listeners.length; i++) {
+    try { listeners[i](state, payload); } catch (e) { /* 忽略 */ }
   }
 }
 
@@ -99,6 +114,25 @@ function speak(text) {
   playNext(seq);
 }
 
+/**
+ * DF-97：追加播报（不打断当前句），用于自由对话通道的「边生成边播」。
+ * 队列空了以后再追加会自动重新起播；空文本直接忽略。
+ * @param {string} text 纯文本
+ */
+function enqueue(text) {
+  var segs = splitText(text);
+  if (!segs.length) return;
+  if (playing) {
+    queue = queue.concat(segs);
+    return;
+  }
+  seq += 1;
+  queue = segs;
+  playing = true;
+  notify('start');
+  playNext(seq);
+}
+
 /** 停止播报 */
 function stop(silent) {
   seq += 1;
@@ -113,8 +147,10 @@ function isPlaying() { return playing; }
 
 module.exports = {
   speak: speak,
+  enqueue: enqueue,
   stop: stop,
   isPlaying: isPlaying,
   setStateCallback: setStateCallback,
+  addStateListener: addStateListener,
   splitText: splitText
 };

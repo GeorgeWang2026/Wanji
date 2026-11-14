@@ -112,6 +112,16 @@ function finishStop(patch) {
 /* ---------------- 插件：RecordRecognitionManager ---------------- */
 var pluginManager = null;
 
+/* ---------------- DF-97：连续监听（自由对话通道专用） ----------------
+ * 插件自带的 VAD 会在停顿后自动结束一段录音，这里在 onStop 后自动续录，
+ * 形成「连续听」；与麦克风链路（start/stop 单次录音）共用同一个 manager，
+ * 两种模式互斥：连续模式开启时，单次录音的回调不参与。 */
+var contWanted = false;
+var contOpts = null;
+var contRestartTimer = null;
+var contSuppressStop = false;  // 主动 stop 时吞掉随之而来的 onStop，避免误判为一句结束
+var contSuppressAt = 0;        // 主动 stop 的时间，超过 1.5s 的 onStop 不再吞（防止标记滞留）
+
 function ensurePluginManager() {
   if (pluginManager) return pluginManager;
   var m = plugin.getRecordRecognitionManager();
@@ -126,6 +136,12 @@ function ensurePluginManager() {
   m.onRecognize = function (res) {
     var t = (res && res.result) || '';
     if (!t) return;
+    if (contWanted) {
+      if (contOpts && typeof contOpts.onPartial === 'function') {
+        try { contOpts.onPartial(t); } catch (e) { /* 上层异常不影响录音 */ }
+      }
+      return;
+    }
     partialCount++;
     if (partialCount === 1) console.log('[asr] partial#1', t);
     finalText = t;
@@ -138,6 +154,16 @@ function ensurePluginManager() {
     var t = (res && res.result) || finalText || '';
     finalText = t;
     finalPath = (res && res.tempFilePath) || finalPath || '';
+    if (contWanted) {
+      if (contSuppressStop && Date.now() - contSuppressAt < 1500) { contSuppressStop = false; return; }
+      contSuppressStop = false;
+      var trimmed = String(t || '').trim();
+      if (trimmed && contOpts && typeof contOpts.onFinal === 'function') {
+        try { contOpts.onFinal(trimmed); } catch (e) { /* 上层异常不影响续录 */ }
+      }
+      scheduleContRestart(trimmed ? 300 : 150);
+      return;
+    }
     finishStop({
       text: t,
       filePath: finalPath,
@@ -149,6 +175,15 @@ function ensurePluginManager() {
     var msg = (res && (res.msg || res.errMsg)) || '语音识别出错';
     lastError = msg;
     console.error('[asr] plugin error | retcode =', (res && res.retcode), '| msg =', msg);
+    if (contWanted) {
+      var fatal = /auth|permission|deny|denied|not authorized|权限|授权/i.test(msg);
+      if (contOpts && typeof contOpts.onError === 'function') {
+        try { contOpts.onError(new Error(msg), fatal); } catch (e) { /* 忽略 */ }
+      }
+      if (fatal) { stopContinuous(); return; }
+      scheduleContRestart(600);
+      return;
+    }
     // 还在启动阶段：直接让 start() 失败，页面走权限/重试提示
     if (startReject) {
       rejectStart(new Error(msg));
@@ -326,6 +361,60 @@ function recognize(filePath, lang) {
   });
 }
 
+/* ---------------- 对外：连续监听（DF-97 自由对话通道） ---------------- */
+function scheduleContRestart(ms) {
+  if (!contWanted) return;
+  if (contRestartTimer) { clearTimeout(contRestartTimer); contRestartTimer = null; }
+  contRestartTimer = setTimeout(function () {
+    contRestartTimer = null;
+    if (!contWanted) return;
+    var m = pluginManager;
+    if (!m) return;
+    try {
+      m.start({ lang: 'zh_CN', duration: 60000 });
+    } catch (e) {
+      scheduleContRestart(600);
+    }
+  }, ms);
+}
+
+/**
+ * 开启连续监听：一段说完自动收尾并续录，直到 stopContinuous()。
+ * @param {{onPartial?:Function, onFinal?:Function, onError?:Function}} opts
+ */
+function startContinuous(opts) {
+  if (getMode() !== 'plugin') {
+    if (opts && typeof opts.onError === 'function') {
+      opts.onError(new Error('当前环境不支持连续语音识别'), true);
+    }
+    return;
+  }
+  var wasOn = contWanted;
+  stopContinuous();
+  contWanted = true;
+  contOpts = opts || {};
+  var m = ensurePluginManager();
+  try {
+    m.start({ lang: 'zh_CN', duration: 60000 });
+  } catch (e) {
+    // 上一段录音还在收尾：稍后自动续上
+    scheduleContRestart(wasOn ? 400 : 600);
+  }
+}
+
+/** 关闭连续监听（幂等） */
+function stopContinuous() {
+  var wasOn = contWanted;
+  contWanted = false;
+  contOpts = null;
+  if (contRestartTimer) { clearTimeout(contRestartTimer); contRestartTimer = null; }
+  if (wasOn && pluginManager) {
+    contSuppressStop = true;
+    contSuppressAt = Date.now();
+    try { pluginManager.stop(); } catch (e) { contSuppressStop = false; }
+  }
+}
+
 /** 把后端各降级路径的错误转成用户能看懂的一句话 */
 function formatAsrError(status, detail) {
   var d = String(detail || '');
@@ -339,6 +428,8 @@ function formatAsrError(status, detail) {
 module.exports = {
   start: start,
   stop: stop,
+  startContinuous: startContinuous,
+  stopContinuous: stopContinuous,
   recognize: recognize,
   mode: getMode,
   version: function () { return PLUGIN_VERSION; },
