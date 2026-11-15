@@ -180,6 +180,23 @@
   white-space: nowrap;
 }
 
+/* DF-103：麦克风闪烁提示（在「可以开始说话了」提示处）。
+   可说话时呼吸闪烁，识别中/播报中由 onTurn(false) 自动撤下，不与播报状态冲突。 */
+.ft-mic {
+  display: inline-block;
+  margin-right: 8rpx;
+  font-size: 26rpx;
+  line-height: 1.5;
+  color: #7ee0a8;
+}
+.ft-mic.blink {
+  animation: ft-mic-blink 1.1s ease-in-out infinite;
+}
+@keyframes ft-mic-blink {
+  0%, 100% { opacity: .25; transform: scale(.9); }
+  50% { opacity: 1; transform: scale(1.08); }
+}
+
 /* 参考页 #pinnedContext 展开后是 display:block（inline style），子块靠自身 margin 排布 */
 .pinned-context {
   display: block;

@@ -276,6 +276,7 @@ Page({
     ftCountdown: '',       // 用户文字区尾部的发送倒计时（小字，空 = 不显示）
     ftStatus: '',          // 通道状态文案（正在连接/思考/回答…）
     ftPhase: '',           // connecting | listening | thinking | speaking（光圈/脉冲判定用）
+    ftTurnHint: false,     // DF-103：「可以开始说话了」提示是否显示（麦克风闪烁动效开关）
   },
 
   /* ---------------- 生命周期 ---------------- */
@@ -557,6 +558,7 @@ Page({
       ttsLabel: '玄机子',
       ftStatus: '正在连接…',
       ftPhase: 'connecting',
+      ftTurnHint: false,
       idleQuote: null,
       hintQuote: null,
       inputOpen: false,
@@ -605,6 +607,10 @@ Page({
         }
         self.setData({ ftCountdown: s });
       },
+      // DF-103：「可以开始说话了」提示启停 → 麦克风闪烁动效开关
+      onTurn: function (active) {
+        self.setData({ ftTurnHint: !!active });
+      },
       // 录音异常状态：写进用户文字区（如「麦克风异常，正在重连」），不弹窗、不静默空转
       onStatus: function (text) {
         var s = String(text || '');
@@ -631,7 +637,7 @@ Page({
   exitFreeTalk: function () {
     if (this._ft) { this._ft.stop(); this._ft = null; }
     this._stopMouth();
-    this.setData({ freeTalk: false, ftUserText: '', ftCountdown: '', ttsText: '', ftStatus: '', ftPhase: '' });
+    this.setData({ freeTalk: false, ftUserText: '', ftCountdown: '', ttsText: '', ftStatus: '', ftPhase: '', ftTurnHint: false });
     this._maybeStartIdleHint();
   },
 
@@ -2698,6 +2704,11 @@ Page({
   /* ---------------- 语音播报控制（tts-line 音量图标） ---------------- */
   // 单击：正在播 → 暂停这一条；已暂停/空闲 → 从头恢复上一条；已关闭 → 重新开启
   onTtsIcon: function () {
+    // DF-103：自由对话播报中，点按播报图标 = 打断（停止播报 + 清待播队列 + 转等待输入，不自动续播）
+    if (this.data.freeTalk && this._ft && this.data.speaking) {
+      this._ft.interrupt('点按播报图标');
+      return;
+    }
     if (this.data.speaking) {
       this.stopSpeaking('pause');
       wx.showToast({ title: '已暂停播报', icon: 'none' });

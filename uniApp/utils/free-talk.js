@@ -189,6 +189,8 @@ function FreeTalk(opts) {
   this.onAiText = opts.onAiText || noop;
   // 发送倒计时：'即将发送…2' 显示在用户文字区；'' 表示撤掉。不新增控件。
   this.onCountdown = opts.onCountdown || noop;
+  // DF-103：「可以开始说话了」提示的启停（麦克风闪烁动效开关），true = 可说话 / false = 撤下
+  this.onTurn = opts.onTurn || noop;
   // 录音状态提示：写进用户文字区（如「麦克风异常，正在重连」），不弹窗、不静默空转
   this.onStatus = opts.onStatus || noop;
 
@@ -911,6 +913,10 @@ FreeTalk.prototype._onAsrFinal = function (text, meta) {
       : '[ft-echo] 窗口外 → 放行（不判回录）| 来源 = final | len = ' + t.length);
   }
   if (lock === 'show') console.log('[ft] 段锁 = show，final 直接发送 | len =', t.length);
+  // DF-103：发送前统一按 200 字截断（超出部分不再接收），保证实际送出长度与分档口径一致
+  var capped = asr.truncateEff(t, 200);
+  if (capped.length !== t.length) console.log('[ft] final 超 200 字 → 截断 | 原 =', t.length, '| 截断后 =', capped.length);
+  t = capped;
   if (t === this._lastFinal && now - this._lastFinalAt < 1200) {
     // 重复定稿：已显示过就不再重复发送/重复建轮
     var cur = this._curId ? this._findLog(this._curId) : null;
@@ -1850,7 +1856,8 @@ FreeTalk.prototype._clearUserLine = function () {
 
 /** 用户行：识别中不断更新同一条，定稿后保留；用户再次开口则另起一轮 */
 FreeTalk.prototype._logUser = function (text, isFinal) {
-  var t = String(text || '').trim();
+  // DF-103：文字输入上限 200 字（超出截断，不再接收），与倒计时分档同口径（中文 1 / 半角 0.5）
+  var t = asr.truncateEff(String(text || '').trim(), 200);
   if (!t) return;
   // 同一识别段 + 同一文本 + 同一状态 = 同一个终态值，重复写只会让 UI 重渲染一次。
   // 作用域严格限制在「本段最近一次写入」，换段（_uiSegNo 变化）、换字、interim→final 都照常写，
@@ -2043,6 +2050,7 @@ FreeTalk.prototype._showTurnHint = function () {
   this._countText = t;
   console.log('[ft-diag] 轮到你说 | 提示 =', t, '| 触发 =', '回复结束 + 队列空 + 收音已恢复');
   try { this.onCountdown(t); } catch (e) { /* 忽略 */ }
+  try { this.onTurn(true); } catch (e) { /* 忽略 */ }
 };
 
 FreeTalk.prototype._clearTurnHint = function (why) {
@@ -2051,6 +2059,20 @@ FreeTalk.prototype._clearTurnHint = function (why) {
   this._countText = '';
   console.log('[ft-diag] 轮到你说提示撤下 |', why);
   try { this.onCountdown(''); } catch (e) { /* 忽略 */ }
+  try { this.onTurn(false); } catch (e) { /* 忽略 */ }
+};
+
+/** DF-103：播报中断（点按播报图标打断 / 语音打断共用）。
+ *  停止播报 + 清空待播队列 + 丢弃在途回复 + 转等待输入，不自动续播。 */
+FreeTalk.prototype.interrupt = function (reason) {
+  if (!this._active) return false;
+  this._muteDeltas = true;       // 在途 delta 作废：不续播、不补文字
+  this._chanBusy = false;        // 本轮回复视为已结束，不再维持「生成中」
+  this._replyOpen = false;
+  this._clearReplyTimer();
+  this._resetSpeech();           // 停播 + 清待播队列 + 恢复收音
+  this._syncTurnState(reason || '点按打断');
+  return true;
 };
 
 FreeTalk.prototype.stop = function () {

@@ -196,24 +196,56 @@ var contDiagTick = 0;          // 快照节拍
 var CONT_STALL_MS = 5000;
 var CONT_STALL_MIN_MS = 1000;
 var CONT_STALL_MAX_MS = 10000;
-// 自适应等待窗口：以「说完的可能性」为准，短句快发、长句给足补充时间，上限 10s。
-//  - 已出现句末标点（。！？；…!?;）→ 视为说完，但也要给足 5s 缓冲
-//  - 无标点则按字数分档：中文日常语速约 4~5 字/秒，越长的句子越可能还没说完
-//
-// ft-diag15：显示与 stop 必须同一个到期时刻，且界面按整数秒递减。
-// 旧实现最短档 800/1200ms 太短（说一半被截断）；现在所有档位 ≥5s，
-// 上一版的 700ms 滞后补偿已被这个下限覆盖，不再额外叠加。
-// 分档（起始秒数 = 该档窗口，界面显示 ceil(剩余/1000)）：
-//   ≤8 字 / 含句末标点 = 5s，≤16 字 = 6s，≤28 字 = 7s，≤44 字 = 9s，超长 = 10s
+// 自适应等待窗口（DF-103）：按「字数」分档，判定与渲染解耦，不看渲染行数 / scrollHeight。
+// 字数口径：中文 / 全角计 1，半角计 0.5，空白不计（与需求「中文 1、半角 0.5」一致）。
+// 分档（含上限即归本档）：≤60 字 = 3s，61~150 字 = 5s，151~200 字 = 8s；
+// >200 字不再接收（由 free-talk 侧按 truncateEff 截断），此处兜底仍按 8s。
+// 显示与 stop 必须同一个到期时刻，界面按整数秒递减。
 var CONT_STALL_TABLE = [
-  { max: 8, ms: 5000 },      // 「我有点累」这类短句
-  { max: 16, ms: 6000 },     // 一句完整的话
-  { max: 28, ms: 7000 },     // 长句，大概率还有下半句
-  { max: 44, ms: 9000 },     // 连续叙述
-  { max: Infinity, ms: 10000 }// 超长，给到上限
+  { max: 60, ms: 3000 },     // 短句：说完可能性高，快速送出
+  { max: 150, ms: 5000 },    // 中长句：给足补充时间
+  { max: 200, ms: 8000 }     // 长段：最长等待
 ];
-var CONT_STALL_PUNCT_MS = 5000;  // 含句末标点：仍留一次呼吸/补充的时间（旧值 800 是截断主因）
-var CONT_STALL_PUNCT_RE = /[。！？；…!?;]/;
+var CONT_STALL_OVER_MS = 8000;   // >200 字兜底（正常应已被 free-talk 截断）
+
+/** 单个 code unit 的字数权重：中文/全角 1，半角 0.5，空白 0（代理对高位按 1） */
+function charWeight(c) {
+  if (c === 0x20 || c === 0x09 || c === 0x0A || c === 0x0D) return 0;
+  if (c >= 0xD800 && c <= 0xDBFF) return 1;                       // 代理对高位：整对按 1
+  if ((c >= 0x2E80 && c <= 0x9FFF) || (c >= 0xFF00 && c <= 0xFFEF) ||
+      (c >= 0x1100 && c <= 0x11FF) || (c >= 0xAC00 && c <= 0xD7AF) ||
+      (c >= 0xF900 && c <= 0xFAFF)) return 1;
+  return 0.5;
+}
+
+/** 字数口径（中文 1 / 半角 0.5），仅用于分档与截断，不依赖渲染 */
+function effLen(s) {
+  s = String(s || '');
+  var n = 0;
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    var w = charWeight(c);
+    n += w;
+    if (w === 1 && c >= 0xD800 && c <= 0xDBFF) i++;               // 跳过低代理
+  }
+  return n;
+}
+
+/** 按 effLen 口径截断到 max 字（超出部分丢弃，即「不再接收」） */
+function truncateEff(s, max) {
+  s = String(s || '');
+  if (effLen(s) <= max) return s;
+  var n = 0, out = '';
+  for (var i = 0; i < s.length; i++) {
+    var c = s.charCodeAt(i);
+    var w = charWeight(c);
+    if (n + w > max) break;
+    out += s.charAt(i);
+    if (w === 1 && c >= 0xD800 && c <= 0xDBFF) { out += s.charAt(i + 1); i++; }
+    n += w;
+  }
+  return out;
+}
 var contStallMs = 0;           // >0 表示外部强制固定窗口（startContinuous({ stallMs })），0 = 自适应
 var contStallWindow = CONT_STALL_MS;  // 本次倒数实际使用的窗口（日志与 meta 用）
 var contSegWindowMax = 0;      // 本段已用过的最大窗口：新内容只允许把窗口调大，不允许调小（数字不来回跳）
@@ -293,17 +325,16 @@ function clearCountdown(notify) {
  * @param {string} text 本段当前文本
  */
 function stallBaseFor(text) {
-  var s = String(text || '');
-  if (CONT_STALL_PUNCT_RE.test(s)) return CONT_STALL_PUNCT_MS;   // 含句末标点
-  var n = s.replace(/\s/g, '').length;
+  var n = effLen(text);
   for (var i = 0; i < CONT_STALL_TABLE.length; i++) {
     if (n <= CONT_STALL_TABLE[i].max) return CONT_STALL_TABLE[i].ms;
   }
+  return CONT_STALL_OVER_MS;
 }
 
 function stallWindowFor(text) {
   if (contStallMs > 0) return contStallMs;                 // 外部强制固定窗口
-  // ft-diag15：分档值即实际窗口（≥5s），不再额外叠加滞后补偿
+  // DF-103：分档值即实际窗口（3/5/8s），不再额外叠加滞后补偿
   return Math.max(CONT_STALL_MIN_MS, Math.min(CONT_STALL_MAX_MS, stallBaseFor(text)));
 }
 
@@ -311,13 +342,11 @@ function stallWindowFor(text) {
 function stallTierLabel(text) {
   if (contStallMs > 0) return '外部固定 ' + contStallMs + 'ms';
   var base = stallBaseFor(text);
-  var s = String(text || '');
-  if (CONT_STALL_PUNCT_RE.test(s)) return '含句末标点 → ' + base + 'ms';
-  var n = s.replace(/\s/g, '').length;
+  var n = effLen(text);
   for (var i = 0; i < CONT_STALL_TABLE.length; i++) {
     if (n <= CONT_STALL_TABLE[i].max) return '≤' + CONT_STALL_TABLE[i].max + '字 → ' + base + 'ms';
   }
-  return '超长 → ' + base + 'ms';
+  return '>200字 → ' + base + 'ms';
 }
 
 /**
@@ -337,16 +366,15 @@ function armStall() {
   else total = contSegWindowMax;
   contStallWindow = total;
   contStallAt = Date.now();
-  var len = text.replace(/\s/g, '').length;
+  var len = effLen(text);
   if (prevWindow) {
     console.log('[asr-diag] 发送窗口重算（用户继续说话）| 上一次 =', prevTotal + 'ms',
-      '| 新窗口 =', total + 'ms', '| len =', len, '| 距上条 partial =', contLastGap + 'ms',
+      '| 新窗口 =', total + 'ms', '| 字数 =', len, '| 距上条 partial =', contLastGap + 'ms',
       '| 分档 =', stallTierLabel(text));
   } else {
     console.log('[asr-diag] 发送窗口开始 | 倒计时 =', total + 'ms',
-      '| len =', len, '| 距上条 partial =', contLastGap + 'ms',
-      '| 分档 =', stallTierLabel(text),
-      '| 含句末标点 =', CONT_STALL_PUNCT_RE.test(text) ? 'yes（仍留一次呼吸时间）' : 'no（按长度分档）');
+      '| 字数 =', len, '| 距上条 partial =', contLastGap + 'ms',
+      '| 分档 =', stallTierLabel(text));
   }
   if (contOpts && typeof contOpts.onCountdown === 'function') {
     notifyCountdown(total, total);
@@ -1393,6 +1421,8 @@ module.exports = {
   resumeContinuous: resumeContinuous,
   suspendForBackground: suspendForBackground,
   recognize: recognize,
+  effLen: effLen,
+  truncateEff: truncateEff,
   mode: getMode,
   version: function () { return PLUGIN_VERSION; },
   reason: function () { return pluginReason; },

@@ -26,7 +26,7 @@
       <!-- DF-97：自由对话时这块显示用户本轮识别文字（网站 _ulSet）；多行自动换行、不省略截断，换轮即清空 -->
       <view class="pc-empty-hint {{freeTalk ? 'ft-user-line' : ''}}" id="pcEmptyHint"
             wx:if="{{freeTalk || (!pinned && !sentVisible)}}">
-        <block wx:if="{{freeTalk}}">{{ftUserText}}<text class="ft-countdown" wx:if="{{ftCountdown}}">{{ftCountdown}}</text></block>
+        <block wx:if="{{freeTalk}}"><text class="ft-mic {{ftTurnHint ? 'blink' : ''}}" wx:if="{{ftTurnHint}}">🎤</text>{{ftUserText}}<text class="ft-countdown" wx:if="{{ftCountdown}}">{{ftCountdown}}</text></block>
         <block wx:elif="{{idleQuote}}">
           <text class="idle-quote-text">{{idleQuote.text}}</text>
           <text class="idle-quote-translation" wx:if="{{idleQuote.translation}}">{{idleQuote.translation}}</text>
