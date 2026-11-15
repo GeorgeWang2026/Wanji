@@ -314,6 +314,41 @@
   overflow-y: auto;
 }
 
+/* ---- DF-72：免费引导流「开始推算」手动确认 CTA（语音不算授权，必须点击） ---- */
+.free-cta {
+  padding: 20rpx 28rpx;
+  margin-bottom: 8rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 2rpx solid rgba(147, 112, 219, .3);
+  border-radius: 20rpx;
+}
+
+.free-cta-tip {
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #c8b8e8;
+  margin-bottom: 16rpx;
+}
+
+.free-cta-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  height: 84rpx;
+  border-radius: 42rpx;
+  font-size: 28rpx;
+  font-weight: 600;
+  letter-spacing: 2rpx;
+  color: #fff;
+  background: linear-gradient(135deg, #b388ff, #7c4dff);
+  box-shadow: 0 8rpx 24rpx rgba(147, 112, 219, .35);
+}
+
+.free-cta-btn-press {
+  opacity: .85;
+  box-shadow: 0 4rpx 12rpx rgba(147, 112, 219, .3);
+}
+
 /* ---- 语音字幕区（参考页 .tts-lines / #ttsBody） ---- */
 .tts-lines {
   position: relative;

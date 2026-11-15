@@ -565,7 +565,8 @@ FreeTalk.prototype.start = function () {
       self._syncTurnState('打断确认');
     },
     onNotice: function (n) {
-      if (!n || !n.message) return;
+      // DF-72：DEEP_DRAFT 不带 message（带 draft/cards），不能按「无 message 丢弃」处理
+      if (!n || (!n.message && n.code !== 'DEEP_DRAFT')) return;
       try { self.onNotice(n); } catch (e) { /* 忽略 */ }
     },
     onError: function (e, detail) {

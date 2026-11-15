@@ -277,6 +277,10 @@ Page({
     ftStatus: '',          // 通道状态文案（正在连接/思考/回答…）
     ftPhase: '',           // connecting | listening | thinking | speaking（光圈/脉冲判定用）
     ftTurnHint: false,     // DF-103：「可以开始说话了」提示是否显示（麦克风闪烁动效开关）
+    /* ---- DF-72：免费引导流（取消扣费后）手动确认进入深度解读 ---- */
+    freeMode: false,       // 是否处于免费引导流（未付费、无 rootQuestionId）
+    freeQuestion: '',      // 免费流最近一句问题（CTA 复用，无需重输）
+    deepReadingCost: 1,    // 单次深度解读积分（= paipanUtil.DEEP_READING_COST，CTA 展示用）
   },
 
   /* ---------------- 生命周期 ---------------- */
@@ -301,14 +305,21 @@ Page({
       apiOrigin: env.getApiOrigin(),
       ttsOn: !(g0 && g0.ttsOn === false),
       statusBarH: statusBarH,
-      avatarSrc: env.getApiOrigin() + AVATARS[0].file
+      avatarSrc: env.getApiOrigin() + AVATARS[0].file,
+      deepReadingCost: paipanUtil.DEEP_READING_COST
     });
     this._applyMouthRect(AVATARS[0].file);
+    // DF-72：清理旧版本残留的免费流本地键（只删不读、不迁移；当前版本不再写这些键）
+    this._cleanLegacyFreeKeys();
     this.rootQuestionId = null; // question_records 根记录 id（追问免费）
     this.questionId = null;     // 本轮 question_records.id（consume 返回，/chat 回写答案用）
     this.chatMsgId = null;      // 上一条回复的 chat_messages.id（作为追问的 target_id）
     this.autoMetas = [];        // 本轮兜底自动起的盘
     this._ttsText = '';         // 最近一条被播报的文本（暂停后恢复用）
+    this.freeQuestionId = null; // DF-72：免费引导记录 id（后端落库 free 后返回，付费时 reuse）
+    this.freeVersion = null;    // DF-72：该免费记录 version（409 乐观锁重试用）
+    this._freeCtaIntent = false;// DF-72：本次 startFlow 由免费流 CTA 触发（取消时不重进免费流）
+    this._deepDraftIntent = false;// DF-72：本次 startFlow 由 DEEP_DRAFT 通知直连触发（取消时停在当前对话）
     // DF-63/DF-64：等待期提示语轮播状态（单一实例，全页唯一）
     this._hintActive = false;
     this._hintEpoch = 0;
@@ -622,6 +633,16 @@ Page({
         if (on) self._startMouth(); else self._stopMouth();
       },
       onNotice: function (n) {
+        // DF-72：后端收口下发的深度解读草稿 → 直接拉起既有确认流程（不经过输入框、不等点发送）
+        if (n && n.code === 'DEEP_DRAFT') {
+          if (!self.data.loggedIn || self.data.sending) return;  // 未登录/正在发送：丢弃这一帧
+          var draft = String(n.draft || '').trim();
+          if (!draft) return;
+          self._deepDraftIntent = true;                  // 取消扣费时停在当前对话，不转免费引导流
+          if (self.data.freeTalk) self.exitFreeTalk();   // 腾出页面，确认框与对话区可见
+          self.startFlow(draft);
+          return;
+        }
         if (!n || !n.message) return;
         wx.showToast({ title: n.message, icon: 'none' });
       },
@@ -2360,6 +2381,10 @@ Page({
         self._prevBoundStock = false;
         self._stockHintPool = [];
         self._restorePromise = null;
+        self.freeQuestionId = null;
+        self.freeVersion = null;
+        self.freeQuestion = '';
+        self._freeCtaIntent = false;
         var g = app().globalData;
         if (g) g.paipan = {};
         self.setData({
@@ -2382,7 +2407,9 @@ Page({
           showHistory: false,
           topOpen: true,
           chips: [],
-          skillActive: { qimen: false, bazi: false, meihua: false, stock: false }
+          skillActive: { qimen: false, bazi: false, meihua: false, stock: false },
+          freeMode: false,
+          freeQuestion: ''
         });
         tts.stop(true);
         self._ttsText = '';
@@ -2776,10 +2803,16 @@ Page({
 
     // DF-77：首次提问与追问均需确认扣费（每次 1 积分）
     var ok = await this.confirmCost(text, bundle);
+    var fromDeepDraft = this._deepDraftIntent;  // DF-72：草稿直连标记，用完即复位
+    this._deepDraftIntent = false;
     if (!ok) {
       // FB-48：首个根问题取消扣费后转入免费引导对话（与计费路径隔离）；
-      //        DF-77：追问取消则留在当前状态，不进入免费流
-      if (!this.rootQuestionId) {
+      //        DF-77：追问取消则留在当前状态，不进入免费流；
+      //        DF-72：由免费流「开始推算」CTA 触发的取消 → 留在当前免费轮，不重复弹引导气泡
+      var fromFreeCta = this._freeCtaIntent;
+      this._freeCtaIntent = false;
+      // DF-72：DEEP_DRAFT 直连进来的取消 → 停在当前对话，不转免费引导流
+      if (!this.rootQuestionId && !fromFreeCta && !fromDeepDraft) {
         await this.freeGuidanceFlow(text);
       }
       this.setData({ sending: false });
@@ -2810,16 +2843,36 @@ Page({
 
       // 2) 扣积分（幂等 client_id）
       var clientId = 'wx' + Date.now() + Math.floor(Math.random() * 1000);
-      var consume = await api.request('/credits/consume', {
-        method: 'POST',
-        data: {
-          scene: 'ask',
-          usage: { ask: text, client_id: clientId, tool: bundle.types[0] || 'qimen' },
-          paipan_count: Math.min(4, bundle.types.length),
-          paipan_types: bundle.types,
-          target_id: this.rootQuestionId || null
+      var consumeData = {
+        scene: 'ask',
+        usage: { ask: text, client_id: clientId, tool: bundle.types[0] || 'qimen' },
+        paipan_count: Math.min(4, bundle.types.length),
+        paipan_types: bundle.types,
+        target_id: this.rootQuestionId || null
+      };
+      // DF-72：免费引导流确认付费 → 携带 reuse_question_id 复用同一条 free 记录回填，
+      //        不新建行、不重复扣分（后端 DF-70 原子 free→paid）。freeQuestionId 未落地时为 null，
+      //        走既有新建根记录路径，行为零变化。
+      var reusingFree = !!(this.freeQuestionId && !this.rootQuestionId);
+      if (reusingFree) {
+        consumeData.reuse_question_id = this.freeQuestionId;
+        if (this.freeVersion) consumeData.reuse_version = this.freeVersion;
+      }
+      var consume = await api.request('/credits/consume', { method: 'POST', data: consumeData });
+      // DF-72：并发乐观锁 409 → 取最新 version 自动重试 1 次；仍失败提示用户手动重试，不产生重复行
+      if (reusingFree && consume && consume.code === 409) {
+        var latestVer = consume && consume.data && consume.data.version;
+        if (!latestVer) {
+          try {
+            var det = await api.request('/credits/questions/' + this.freeQuestionId);
+            latestVer = det && det.data && det.data.version;
+          } catch (e) { /* 取不到 version 则按无版本重试 */ }
         }
-      });
+        if (latestVer) {
+          consumeData.reuse_version = latestVer;
+          consume = await api.request('/credits/consume', { method: 'POST', data: consumeData });
+        }
+      }
 
       if (consume && consume.code === 402) {
         this.setData({ typing: false, sending: false });
@@ -2828,6 +2881,10 @@ Page({
         return;
       }
       if (!consume || consume.code !== 0 || !consume.data) {
+        // DF-72：复用 free 记录时 409 重试仍失败 → 提示用户手动重试，不抛通用报错
+        if (reusingFree && consume && consume.code === 409) {
+          wx.showToast({ title: '内容已更新，请重试', icon: 'none' });
+        }
         throw new Error((consume && (consume.msg || consume.detail)) || '积分结算失败');
       }
       var cdata = consume.data;
@@ -2837,6 +2894,8 @@ Page({
       // 回填到用户消息，供本次会话的本地聚合兜底使用
       if (this.rootQuestionId) this.patchMsgField(userMsgId, 'qid', this.rootQuestionId);
       if (typeof cdata.balance === 'number') this.setData({ balance: cdata.balance });
+      // DF-72：付费成功 → 退出免费引导流（复用 free 记录或新建根记录均结清免费态）
+      this._exitFreeMode();
 
       if (cdata.cost > 0) {
         this.pushMsg('assistant', '已消耗 ' + cdata.cost + ' 积分（剩余 ' + cdata.balance + '），正在为你用「'
@@ -2901,6 +2960,9 @@ Page({
    * 不显示「已消耗 N 积分」气泡与 sentPreview 置顶，question_id 传 null 保证不落问事记录。
    */
   freeGuidanceFlow: async function (text) {
+    // DF-72：进入免费引导流 —— 记住问题供「开始推算」CTA 复用；落库指针等后端返回后再填
+    this.freeQuestion = text;
+    this.setData({ freeMode: true, freeQuestion: text });
     // DF-63：免费路径同样展示「已发送」卡片（定稿口径）
     this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '' });
     // 用户这句作为普通消息展示，不带技能标记，不进咨询记录卡片
@@ -2924,6 +2986,11 @@ Page({
       });
       if (!res || typeof res.reply !== 'string') {
         throw new Error((res && (res.detail || res.msg)) || '模型未返回内容');
+      }
+      // DF-72：后端若已落库免费记录并返回 question_id/version，则记住指针（付费时 reuse 回填同条）
+      if (res && res.question_id) {
+        this.freeQuestionId = res.question_id;
+        if (typeof res.version === 'number') this.freeVersion = res.version;
       }
       this._stopThinking();
       this.setData({ typing: false });
@@ -2984,6 +3051,46 @@ Page({
     this._costResolve = null;
     this.setData({ costOpen: false });
     if (fn) fn(true);
+  },
+
+  /**
+   * DF-72：免费引导流「开始推算」手动 CTA —— 口述/语音不算授权，必须点击此按钮。
+   * 复用既有 confirmCost → startFlow 付费链路，不重写扣费、不新建计费路径。
+   */
+  onFreeConfirm: function () {
+    if (this.data.sending || this.data.typing) return;
+    var text = (this.freeQuestion || '').trim() || (this.data.lastQuestion || '').trim();
+    if (!text) {
+      wx.showToast({ title: '先说说你想推算的事', icon: 'none' });
+      return;
+    }
+    if (!this.data.loggedIn) {
+      this.pendingText = text;
+      this.pendingAction = 'send';
+      this.setData({ showLogin: true });
+      return;
+    }
+    this._freeCtaIntent = true;
+    this.startFlow(text);
+  },
+
+  /** DF-72：退出免费引导流（付费成功 / 重新开始时调用） */
+  _exitFreeMode: function () {
+    this.freeQuestionId = null;
+    this.freeVersion = null;
+    this.freeQuestion = '';
+    this._freeCtaIntent = false;
+    if (this.data.freeMode) this.setData({ freeMode: false, freeQuestion: '' });
+  },
+
+  /** DF-72：清理旧版本残留的免费流本地键（只删不读、不迁移；当前版本不再写这些键） */
+  _cleanLegacyFreeKeys: function () {
+    var uid = this.data.userId || '';
+    var keys = ['xb_free_chat_sid'];
+    if (uid) { keys.push('free_sid:' + uid, 'free_turns:' + uid, 'free_session:' + uid); }
+    for (var i = 0; i < keys.length; i++) {
+      try { wx.removeStorageSync(keys[i]); } catch (e) { /* 忽略 */ }
+    }
   },
 
   findMsg: function (id) {
