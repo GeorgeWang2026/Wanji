@@ -12,6 +12,13 @@
  * ============================================================ */
 var ENV = 'prod'; // 'dev' | 'prod'
 
+/**
+ * 真机排障版本标记（只用于 console 输出，不影响任何界面）：
+ * 每次上传体验版 / 提交前手动改一次，真机日志里出现这行才说明跑的是本次代码。
+ * 「真机调试」「预览」跑的是开发者工具当前工作区代码；「体验版」跑的是上次上传的包。
+ */
+var BUILD_TAG = 'wanji-mp / 2026-11-15 / ft-diag16';
+
 var CONFIG = {
   dev: {
     API_ORIGIN: 'http://localhost:5000'
@@ -45,6 +52,7 @@ function setApiOrigin(origin) {
 
 module.exports = {
   ENV: ENV,
+  BUILD_TAG: BUILD_TAG,
   CONFIG: CONFIG,
   getApiOrigin: getApiOrigin,
   getApiBase: getApiBase,

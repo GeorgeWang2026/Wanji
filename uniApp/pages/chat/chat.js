@@ -18,6 +18,7 @@ var tts = require('../../utils/tts.js');
 var asr = require('../../utils/asr.js');
 var paipanUtil = require('../../utils/paipan.js');
 var avatarMouth = require('../../utils/avatar-mouth.js');
+var freeTalk = require('../../utils/free-talk.js');   // DF-97：头像连续对话通道（WebSocket 流式播报）
 var QUOTES = require('../../data/quotes.js');   // DF-64：等待期/空闲期金句池（自动生成）
 // DF-67：证券条件池（仅当当前线程关联了证券信息卡片时并入轮播）；缺失/为空/解析失败自动降级为主力池
 var QUOTES_STOCK = [];
@@ -170,7 +171,7 @@ Page({
     loggedIn: false,
     userName: '',
     chips: [],
-    skillActive: { qimen: false, bazi: false, meihua: false },
+    skillActive: { qimen: false, bazi: false, meihua: false, stock: false },
     ttsOn: true,
     speaking: false,
     recording: false,
@@ -268,7 +269,13 @@ Page({
     /* ---- 头像口型（DF-55：播报时嘴部缩放动画，定位照抄 XB_AVATAR_CONFIGS） ---- */
     mouthRect: null,       // {left,top,width,height} 百分比；null 则不渲染口型层
     mouthSx: 1,            // 口型横向缩放
-    mouthSy: 1             // 口型纵向缩放
+    mouthSy: 1,            // 口型纵向缩放
+    /* ---- DF-97：头像连续对话通道（不建正式提问、不计费） ---- */
+    freeTalk: false,       // 通道是否开启
+    ftUserText: '',        // 用户最近一句话（网站 #pcEmptyHint / _ulSet 口径）
+    ftCountdown: '',       // 用户文字区尾部的发送倒计时（小字，空 = 不显示）
+    ftStatus: '',          // 通道状态文案（正在连接/思考/回答…）
+    ftPhase: '',           // connecting | listening | thinking | speaking（光圈/脉冲判定用）
   },
 
   /* ---------------- 生命周期 ---------------- */
@@ -337,6 +344,8 @@ Page({
 
   onShow: function () {
     this._appHidden = false;
+    // DF-97：回前台先重建录音实例并恢复连续识别（锁屏/切后台后旧实例必死）
+    if (this._ft) { try { this._ft.handleShow('onShow'); } catch (e) { /* 忽略 */ } }
     var u = api.readUser();
     this.setData({ loggedIn: !!u, userName: u ? u.name : '', userId: u ? String(u.uid || '') : '' });
     // FB-51：冷启动 / 切账号后按 uid 恢复未读角标（杀进程保留）
@@ -362,6 +371,8 @@ Page({
     this._stopIdleHint();
     // DF-81：离开前台清除快捷问题定时器
     this._stopQuickQATimer();
+    // DF-97：切后台/锁屏必须停收音（后台录音一定失败），回前台再重建实例
+    if (this._ft) { try { this._ft.handleHide('onHide'); } catch (e) { /* 忽略 */ } }
   },
 
   /** DF-61：打开档案层并直接进入新增编辑器（未登录先弹登录，沿用 pendingAction） */
@@ -374,6 +385,7 @@ Page({
   onUnload: function () {
     this._stopThinking();
     this._stopIdleHint();
+    if (this._ft) { this._ft.stop(); this._ft = null; }
     tts.stop(true);
     if (this.recTimer) clearInterval(this.recTimer);
     if (this._mouthTimer) { clearInterval(this._mouthTimer); this._mouthTimer = null; }
@@ -515,9 +527,112 @@ Page({
     });
   },
 
-  /** 主页头像点击：保持原有录音行为（角色头像不再被用户头像顶替） */
+  /** DF-97：主页头像点击 = 开关连续对话通道（不再转发麦克风，二者严格分离） */
   onAvatarTap: function () {
-    this.onMicTap();
+    if (this.data.freeTalk) { this.exitFreeTalk(); return; }
+    if (this.data.recording) {
+      wx.showToast({ title: '正在录音，请先结束录音', icon: 'none' });
+      return;
+    }
+    if (!api.getToken()) {
+      this.pendingAction = 'freeTalk';
+      this.setData({ showLogin: true });
+      return;
+    }
+    this.enterFreeTalk();
+  },
+
+  /** DF-97：进入连续对话（换票 → WebSocket → 连续识别 + 流式播报；不计费、不建正式提问） */
+  enterFreeTalk: function () {
+    if (this._ft) return;
+    var self = this;
+    // 与等待期/空闲期提示、正式播报互斥：先停干净再进（stopSpeaking 内部已清等待期提示）
+    this.stopSpeaking('ft');
+    this._stopIdleHint();
+    this.setData({
+      freeTalk: true,
+      ftUserText: '',
+      ftCountdown: '',
+      ttsText: '',
+      ttsLabel: '玄机子',
+      ftStatus: '正在连接…',
+      ftPhase: 'connecting',
+      idleQuote: null,
+      hintQuote: null,
+      inputOpen: false,
+      topOpen: true
+    });
+
+    this._ft = freeTalk.create({
+      onState: function (state) {
+        if (state === 'failed' || state === 'closed' || state === 'idle') {
+          self.exitFreeTalk();
+          return;
+        }
+        // 与网站 showStatus/setGlow 同口径：连接中显示标签；聆听与播报结束不显示标签；思考/回答显示标签
+        var map = {
+          ticketing: ['正在连接…', 'connecting'],
+          connecting: ['正在连接…', 'connecting'],
+          reconnecting: ['正在连接…', 'connecting'],
+          your_turn: ['轮到你说', 'listening'],
+          generating: ['正在生成回答…', 'thinking'],
+          speaking: ['🔊 正在回答…', 'speaking']
+        };
+        var row = map[state];
+        if (row) self.setData({ ftStatus: row[0], ftPhase: row[1] });
+      },
+      onLog: function (items) {
+        var list = items || [];
+        // 网站口径：#pcEmptyHint 只显示用户最近一句话；AI 文字进 .tts-lines/#ttsBody
+        var top = list[0] || null;
+        self.setData({
+          ftUserText: top ? (top.user || '') : '',
+          ttsLabel: '玄机子'
+        });
+      },
+      // AI 字幕逐句上屏：free-talk 在每一句开始播报时回调，与播报队列同一分段、同一时刻；
+      // 不再随流式 delta 整体刷新，避免整段回复一次性铺满。
+      onAiText: function (text) {
+        self.setData({ ttsText: String(text || ''), ttsLabel: '玄机子' });
+      },
+      // 发送倒计时：直接显示在用户文字区尾部（小字，复用现有位置，不新增控件）
+      onCountdown: function (text) {
+        var s = String(text || '');
+        if (s === self.data.ftCountdown) return;
+        // 真机排障：日志有、界面没有时，看这一条判断是「没下发」还是「渲染被遮」
+        if (!self.data.ftCountdown && s) {
+          console.log('[ft-diag] 倒计时上屏 | 显示 =', s, '| 用户行 =', self.data.ftUserText || '（空）');
+        }
+        self.setData({ ftCountdown: s });
+      },
+      // 录音异常状态：写进用户文字区（如「麦克风异常，正在重连」），不弹窗、不静默空转
+      onStatus: function (text) {
+        var s = String(text || '');
+        if (!s) return;
+        self.setData({ ftUserText: s, ftCountdown: '' });
+      },
+      onSpeaking: function (on) {
+        self.setData({ speaking: !!on });
+        if (on) self._startMouth(); else self._stopMouth();
+      },
+      onNotice: function (n) {
+        if (!n || !n.message) return;
+        wx.showToast({ title: n.message, icon: 'none' });
+      },
+      onError: function (e) {
+        wx.showToast({ title: (e && e.message) || '语音对话连接失败', icon: 'none' });
+        self.exitFreeTalk();
+      }
+    });
+    this._ft.start();
+  },
+
+  /** DF-97：退出通道 —— 停止播报与识别，恢复空态与原提示逻辑（不保留会话摘要、不续聊） */
+  exitFreeTalk: function () {
+    if (this._ft) { this._ft.stop(); this._ft = null; }
+    this._stopMouth();
+    this.setData({ freeTalk: false, ftUserText: '', ftCountdown: '', ttsText: '', ftStatus: '', ftPhase: '' });
+    this._maybeStartIdleHint();
   },
 
   /* ================= DF-63：等待期提示语轮播 + 统一停止 ================= */
@@ -608,6 +723,7 @@ Page({
 
   /** DF-64：空闲期顶部金句轮播（纯文字，6 秒/句，顺序遍历；DF-67：每 2 条主力插 1 条证券） */
   _startIdleHint: function () {
+    if (this.data.freeTalk) return;   // DF-97：连续对话通道内不显示随机金句
     if (!(QUOTES || []).length) return;
     if (this._hintOwner === 'idle' && this._idleTimer) return;
     this._hintOwner = 'idle';
@@ -2260,7 +2376,7 @@ Page({
           showHistory: false,
           topOpen: true,
           chips: [],
-          skillActive: { qimen: false, bazi: false, meihua: false }
+          skillActive: { qimen: false, bazi: false, meihua: false, stock: false }
         });
         tts.stop(true);
         self._ttsText = '';
@@ -2466,7 +2582,14 @@ Page({
       }
     });
 
-    // 未绑定任何技能：与网页版 FB-40 一致，按当前时空自动起「奇门 + 梅花」双盘
+    // DF-68：证券绑定结构为 { stock: {name,code,...}, meta:{type:'stock'} }（与 restoreThread 还原一致）
+    if (bound.stock && bound.stock.stock) {
+      paipanData.stock = bound.stock.stock;
+      metas.push(bound.stock.meta || { type: 'stock' });
+      types.push('stock');
+    }
+
+    // 未绑定任何技能（奇门 / 八字 / 梅花 / 证券 均未绑定）：与网页版 FB-40 一致，按当前时空自动起「奇门 + 梅花」双盘
     if (!types.length) {
       var now = new Date();
       var q = paipanUtil.autoQimen(now);
@@ -2503,14 +2626,17 @@ Page({
   syncChips: function () {
     var bound = (app().globalData && app().globalData.paipan) || {};
     var chips = [];
-    var active = { qimen: false, bazi: false, meihua: false };
+    var active = { qimen: false, bazi: false, meihua: false, stock: false };
     var order = (this.threadTypes && this.threadTypes.length)
       ? this.threadTypes
       : ['qimen', 'bazi', 'meihua', 'stock'];
     for (var i = 0; i < order.length; i++) {
       var t = order[i];
       if (t === 'stock') {
-        if (bound.stock) chips.push(this._chipOf('stock', bound.stock));
+        if (bound.stock) {
+          chips.push(this._chipOf('stock', bound.stock));
+          active.stock = true;
+        }
         continue;
       }
       if (bound[t] && bound[t].meta) {
@@ -2531,6 +2657,16 @@ Page({
 
   onChipTap: function (e) {
     var type = e.currentTarget.dataset.type;
+    // DF-68：证券标签点击进入详情页，并携带当前绑定 code/name（stock.js 按 ?code= 加载）
+    if (type === 'stock') {
+      var bound = (app().globalData && app().globalData.paipan) || {};
+      var s = (bound.stock && bound.stock.stock) || {};
+      var qs = [];
+      if (s.code) qs.push('code=' + encodeURIComponent(s.code));
+      if (s.name) qs.push('name=' + encodeURIComponent(s.name));
+      wx.navigateTo({ url: '/uniApp/pages/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      return;
+    }
     wx.navigateTo({ url: '/uniApp/pages/' + type + '/' + type });
   },
 
@@ -2693,7 +2829,7 @@ Page({
 
       if (cdata.cost > 0) {
         this.pushMsg('assistant', '已消耗 ' + cdata.cost + ' 积分（剩余 ' + cdata.balance + '），正在为你用「'
-          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数' })[t] || t; }).join('、')
+          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券投资' })[t] || t; }).join('、')
           + '」推演「' + text + '」…', { plainOnly: true });
       }
       this.updateScroll();
@@ -2813,7 +2949,7 @@ Page({
   confirmCost: function (text, bundle) {
     var self = this;
     var typeNames = bundle.types.map(function (t) {
-      return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数' })[t] || t;
+      return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券投资' })[t] || t;
     }).join('、');
     return new Promise(function (resolve) {
       self._costResolve = resolve;
@@ -2886,6 +3022,13 @@ Page({
 
   /* ---------------- 语音输入 ---------------- */
   onMicTap: function () {
+    // DF-97：麦克风链路与头像通道严格分离——先退出通道（停止播报与连续识别），再走原录音流程
+    if (this.data.freeTalk) {
+      var self = this;
+      this.exitFreeTalk();
+      setTimeout(function () { self.onMicTap(); }, 250);
+      return;
+    }
     this.stopSpeaking('record');
     if (this.data.recording) this.stopRecord();
     else this.startRecord();
@@ -3094,6 +3237,11 @@ Page({
     }
     if (action === 'stock') {
       wx.navigateTo({ url: '/uniApp/pages/my-stocks/my-stocks' });
+      return;
+    }
+    // DF-97：登录前点头像的意图 = 登录后直接进连续对话
+    if (action === 'freeTalk') {
+      this.enterFreeTalk();
       return;
     }
     // 默认：停在主页，不打开任何全屏层

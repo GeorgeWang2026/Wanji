@@ -12,6 +12,7 @@ var BACKOFF_MS = [500, 1000, 2000, 4000, 8000, 15000, 30000];
 var MAX_RETRY = 8;
 var CLIENT_PING_MS = 20000;
 var MAX_TEXT_CHARS = 1900;
+var READY_TIMEOUT_MS = 8000;   // 建连后等 session.ready 的上限：超时主动断开重连
 
 // 这几种关闭码不重连：限流 / 消息非法 / 票据换了用户
 var NO_RETRY_CODES = { 4004: true, 4006: true, 4010: true };
@@ -30,7 +31,6 @@ function toWsUrl(raw) {
 function AgentChannel(opts) {
   opts = opts || {};
   this.onState = opts.onState || noop;
-  this.onReady = opts.onReady || noop;
   this.onDelta = opts.onDelta || noop;
   this.onEnd = opts.onEnd || noop;
   this.onInterrupted = opts.onInterrupted || noop;
@@ -40,6 +40,10 @@ function AgentChannel(opts) {
 
   this.state = 'idle';
   this.sessionId = opts.sessionId || '';
+  // DF-100：会话档位（auto/chat/deep）。与网页端一致走换票（连接级默认档），
+  // 不放在 user.message 帧里，避免首帧竞态；不传则保持后端默认（auto）。
+  this.scenario = opts.scenario || '';
+  this._ticketScenario = '';
 
   this._task = null;
   this._opened = false;
@@ -48,6 +52,7 @@ function AgentChannel(opts) {
   this._authRetried = false;
   this._retryTimer = null;
   this._pingTimer = null;
+  this._readyTimer = null;
   this._mergeTimer = null;
   this._frag = '';
   this._pendingText = '';
@@ -86,7 +91,11 @@ AgentChannel.prototype._fetchTicket = function () {
     err.fatal = true;
     return Promise.reject(err);
   }
-  return api.request('/agent/ws-ticket', { method: 'POST', data: {} }).then(function (body) {
+  return api.request('/agent/ws-ticket', {
+    method: 'POST',
+    // DF-100：档位随换票下发（重连换票会自动带上），与网页端 static/agent-ws.js 落点一致
+    data: this.scenario ? { scenario: this.scenario } : {}
+  }).then(function (body) {
     if (!body || (body.code !== undefined && body.code !== 0)) {
       var msg = (body && (body.detail || body.msg)) || '换票失败，请稍后重试';
       var e1 = new Error(msg);
@@ -95,6 +104,9 @@ AgentChannel.prototype._fetchTicket = function () {
     }
     var data = body.data || body;
     if (!data || !data.ticket || !data.ws_url) throw new Error('换票响应缺少字段');
+    self._ticketScenario = String(data.scenario || '');
+    console.log('[agent-ws] ws-ticket | 请求档位 =', self.scenario || 'auto(默认)',
+      '| 回显档位 =', self._ticketScenario || '-');
     return data;
   }).catch(function (e) {
     var err = e instanceof Error ? e : new Error(String(e || '换票失败'));
@@ -121,6 +133,7 @@ AgentChannel.prototype._connect = function (first) {
     self._open(ticket);
   }).catch(function (e) {
     if (!self._wantOpen) return;   // 已主动退出：不再提示、不再重连
+    console.warn('[agent-ws] 换票失败', (e && e.message) || e);
     try { self.onError(e); } catch (err) { /* 忽略 */ }
     if (e && e.fatal) { self._finish('failed'); return; }
     self._scheduleReconnect();
@@ -137,6 +150,8 @@ AgentChannel.prototype._open = function (ticket) {
   }
   var url = base + (base.indexOf('?') >= 0 ? '&' : '?') + 'ticket=' + encodeURIComponent(ticket.ticket);
   if (this.sessionId) url += '&session_id=' + encodeURIComponent(this.sessionId);
+  // 只打去掉 ticket 的地址：真机排查时用于确认是否为 wss 及 socket 合法域名
+  console.log('[agent-ws] connect', url.split('?')[0]);
 
   var self = this;
   var settled = false;
@@ -148,6 +163,8 @@ AgentChannel.prototype._open = function (ticket) {
         if (settled) return;
         settled = true;
         self._opened = false;
+        // 真机常见：socket 合法域名未配置 → 这里拿到 "url not in domain list"
+        console.warn('[agent-ws] connectSocket fail |', (e && e.errMsg) || 'unknown');
         self._onClose({ code: 0, reason: (e && e.errMsg) || 'connect failed' });
       }
     });
@@ -172,15 +189,15 @@ AgentChannel.prototype._open = function (ticket) {
     try { task.close({ code: 1006, reason: 'connect_timeout' }); } catch (e) { /* 忽略 */ }
     self._onClose({ code: 1006, reason: 'connect_timeout' });
   }, 8000);
-  this._connectTimer = connectTimer;
 
   task.onOpen(function () {
     clearTimeout(connectTimer);
-    self._connectTimer = null;
     self._opened = true;
     self._attempt = 0;
     self._authRetried = false;
     self._startPing();
+    console.log('[agent-ws] open');
+    self._armReadyWatch(task);
   });
 
   task.onMessage(function (res) {
@@ -189,7 +206,6 @@ AgentChannel.prototype._open = function (ticket) {
 
   task.onClose(function (res) {
     clearTimeout(connectTimer);
-    self._connectTimer = null;
     if (settled) return;
     settled = true;
     self._opened = false;
@@ -199,6 +215,22 @@ AgentChannel.prototype._open = function (ticket) {
   task.onError(function () {
     // 交给 onClose 统一收口，避免重复重连
   });
+};
+
+/** 建连成功但等不到 session.ready：多为反代/鉴权卡住，主动断开交给重连兜底 */
+AgentChannel.prototype._armReadyWatch = function (task) {
+  var self = this;
+  this._clearReadyTimer();
+  this._readyTimer = setTimeout(function () {
+    self._readyTimer = null;
+    if (!self._wantOpen || !self._opened || self.state === 'ready') return;
+    console.warn('[agent-ws] ' + READY_TIMEOUT_MS + 'ms 未收到 session.ready，主动断开重连');
+    try { task.close({ code: 4005, reason: 'ready_timeout' }); } catch (e) { /* 忽略 */ }
+  }, READY_TIMEOUT_MS);
+};
+
+AgentChannel.prototype._clearReadyTimer = function () {
+  if (this._readyTimer) { clearTimeout(this._readyTimer); this._readyTimer = null; }
 };
 
 AgentChannel.prototype._onFrame = function (raw) {
@@ -215,9 +247,12 @@ AgentChannel.prototype._onFrame = function (raw) {
   if (type === 'pong') return;
 
   if (type === 'session.ready') {
+    this._clearReadyTimer();
     if (data.session_id) this.sessionId = data.session_id;
+    console.log('[agent-ws] session.ready | session_id =', this.sessionId || '-',
+      '| scenario =', data.scenario || this._ticketScenario || this.scenario || '-',
+      '| model =', data.model || '-', '| model_mode =', data.model_mode || '-');
     this._setState('ready', data);
-    try { this.onReady(data); } catch (e) { /* 忽略 */ }
     if (this._pendingText) {
       var pending = this._pendingText;
       this._pendingText = '';
@@ -228,6 +263,9 @@ AgentChannel.prototype._onFrame = function (raw) {
   if (type === 'assistant.start') {
     this._generating = true;
     this._assistantText = '';
+    // DF-100：服务端在这一帧回显本轮实际档位，是「有没有走到 chat」的客户端判据
+    console.log('[agent-ws] assistant.start | scenario =', data.scenario || '-',
+      '| model =', data.model || '-');
     this._setState('generating', data);
     return;
   }
@@ -268,7 +306,9 @@ AgentChannel.prototype._onFrame = function (raw) {
 
 AgentChannel.prototype._onClose = function (ev) {
   this._stopPing();
+  this._clearReadyTimer();
   this._task = null;
+  console.warn('[agent-ws] close | code =', (ev && ev.code), '| reason =', (ev && ev.reason) || '-');
 
   if (!this._wantOpen) {
     this._setState('idle');
@@ -348,6 +388,7 @@ AgentChannel.prototype._emitUserMessage = function (text) {
   });
   if (!ok) {
     this._pendingText = t;
+    this.onNotice({ code: 'SEND_FAILED', level: 'warn', message: '消息发送失败，正在重连，稍后自动重发' });
     return;
   }
   this._lastSentText = t;
@@ -406,6 +447,7 @@ AgentChannel.prototype._flush = function () {
     this._emitUserMessage(text);
   } else {
     this._pendingText = text;
+    this.onNotice({ code: 'NOT_CONNECTED', level: 'warn', message: '连接已断开，正在重连，这句话稍后自动发送' });
   }
 };
 
@@ -424,6 +466,7 @@ AgentChannel.prototype._finish = function (reason) {
   this._wantOpen = false;
   this._stopPing();
   this._clearRetryTimer();
+  this._clearReadyTimer();
   if (this._mergeTimer) { clearTimeout(this._mergeTimer); this._mergeTimer = null; }
   this._frag = '';
   this._pendingText = '';
@@ -438,6 +481,7 @@ AgentChannel.prototype.stop = function () {
   this._wantOpen = false;
   this._stopPing();
   this._clearRetryTimer();
+  this._clearReadyTimer();
   if (this._mergeTimer) { clearTimeout(this._mergeTimer); this._mergeTimer = null; }
   this._frag = '';
   this._pendingText = '';

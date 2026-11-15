@@ -9,8 +9,7 @@
      - 积分消耗确认卡片（参考页自绘对话框）
      ============================================================ -->
 <view class="app" style="padding-top:{{statusBarH}}px;">
-
-  <!-- ============ 顶部：您的咨询 ============ -->
+  <!-- ============ 顶部：您的咨询（自由对话只替换空态金句区，其余保持不变） ============ -->
   <view class="panel-top">
     <view class="panel-header" bindtap="toggleTop">
       <!-- 原右侧「⟳ 重新开始」文字按钮 → 左侧圆形按钮（同一点击逻辑 onRestart，热区仍是 56rpx 圆） -->
@@ -24,8 +23,11 @@
 
     <view class="panel-body {{topOpen ? 'open' : ''}}">
       <!-- 未提交问题时的默认提示（对应参考页 #pcEmptyHint）；DF-64：空闲期在此轮播金句 -->
-      <view class="pc-empty-hint" id="pcEmptyHint" wx:if="{{!pinned && !sentVisible}}">
-        <block wx:if="{{idleQuote}}">
+      <!-- DF-97：自由对话时这块显示用户本轮识别文字（网站 _ulSet）；多行自动换行、不省略截断，换轮即清空 -->
+      <view class="pc-empty-hint {{freeTalk ? 'ft-user-line' : ''}}" id="pcEmptyHint"
+            wx:if="{{freeTalk || (!pinned && !sentVisible)}}">
+        <block wx:if="{{freeTalk}}">{{ftUserText}}<text class="ft-countdown" wx:if="{{ftCountdown}}">{{ftCountdown}}</text></block>
+        <block wx:elif="{{idleQuote}}">
           <text class="idle-quote-text">{{idleQuote.text}}</text>
           <text class="idle-quote-translation" wx:if="{{idleQuote.translation}}">{{idleQuote.translation}}</text>
           <text class="idle-quote-author">—— {{idleQuote.author}}</text>
@@ -110,11 +112,12 @@
 
   <!-- ============ 中部：头像舞台 ============ -->
   <view class="stage">
-    <view class="status-tag {{(recording || typing || speaking) && !topOpen ? 'show' : ''}}">{{recording ? '正在聆听…' : (typing ? typingText : (speaking ? '正在播报…' : ''))}}</view>
+    <view class="status-tag {{((freeTalk ? ftStatus : (recording || typing || speaking)) && !topOpen) ? 'show' : ''}}">{{freeTalk ? ftStatus : (recording ? '正在聆听…' : (typing ? typingText : (speaking ? '正在播报…' : '')))}}</view>
 
+    <!-- DF-97：光圈按网站 setGlow 口径——连接中 idle；聆听/思考/回答时旋转；脉冲圈只在聆听时 -->
     <view class="avatar-wrap {{recording ? 'is-listening' : ''}}">
-      <view class="pulse-ring {{recording ? 'active' : ''}}"></view>
-      <view class="avatar-ring {{(recording || typing || speaking) ? '' : 'idle'}}"></view>
+      <view class="pulse-ring {{recording || ftPhase === 'listening' ? 'active' : ''}}"></view>
+      <view class="avatar-ring {{(recording || typing || speaking || (freeTalk && ftPhase !== 'connecting' && ftPhase)) ? '' : 'idle'}}"></view>
 
       <view class="avatar-stage" bindtap="onAvatarTap">
         <image
@@ -154,7 +157,7 @@
         <text class="p-icon">☰</text>
         <text class="p-label">梅花</text>
       </view>
-      <view class="paipan-btn" hover-class="press-zone" bindtap="openPaipan" data-type="stock">
+      <view class="paipan-btn {{skillActive.stock ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="stock">
         <text class="p-icon">📈</text>
         <text class="p-label">证券</text>
       </view>

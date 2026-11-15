@@ -131,6 +131,7 @@
   font-size: 28rpx;
   line-height: 1.6;
   color: #d7cdec;
+  text-align: left;
   animation: quote-fade .2s ease;
 }
 .idle-quote-author {
@@ -145,10 +146,38 @@
   margin-top: 6rpx;
   font-size: 24rpx;
   color: rgba(255, 255, 255, .5);
+  text-align: left;
 }
 @keyframes quote-fade {
   from { opacity: 0; }
   to { opacity: 1; }
+}
+
+/* ================= DF-97：自由对话文字区 =================
+ * #pcEmptyHint 显示用户本轮识别文字（多行、不截断，换轮清空），
+ * AI 回复显示在下方既有 .tts-lines / .tts-body 里（2~15 行封顶）。
+ */
+.pc-empty-hint.ft-user-line {
+  padding: 24rpx 12rpx;             /* 12px 6px */
+  font-size: 26rpx;                 /* 13px */
+  line-height: 1.5;
+  color: #e8dff5;
+  text-align: left;
+  /* 用户明确要求：识别到多少显示多少，不省略号截断，超宽自动换行、多行显示。
+     高度随行数自然增长，由外层 .panel-body 自身的纵向滚动兜住，
+     不新增滚动容器、不改面板结构与尺寸。 */
+  white-space: normal;
+  word-break: break-all;
+  overflow: visible;
+}
+
+/* 发送倒计时：跟在用户文字尾部的小字提示。
+   只加内联小字，不新增控件、不改 padding / 字号 / 行高，布局尺寸不变。 */
+.ft-countdown {
+  margin-left: 10rpx;
+  font-size: 22rpx;
+  color: rgba(255, 255, 255, .42);
+  white-space: nowrap;
 }
 
 /* 参考页 #pinnedContext 展开后是 display:block（inline style），子块靠自身 margin 排布 */
@@ -320,6 +349,7 @@
   font-size: 28rpx;
   line-height: 1.6;
   color: #e3d8f5;
+  text-align: left;
 }
 .quote-author {
   display: block;
@@ -333,6 +363,7 @@
   margin-top: 6rpx;
   font-size: 24rpx;
   color: rgba(255, 255, 255, .5);
+  text-align: left;
 }
 
 .dot-flash {
@@ -2361,3 +2392,5 @@
 .ledger-amount.amt-consume { color: #ff9aa8; }
 .credits-empty { padding: 120rpx 40rpx; text-align: center; color: rgba(224, 208, 240, .5); font-size: 26rpx; }
 .credits-load-more { padding: 28rpx; text-align: center; font-size: 26rpx; color: #c9a3ff; }
+
+
