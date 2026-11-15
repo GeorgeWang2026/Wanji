@@ -5,7 +5,6 @@
  *   - 信息区 #stockDetailInfo（股票/涨跌幅/方向/级别/结构/态势/空间/行业）
  *   - K 线 embed（kline.html，simple 模式）；单据要求：只做日 K、方形满宽
  *   - 底部工具栏（预览提示词 / 关联到提问）保持原样
- * 画线：B 方案 —— 小程序本地绘制、本地保存（wx.setStorageSync），不读网站已画线
  * ============================================================ */
 var stock = require('../../utils/stock.js');
 var paipan = require('../../utils/paipan.js');
@@ -13,8 +12,6 @@ var paipan = require('../../utils/paipan.js');
 var UP_COLOR = '#EF5350';    // 与 kline.html klineColors 一致
 var DOWN_COLOR = '#26A69A';
 var MA_COLORS = ['#c9a227', '#3b82c4', '#8a6fbf'];
-var DRAW_COLOR = '#2962FF';  // TradingView 手绘趋势线默认色
-var TREND_KEY = 'kline_draw_v1:';    // 对齐站点「symbol|级别」的画线存储口径
 var VISIBLE_BARS = 90;       // 绘制窗口（取数 300 根与站点一致，小程序无平移只画最近一段）
 
 function fixed(n, d) {
@@ -61,19 +58,15 @@ Page({
     status: 'loading',       // loading | ready | empty | error
     chartTip: 'K线图加载中…',  // 与 kline.html #kline_tip 同文案，文字随状态切换
 
-    drawMode: false,
-    drawTool: 'h',           // h 水平线 | t 趋势线
-
     hint: '',
     showHint: false
   },
 
   onLoad: function (options) {
     this._klines = [];
-    this._drawings = [];
-    this._pending = null;
     this._cursor = -1;
     this._seq = 0;
+    this._detail = null;
 
     var opt = options || {};
     var code = opt.code ? String(opt.code).trim() : '';
@@ -88,6 +81,22 @@ Page({
       if (mm) code = mm[0];
     }
     if (!code) code = '600519';   // 无参进入时的兜底（与页面上线前一致）
+
+    // 天时(大盘) / 地利(板块) 口径：路由参数优先，其次沿用已绑定证券的同名卡片
+    // （网站 selectStock 把 zs_*/bk_* 存在绑定数据里，进详情后原样带进提示词）
+    var bound = null;
+    try {
+      var g = getApp().globalData || {};
+      bound = (g.paipan && g.paipan.stock && g.paipan.stock.stock) || null;
+    } catch (e) { bound = null; }
+    var boundSame = bound && String(bound.code || '').toUpperCase().indexOf(code) >= 0;
+    this._meta = {
+      zs_code: opt.zs_code || (boundSame ? bound.zs_code : '') || '',
+      zs_name: opt.zs_name || (boundSame ? bound.zs_name : '') || '',
+      bk_code: opt.bk_code || (boundSame ? bound.bk_code : '') || '',
+      bk_name: opt.bk_name || (boundSame ? bound.bk_name : '') || ''
+    };
+    if (!name && boundSame && bound.name) name = String(bound.name).trim();
 
     this.setData({ code: code, name: name });
     this.applyTitle();
@@ -132,6 +141,7 @@ Page({
     }
     this.setData({ infoStatus: 'loading', info: null });
     stock.fetchDetail(code, this._market).then(function (d) {
+      self._detail = (d && d.code) ? d : null;
       var info = stock.buildInfo(d, { name: self.data.name, code: code });
       if (!info) {
         self.setData({ infoStatus: 'empty', info: null });
@@ -153,12 +163,10 @@ Page({
 
     this.setData({ status: 'loading', chartTip: 'K线图加载中…' });
     this._klines = [];
-    this._pending = null;
 
     return stock.load(code, force, this._market).then(function (klines) {
       if (seq !== self._seq) return;
       self._klines = klines || [];
-      self._drawings = self.readDrawings();
       if (self._klines.length) {
         self.setData({ status: 'ready' });
       } else {
@@ -172,55 +180,6 @@ Page({
       self.setData({ status: 'error', chartTip: 'K线数据加载失败，请稍后重试' });
       self.draw();
     });
-  },
-
-  /* ---------------- 本地画线（B 方案） ---------------- */
-  /** 存储键与站点一致按「symbol|级别」区分：kline_draw_v1:a:600519|1D */
-  drawKey: function () {
-    return TREND_KEY + 'a:' + this.data.code + '|1D';
-  },
-
-  readDrawings: function () {
-    try {
-      var raw = wx.getStorageSync(this.drawKey());
-      var arr = raw ? JSON.parse(raw) : [];
-      return Array.isArray(arr) ? arr : [];
-    } catch (e) { return []; }
-  },
-
-  saveDrawings: function () {
-    try {
-      wx.setStorageSync(this.drawKey(), JSON.stringify(this._drawings || []));
-    } catch (e) { /* 忽略 */ }
-  },
-
-  toggleDraw: function () {
-    var on = !this.data.drawMode;
-    this._pending = null;
-    this._cursor = -1;
-    this.setData({ drawMode: on, drawTool: on ? (this.data.drawTool === 't' ? 't' : 'h') : 'none' });
-    this.draw();
-  },
-
-  pickTool: function (e) {
-    var t = e.currentTarget.dataset.tool || 'h';
-    this._pending = null;
-    this.setData({ drawMode: true, drawTool: t });
-    this.draw();
-  },
-
-  undoDraw: function () {
-    if (!this._drawings.length) return;
-    this._drawings.pop();
-    this.saveDrawings();
-    this.draw();
-  },
-
-  clearDraw: function () {
-    if (!this._drawings.length) return;
-    this._drawings = [];
-    this.saveDrawings();
-    this.draw();
   },
 
   /* ---------------- Canvas ---------------- */
@@ -395,58 +354,6 @@ Page({
     drawMA(ma10, MA_COLORS[1]);
     drawMA(ma20, MA_COLORS[2]);
 
-    // 手绘趋势线（本地保存，锚点用日期 + 价格）
-    if (this._drawings && this._drawings.length) {
-      var dateMap = {};
-      for (var mi = 0; mi < total; mi++) dateMap[all[mi].date] = mi;
-      var idxOf = function (pt) {
-        if (!pt) return 0;
-        if (pt.d && dateMap[pt.d] !== undefined) return dateMap[pt.d];
-        return pt.i || 0;
-      };
-      ctx.save();
-      ctx.beginPath();
-      ctx.rect(padL, padT, plotW, mainH);
-      ctx.clip();
-      ctx.strokeStyle = DRAW_COLOR;
-      ctx.fillStyle = DRAW_COLOR;
-      ctx.lineWidth = 1.5;
-      for (var di = 0; di < this._drawings.length; di++) {
-        var dr = this._drawings[di];
-        if (dr.t === 'h') {
-          var hy = yOf(Number(dr.p));
-          ctx.beginPath();
-          ctx.moveTo(padL, hy);
-          ctx.lineTo(padL + plotW, hy);
-          ctx.stroke();
-        } else if (dr.t === 't' && dr.a && dr.b) {
-          var x1 = xOfAbs(idxOf(dr.a));
-          var y1 = yOf(Number(dr.a.p));
-          var x2 = xOfAbs(idxOf(dr.b));
-          var y2 = yOf(Number(dr.b.p));
-          ctx.beginPath();
-          ctx.moveTo(x1, y1);
-          ctx.lineTo(x2, y2);
-          ctx.stroke();
-          ctx.beginPath();
-          ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
-          ctx.fill();
-        }
-      }
-      // 趋势线第一个锚点
-      if (this._pending) {
-        var px = xOfAbs(idxOf(this._pending));
-        var py = yOf(Number(this._pending.p));
-        ctx.beginPath();
-        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
-        ctx.fill();
-      }
-      ctx.restore();
-    }
-
     // 底部日期（首 / 中 / 末）
     ctx.fillStyle = '#8a7a5f';
     ctx.textBaseline = 'top';
@@ -510,17 +417,14 @@ Page({
 
   /* ---------------- 交互 ---------------- */
   onTouchStart: function (e) {
-    if (this.data.drawMode) { this.addPoint(e); return; }
     this.moveCross(e);
   },
 
   onTouchMove: function (e) {
-    if (this.data.drawMode) return;
     this.moveCross(e);
   },
 
   onTouchEnd: function () {
-    if (this.data.drawMode) return;
     if (this._cursor < 0) return;
     this._cursor = -1;
     this.draw();
@@ -540,63 +444,68 @@ Page({
     this.draw();
   },
 
-  /** 画线模式下的一次点击：水平线一次成线，趋势线两次成线 */
-  addPoint: function (e) {
-    var geo = this.geo;
-    if (!geo) return;
-    var pt = touchXY(e, this._canvasLeft, this._canvasTop);
-    if (!pt) return;
-    if (pt.y < geo.padT || pt.y > geo.padT + geo.mainH) return;
-
-    var idx = Math.floor((pt.x - geo.padL) / geo.xStep);
-    if (idx < 0) idx = 0;
-    if (idx > geo.n - 1) idx = geo.n - 1;
-
-    var price = geo.maxP - (pt.y - geo.padT) / geo.mainH * geo.spanP;
-    var absIdx = geo.start + idx;   // 锚点存全量数据绝对序号，日期用于重新定位
-    var anchor = {
-      p: Math.round(price * 100) / 100,
-      d: (this._klines[absIdx] || {}).date || '',
-      i: absIdx
+  /* ---------------- 置底工具条：提示词预览 / 关联到提问 ---------------- */
+  /**
+   * 组装 paipan_data.stock —— 逐条对齐网站 selectStock（xiaoxuan.html L6194-L6238）：
+   *   1) 个股：GET /stocks/detail?code=，回填 zs_ 与 bk_ 字段后作为 stock_detail
+   *   2) 天时：GET /stocks/detail?code=<zs_code> → index_detail
+   *   3) 地利：GET /stocks/detail?code=<bk_code> → industry_detail
+   * 三个 detail 都是 total_space / level_space 的缓存快照，缺一个提示词就会缺段。
+   */
+  buildStockPayload: function () {
+    var code = String(this.data.code || '').trim().toUpperCase();
+    var full = stock.withMarket(code, this._market) || code;
+    var meta = this._meta || {};
+    var base = {
+      name: this.data.name || code,
+      code: full,
+      zs_code: meta.zs_code || '',
+      zs_name: meta.zs_name || '',
+      bk_code: meta.bk_code || '',
+      bk_name: meta.bk_name || ''
     };
 
-    if (this.data.drawTool === 'h') {
-      this._drawings.push({ t: 'h', p: anchor.p, d: anchor.d, i: absIdx });
-      this.saveDrawings();
-      this.draw();
-      return;
-    }
+    // 与网站一致：detail 请求原样传代码（已带前缀的直接用，6 位纯数字才补市场前缀）
+    var detailOf = function (c) {
+      var cc = String(c || '').trim().toUpperCase();
+      if (!cc) return Promise.resolve(null);
+      var norm = /^\d{6}$/.test(cc) ? stock.withMarket(cc) : cc;
+      return stock.fetchDetail(norm).then(function (d) {
+        return (d && d.code) ? d : null;
+      }).catch(function () { return null; });
+    };
 
-    if (!this._pending) {
-      this._pending = anchor;
-      this.draw();
-      return;
-    }
+    // 优先用页面已取的详情（对应网站「优先用已缓存的 stock_detail」）
+    var stockDetail = (this._detail && this._detail.code)
+      ? Promise.resolve(this._detail)
+      : detailOf(full);
 
-    this._drawings.push({ t: 't', a: this._pending, b: anchor });
-    this._pending = null;
-    this.saveDrawings();
-    this.draw();
+    return stockDetail.then(function (d) {
+      if (d && d.code) {
+        if (base.zs_code) d.zs_code = base.zs_code;
+        if (base.zs_name) d.zs_name = base.zs_name;
+        if (base.bk_code) d.bk_code = base.bk_code;
+        if (base.bk_name) d.bk_name = base.bk_name;
+        base.stock_detail = d;
+      }
+      return base.zs_code ? detailOf(base.zs_code) : null;
+    }).then(function (zd) {
+      if (zd) base.index_detail = zd;
+      return base.bk_code ? detailOf(base.bk_code) : null;
+    }).then(function (bd) {
+      if (bd) base.industry_detail = bd;
+      return base;
+    });
   },
 
-  /* ---------------- 置底工具条：提示词预览 / 关联到提问 ---------------- */
   previewPrompt: function () {
     var self = this;
     var code = String(this.data.code || '').trim().toUpperCase();
     if (!code) return;
-    // 与网站一致：paipan_data.stock.code 用的就是带市场前缀的证券代码
-    var full = stock.withMarket(code, this._market) || code;
     wx.showLoading({ title: '生成中…' });
     // 与网站 _buildPreviewPaipanDataFor('stock') 同结构：个股 + 天时 + 地利
-    paipan.fetchPromptText({
-      stock: {
-        name: this.data.name || code,
-        code: full,
-        zs_code: '',
-        zs_name: '',
-        bk_code: '',
-        bk_name: ''
-      }
+    this.buildStockPayload().then(function (payload) {
+      return paipan.fetchPromptText({ stock: payload });
     }).then(function (r) {
       wx.hideLoading();
       // 网站只渲染后端 hint 全文（pre 原样展示），不做截断；空时给同一句占位
@@ -614,14 +523,18 @@ Page({
   onBind: function () {
     var code = String(this.data.code || '').trim().toUpperCase();
     if (!code) return;
-    var full = stock.withMarket(code, this._market) || code;
-    var app = getApp();
-    app.globalData.paipan = app.globalData.paipan || {};
-    app.globalData.paipan.stock = {
-      stock: { name: this.data.name || code, code: full },
-      meta: { type: 'stock' }
-    };
-    wx.showToast({ title: '已关联到提问', icon: 'none' });
-    setTimeout(function () { wx.navigateBack(); }, 400);
+    // 与网站 selectStock 一致：绑定数据里同时带个股/大盘/板块三个 detail
+    this.buildStockPayload().then(function (payload) {
+      var app = getApp();
+      app.globalData.paipan = app.globalData.paipan || {};
+      app.globalData.paipan.stock = {
+        stock: payload,
+        meta: { type: 'stock' }
+      };
+      wx.showToast({ title: '已关联到提问', icon: 'none' });
+      setTimeout(function () { wx.navigateBack(); }, 400);
+    }).catch(function () {
+      wx.showToast({ title: '关联失败', icon: 'none' });
+    });
   }
 });

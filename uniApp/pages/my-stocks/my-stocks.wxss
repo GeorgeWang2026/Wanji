@@ -97,19 +97,6 @@
 
 .stock-pick-item .spi-grade { margin-top: 4rpx; font-size: 20rpx; color: #8a75b0; }
 
-/* 最右「查看」：阻止冒泡，点击不进关联 */
-.spi-view {
-  flex-shrink: 0;
-  margin-left: 12rpx;
-  padding: 12rpx 24rpx;
-  border-radius: 32rpx;
-  font-size: 24rpx;
-  color: #c9a3ff;
-  border: 1rpx solid rgba(201, 163, 255, .45);
-  background: rgba(201, 163, 255, .08);
-}
-.spi-view-press { background: rgba(201, 163, 255, .2); }
-
 /* ---------- qd-* 弹窗（复制自 chat.wxss） ---------- */
 .qd-mask {
   position: fixed;

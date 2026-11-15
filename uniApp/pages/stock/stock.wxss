@@ -62,36 +62,6 @@
   white-space: nowrap;
 }
 
-/* ---------- ② K 线区工具条（对齐 kline.html #level_bar 浅色） ---------- */
-.kline-tools {
-  display: flex;
-  align-items: center;
-  gap: 12rpx;
-  padding: 12rpx 20rpx;
-  background: #fbf6ea;
-  border-top: 1rpx solid #e6dcc6;
-  border-bottom: 1rpx solid #e6dcc6;
-  overflow-x: auto;
-  white-space: nowrap;
-}
-
-.kt {
-  flex: none;
-  padding: 10rpx 18rpx;
-  border: 1rpx solid #d9cdb0;
-  border-radius: 8rpx;
-  background: #fff;
-  color: #6b5b3e;
-  font-size: 26rpx;
-  line-height: 1.4;
-}
-
-.kt.on {
-  background: #c9a227;
-  border-color: #c9a227;
-  color: #fff;
-}
-
 /* 方形满宽：高度 = 屏宽（750rpx），左右无横向内边距，不溢出 */
 .chart-wrap {
   position: relative;

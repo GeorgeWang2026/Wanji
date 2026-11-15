@@ -96,6 +96,10 @@ Page({
     return {
       name: s.name || s.code || '',
       code: s.code || '',
+      zs_code: s.zs_code || '',
+      zs_name: s.zs_name || '',
+      bk_code: s.bk_code || '',
+      bk_name: s.bk_name || '',
       sub: sub.join(' · '),
       zdfText: text,
       zdfCls: cls,
@@ -103,39 +107,21 @@ Page({
     };
   },
 
-  /** 点行＝关联：写 globalData.paipan.stock 后返回首页（再次选另一只＝覆盖，不叠加） */
-  onPick: function (e) {
-    // 长按抬手后紧随的 tap 抑制，避免误触发关联
-    if (Date.now() - this._lastLongPress < 600) return;
-    var code = String((e.currentTarget.dataset.code) || '').trim().toUpperCase();
-    if (!code) return;
-    var arr = this._myStocks || [];
-    var cached = null;
-    for (var i = 0; i < arr.length; i++) {
-      if (String(arr[i].code || '').toUpperCase() === code) { cached = arr[i]; break; }
-    }
-    cached = cached || {};
-    var stock = {
-      name: cached.name || code,
-      code: code,
-      zs_code: cached.zs_code || '',
-      zs_name: cached.zs_name || '',
-      bk_code: cached.bk_code || '',
-      bk_name: cached.bk_name || ''
-    };
-    var g = getApp().globalData;
-    g.paipan = g.paipan || {};
-    g.paipan.stock = { stock: stock, meta: { type: 'stock' } };
-    wx.navigateBack();
-  },
-
-  /** 最右「查看」：跳详情页并带 code/name（catchtap，不触发关联） */
+  /** 点行＝进入证券详情页；长按抬手后的 tap 抑制，避免误跳转 */
   onView: function (e) {
-    var code = String((e.currentTarget.dataset.code) || '').trim().toUpperCase();
-    var name = e.currentTarget.dataset.name || '';
+    if (Date.now() - this._lastLongPress < 600) return;
+    var ds = e.currentTarget.dataset;
+    var code = String(ds.code || '').trim().toUpperCase();
+    var name = ds.name || '';
     if (!code) return;
+    // 天时/地利代码一起带过去，详情页拼提示词时与网站 selectStock 同口径
     wx.navigateTo({
-      url: '/uniApp/pages/stock/stock?code=' + encodeURIComponent(code) + '&name=' + encodeURIComponent(name)
+      url: '/uniApp/pages/stock/stock?code=' + encodeURIComponent(code)
+        + '&name=' + encodeURIComponent(name)
+        + '&zs_code=' + encodeURIComponent(ds.zsCode || '')
+        + '&zs_name=' + encodeURIComponent(ds.zsName || '')
+        + '&bk_code=' + encodeURIComponent(ds.bkCode || '')
+        + '&bk_name=' + encodeURIComponent(ds.bkName || '')
     });
   },
 

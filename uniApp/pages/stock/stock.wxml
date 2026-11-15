@@ -48,17 +48,7 @@
     </block>
   </view>
 
-  <!-- ② K 线区：画线工具条（本地绘制/本地保存） -->
-  <view class="kline-tools">
-    <view class="kt {{drawMode ? 'on' : ''}}" bindtap="toggleDraw">画线</view>
-    <block wx:if="{{drawMode}}">
-      <view class="kt {{drawTool === 'h' ? 'on' : ''}}" bindtap="pickTool" data-tool="h">水平线</view>
-      <view class="kt {{drawTool === 't' ? 'on' : ''}}" bindtap="pickTool" data-tool="t">趋势线</view>
-      <view class="kt" bindtap="undoDraw">撤销</view>
-      <view class="kt" bindtap="clearDraw">清空</view>
-    </block>
-  </view>
-
+  <!-- ② K 线区 -->
   <view class="chart-wrap">
     <canvas
       type="2d"

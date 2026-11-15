@@ -1,7 +1,7 @@
 <!-- ============================================================
      我的证券（DF-69，原生全屏页，替代 DF-68 的弹层列表）
-     - 列表：名称 / 代码·大盘·板块 / 涨跌幅（红正绿负）/ 级别，最右「查看」
-     - 点行＝关联到当前提问并返回首页；长按行＝确认删除
+     - 列表：名称 / 代码·大盘·板块 / 涨跌幅（红正绿负）/ 级别
+     - 点行＝进入证券详情页；长按行＝确认删除
      - 底部悬浮「新增」：名称+代码，代码必填，联想候选回填
      - 复用 .fs-page/.fs-header（app.wxss）与 qd-*（复制自 chat.wxss）
      ============================================================ -->
@@ -34,7 +34,11 @@
           hover-class="sp-item-press"
           data-code="{{item.code}}"
           data-name="{{item.name}}"
-          bindtap="onPick"
+          data-zs-code="{{item.zs_code}}"
+          data-zs-name="{{item.zs_name}}"
+          data-bk-code="{{item.bk_code}}"
+          data-bk-name="{{item.bk_name}}"
+          bindtap="onView"
           catchlongpress="onLongPress"
         >
           <view class="spi-main">
@@ -45,14 +49,6 @@
             <view class="spi-zdf {{item.zdfCls}}">{{item.zdfText}}</view>
             <view class="spi-grade">{{item.grade}}</view>
           </view>
-          <view
-            class="spi-view"
-            hover-class="spi-view-press"
-            data-code="{{item.code}}"
-            data-name="{{item.name}}"
-            catchtap="onView"
-            catchlongpress="noop"
-          >查看</view>
         </view>
       </block>
 
