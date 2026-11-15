@@ -6,6 +6,7 @@
     "uniApp/pages/meihua/meihua",
     "uniApp/pages/gua/gua",
     "uniApp/pages/stock/stock",
+    "uniApp/pages/stock-chart/stock-chart",
     "uniApp/pages/my-stocks/my-stocks"
   ],
   "window": {

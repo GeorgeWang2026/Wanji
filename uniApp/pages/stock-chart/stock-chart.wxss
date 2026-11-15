@@ -1,0 +1,4 @@
+/* 全屏图表页由 web-view 铺满，页面本身不设样式 */
+page {
+  background: #fffdf7;
+}

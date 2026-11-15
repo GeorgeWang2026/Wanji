@@ -4,29 +4,10 @@
  * 1) 详情信息：GET /api/v1/stocks/detail?code=
  *    与网站 static/xiaoxuan.html 证券详情页（#stockDetailInfo）同一接口、
  *    同一字段口径；渲染用的易学查找表照 static/mystock/yijing.js 同名函数移植。
- * 2) 日 K：GET /api/v1/tv/history（与网站 kline.html 完全同一套 UDF 接口）
- *    - 站点 kline.html L743 用 Datafeeds.UDFCompatibleDatafeed(API_BASE + "/tv")，
- *      由 UDF 发出 /tv/history?symbol=&resolution=&from=&to=&countback=&firstDataRequest=，
- *      attachHistoryParams 再注入 fq；这里按同一契约直接组装请求。
- *    - 站点详情页 K 线 iframe 的地址为 /mystock/kline.html?symbol=a:<code>&interval=1D&simple=1
- *      （xiaoxuan.html L6352），故 symbol=a:<code>、resolution=1D。
- *    - 返回体 {s,t,o,h,l,c,v}：s!=="ok" 视为无数据，t 为秒级时间戳。
- *    - 不依赖任何外部域名（与详情接口同源 https://estock.space/api/v1）。
+ * 2) 日 K：不再由小程序取数，改为全屏图表页 web-view 加载站点 kline.html
+ *    （TradingView 组件自带取数 /tv/history 与画线能力，地址与站点详情页 iframe 一致）。
  * ============================================================ */
 var api = require('./api.js');
-
-var MEMO = {};
-
-/** 与站点 kline.html 首屏取数一致的条数（图表库首次 getBars 的 countBack 默认 300） */
-var COUNTBACK = 300;
-var RESOLUTION = '1D';
-
-/** 秒级时间戳 → YYYY-MM-DD（与 kline.html laneRenderStrategy 的 fmtDate 同口径） */
-function fmtDate(tSec) {
-  var d = new Date(tSec * 1000);
-  var p2 = function (v) { return (v < 10 ? '0' : '') + v; };
-  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
-}
 
 /**
  * 代码补市场前缀（后端只接受 SH./SZ. 形式，与网站一致：a:SH.600519）。
@@ -48,24 +29,6 @@ function withMarket(code, market) {
   if (m === 'SSE' || m === 'SH' || m === '1' || m === '沪' || m === '上海') return 'SH.' + digits;
   if (m === 'SZSE' || m === 'SZ' || m === '0' || m === '深' || m === '深圳') return 'SZ.' + digits;
   return ((digits.charAt(0) === '6' || digits.charAt(0) === '9') ? 'SH.' : 'SZ.') + digits;
-}
-
-/**
- * 组装 /tv/history 请求（复刻 UDF datafeed 首次取数的请求形状）。
- * @param {string} code 带市场前缀的代码（SH.600519）
- * @returns {string} 接口路径（含 query）
- */
-function historyPath(code, countback) {
-  var to = Math.floor(Date.now() / 1000);
-  var cb = countback || COUNTBACK;
-  var from = to - cb * 86400;
-  return '/tv/history?symbol=' + encodeURIComponent('a:' + code)
-    + '&resolution=' + RESOLUTION
-    + '&from=' + from
-    + '&to=' + to
-    + '&countback=' + cb
-    + '&firstDataRequest=true'
-    + '&fq=qfq';
 }
 
 /* ============================================================
@@ -263,53 +226,8 @@ function buildInfo(d, meta) {
   };
 }
 
-/* ============================================================
- * 日 K —— /tv/history（与站点 kline.html 同一接口）
- * ============================================================ */
-
-/**
- * 拉取日 K。
- * 返回 Promise<Array<{date,open,high,low,close,volume}>>；
- * s!=="ok" 或 t 为空 → 空数组（对应站点「暂无 K 线数据」）；
- * 网络/HTTP 异常 → reject（对应站点「K线数据加载失败」）。
- */
-function fetchKline(code, market) {
-  return api.request(historyPath(withMarket(code, market)), { auth: false, timeout: 20000 }).then(function (r) {
-    if (!r || r.s !== 'ok' || !r.t || !r.t.length) return [];
-    var out = [];
-    for (var i = 0; i < r.t.length; i++) {
-      // UDF 返回并列数组：t 秒级时间戳 / o 开 / h 高 / l 低 / c 收 / v 量
-      out.push({
-        date: fmtDate(r.t[i]),
-        open: Number(r.o[i]),
-        high: Number(r.h[i]),
-        low: Number(r.l[i]),
-        close: Number(r.c[i]),
-        volume: Number(r.v[i])
-      });
-    }
-    return out;
-  });
-}
-
-/** 带 60s 内存缓存（对齐站点 PULSE_MS 的刷新节奏）；force=true 强制绕过缓存 */
-function load(code, force, market) {
-  var full = withMarket(code, market);
-  var key = String(full);
-  var hit = MEMO[key];
-  if (!force && hit && Date.now() - hit.t < 60000) {
-    return Promise.resolve(hit.data);
-  }
-  return fetchKline(full).then(function (klines) {
-    MEMO[key] = { t: Date.now(), data: klines };
-    return klines;
-  });
-}
-
 module.exports = {
   withMarket: withMarket,
   fetchDetail: fetchDetail,
-  buildInfo: buildInfo,
-  fetchKline: fetchKline,
-  load: load
+  buildInfo: buildInfo
 };

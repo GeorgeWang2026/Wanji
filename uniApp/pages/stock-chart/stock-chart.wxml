@@ -1,0 +1,2 @@
+<!-- web-view 自动铺满整页，只承载站点 kline.html（TV 组件与画线能力原样使用） -->
+<web-view src="{{src}}"></web-view>
