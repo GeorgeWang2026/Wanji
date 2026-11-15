@@ -1,29 +1,29 @@
 # 万机决策助手 · 微信小程序（独立工程）
 
-本工程原先放在 `qimen-1/static/` 下，现已迁出为独立工程 **`G:\projects\wanji`**，
+本工程原先放在 `wanji/static/` 下，现已迁出为独立工程 **`G:\projects\wanji-mp`**，
 微信开发者工具导入工程根目录即可编译运行。
 
 术数算法与 Markdown 渲染**复用网页版公共库的复制件**（`yishu.js` / `markdown.js`），不重写一套。
 
-> 网页版仍在 `qimen-1/static/`（`xiaoxuan.html` / `assistant-widget.js`），本次迁移没有改动它的任何文件。
+> 网页版仍在 `wanji/static/`（`xiaoxuan.html` / `assistant-widget.js`），本次迁移没有改动它的任何文件。
 > 本工程根目录的 `yishu.js` / `markdown.js` 是**复制件**；网页版更新这两个库后需手工同步，见「三、公共库来源与同步」。
 
 ---
 
 ## 一、目录结构
 
-工程根目录就是 `G:\projects\wanji`，`app.*`、`project.config.json`、`sitemap.json` 与两个公共库都在这一层，
+工程根目录就是 `G:\projects\wanji-mp`，`app.*`、`project.config.json`、`sitemap.json` 与两个公共库都在这一层，
 页面与工具层在 `uniApp/` 下。微信开发者工具导入**工程根目录**（根目录直接可见 `app.json`）。
 
 ```
-G:\projects\wanji\
+G:\projects\wanji-mp\
 ├── app.js                        # 小程序入口：补 window 壳、globalData（排盘关联、TTS 开关）
 ├── app.json                      # 页面注册 / 窗口样式（录音权限不在此声明，见 3.5）
 ├── app.wxss                      # 全局暗色紫金主题 + 通用按钮/弹层样式
 ├── project.config.json           # 开发者工具项目配置（miniprogramRoot = "./"）
 ├── sitemap.json
-├── yishu.js                      # ★ 术数引擎（复制自 qimen-1/static/yishu.js，保留 CommonJS 导出守卫）
-├── markdown.js                   # ★ Markdown 渲染（复制自 qimen-1/static/markdown.js，未改动）
+├── yishu.js                      # ★ 术数引擎（复制自 wanji/static/yishu.js，保留 CommonJS 导出守卫）
+├── markdown.js                   # ★ Markdown 渲染（复制自 wanji/static/markdown.js，未改动）
 └── uniApp/
     ├── README.md                 # 本文档（packOptions 已忽略，不参与打包）
     ├── utils/
@@ -49,8 +49,8 @@ G:\projects\wanji\
 ## 二、如何导入运行
 
 1. 打开**微信开发者工具** → 导入项目。
-2. 项目目录选择 **`G:\projects\wanji`**（工程根目录，进来就能直接看到 `app.json`；
-   不要再选 `uniApp` 或旧的 `qimen-1\static`）。
+2. 项目目录选择 **`G:\projects\wanji-mp`**（工程根目录，进来就能直接看到 `app.json`；
+   不要再选 `uniApp` 或旧的 `wanji\static`）。
    - `project.config.json` 里 `miniprogramRoot` 为 `"./"`，AppID 为 `wx27c9a5ea8b03c258`（IDE 导入时写入）；
      正式发布请替换成你们自己的小程序 AppID。
 3. 首次打开建议检查：**详情 → 本地设置 →
@@ -70,10 +70,10 @@ G:\projects\wanji\
 
 | 本工程文件 | 来源 | 迁移方式 | 说明 |
 | --- | --- | --- | --- |
-| `G:\projects\wanji\yishu.js` | `g:\projects\qimen-1\static\yishu.js` | 复制 | 术数引擎；末尾保留 CommonJS 导出守卫 |
-| `G:\projects\wanji\markdown.js` | `g:\projects\qimen-1\static\markdown.js` | 复制 | Markdown 渲染；内容与网页版一致 |
+| `G:\projects\wanji-mp\yishu.js` | `g:\projects\wanji\static\yishu.js` | 复制 | 术数引擎；末尾保留 CommonJS 导出守卫 |
+| `G:\projects\wanji-mp\markdown.js` | `g:\projects\wanji\static\markdown.js` | 复制 | Markdown 渲染；内容与网页版一致 |
 
-原件**仍在 qimen-1 中保留**，网页版通过 `<script src="/yishu.js">`、`<script src="/markdown.js">` 正常加载，互不影响。
+原件**仍在 wanji 中保留**，网页版通过 `<script src="/yishu.js">`、`<script src="/markdown.js">` 正常加载，互不影响。
 其余网页版资产（`xiaoxuan.html`、`assistant-widget.js`、`api-client.js`、`avatar/`、`mystock/` 等）**没有**迁入本工程。
 
 ### 3.2 `yishu.js`：导出守卫必须保留
@@ -115,15 +115,15 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 
 ### 3.4 网页版公共库更新后如何同步
 
-1. 从 `g:\projects\qimen-1\static\` 复制同名文件覆盖本工程根目录的 `yishu.js` / `markdown.js`。
+1. 从 `g:\projects\wanji\static\` 复制同名文件覆盖本工程根目录的 `yishu.js` / `markdown.js`。
 2. **重打上面两条本地补丁**（覆盖会连带把补丁冲掉，漏了就是运行时「引擎未就绪 / Markdown 渲染库加载失败」）：
    - `markdown.js` 最后一行的 `})(window);` → 3.3 里带 `typeof` 守卫的版本；
    - `yishu.js` 第 910 行的 `Object.keys(window)` → 3.2 里带 `typeof` 守卫的版本。
    快速自检（两条都应有输出、且不报错）：
 
    ```powershell
-   Select-String -Path G:\projects\wanji\markdown.js -Pattern 'globalThis : \{\}'
-   Select-String -Path G:\projects\wanji\yishu.js -Pattern 'window \? window : globalThis'
+   Select-String -Path G:\projects\wanji-mp\markdown.js -Pattern 'globalThis : \{\}'
+   Select-String -Path G:\projects\wanji-mp\yishu.js -Pattern 'window \? window : globalThis'
    ```
 
 3. 检查 `yishu.js` 末尾的 `typeof module !== "undefined"` 导出块是否仍在：
@@ -265,20 +265,20 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 
 ## 十、自测清单（迁移后在新位置重跑）
 
-迁移后（2026-11-11）在 `G:\projects\wanji` 重新执行：
+迁移后（2026-11-11）在 `G:\projects\wanji-mp` 重新执行：
 
 - [x] 17 个 JS 文件全部通过 `node --check`（含 `yishu.js` / `markdown.js` 与 5 个页面）
 - [x] 8 个 JSON 全部可解析（`app.json` / `project.config.json` / `sitemap.json` / 5 个页面 json）
 - [x] `app.json` 注册的 5 个页面 × `.js/.json/.wxml` 全部存在
 - [x] 所有 `require('./…')` / `require('../../…')` 相对路径目标均存在（`../../yishu.js`、`../../markdown.js`）
-- [x] 全工程无指向 `qimen-1` 的硬编码绝对路径（除本文档的说明性文字）
+- [x] 全工程无指向 `wanji` 的硬编码绝对路径（除本文档的说明性文字）
 - [x] 整包 38 个文件、约 208 KB（源码），打包后主包 255.0 KB，远低于主包 2 MB 限制
 - [x] Node 宿主模拟：`app.js onLaunch`、5 个页面 `onLoad` 均无异常
 - [x] `yishu.js` 导出 97 个成员，`getBazi` / `qimenPaiPan` / `calcDayun` / `dayMasterProfile` / `meihuaGua` 输出正常
 - [x] `markdown.js` 经 `chatHtml()` 输出带内联样式的 HTML（表格/标题/加粗）
 - [x] 奇门九宫格、梅花三卦、八字四柱与十步大运、卦典回退（`/gua/{n}` → `/gua/fetch/{n}`）逻辑与迁移前一致
 - [x] 首页全链路（mock 后端）：确认弹窗 → `preview_prompt_hint` → `consume`(5) → `/chat` → Markdown HTML
-- [x] 微信开发者工具真实构建（2026-11-11）：`cli preview --project G:\projects\wanji` 退出码 0，
+- [x] 微信开发者工具真实构建（2026-11-11）：`cli preview --project G:\projects\wanji-mp` 退出码 0，
       主包 **255.0 KB**（261,081 B，单包；两次 preview 结果一致），编译 0 error / 0 warning
 - [x] 运行时实测（模拟器 appservice）：`window.QimenMarkdown` 可用、术数引擎导出可用，
       聊天页无「Markdown 渲染库加载失败」提示，奇门排盘能出九宫格数据
