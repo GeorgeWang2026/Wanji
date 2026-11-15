@@ -4,61 +4,46 @@
  * 1) 详情信息：GET /api/v1/stocks/detail?code=
  *    与网站 static/xiaoxuan.html 证券详情页（#stockDetailInfo）同一接口、
  *    同一字段口径；渲染用的易学查找表照 static/mystock/yijing.js 同名函数移植。
- * 2) 日 K：东方财富公开行情接口（仅日线，保持既有取数方式）
- *    - 小程序后台「request 合法域名」需加入 push2his.eastmoney.com；
- *    - 公开接口无 SLA；若后端补了行情代理，只改 KLINE_URL。
+ * 2) 日 K：GET /api/v1/tv/history（与网站 kline.html 完全同一套 UDF 接口）
+ *    - 站点 kline.html L743 用 Datafeeds.UDFCompatibleDatafeed(API_BASE + "/tv")，
+ *      由 UDF 发出 /tv/history?symbol=&resolution=&from=&to=&countback=&firstDataRequest=，
+ *      attachHistoryParams 再注入 fq；这里按同一契约直接组装请求。
+ *    - 站点详情页 K 线 iframe 的地址为 /mystock/kline.html?symbol=a:<code>&interval=1D&simple=1
+ *      （xiaoxuan.html L6352），故 symbol=a:<code>、resolution=1D。
+ *    - 返回体 {s,t,o,h,l,c,v}：s!=="ok" 视为无数据，t 为秒级时间戳。
+ *    - 不依赖任何外部域名（与详情接口同源 https://estock.space/api/v1）。
  * ============================================================ */
 var api = require('./api.js');
 
-var UT = 'fa5fd1943c7b386f172d6893dbfba10b';
-var KLINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/kline/get';
-
 var MEMO = {};
 
-function num(v) {
-  if (v === '-' || v === null || v === undefined || v === '') return null;
-  var n = Number(v);
-  return isNaN(n) ? null : n;
+/** 与站点 kline.html 首屏取数一致的条数（图表库首次 getBars 的 countBack 默认 300） */
+var COUNTBACK = 300;
+var RESOLUTION = '1D';
+
+/** 秒级时间戳 → YYYY-MM-DD（与 kline.html laneRenderStrategy 的 fmtDate 同口径） */
+function fmtDate(tSec) {
+  var d = new Date(tSec * 1000);
+  var p2 = function (v) { return (v < 10 ? '0' : '') + v; };
+  return d.getFullYear() + '-' + p2(d.getMonth() + 1) + '-' + p2(d.getDate());
 }
 
-/** 600028 → 1.600028（沪市 1 / 深市 0） */
-function secid(code) {
-  var c = String(code || '').replace(/\D/g, '');
-  var market = (c.charAt(0) === '6' || c.charAt(0) === '9') ? '1' : '0';
-  return market + '.' + c;
-}
-
-function getJSON(url, params) {
-  return new Promise(function (resolve, reject) {
-    wx.request({
-      url: url,
-      data: params,
-      method: 'GET',
-      timeout: 15000,
-      success: function (res) {
-        if (res.statusCode !== 200) {
-          reject(new Error('行情接口返回 HTTP ' + res.statusCode));
-          return;
-        }
-        var body = res.data;
-        if (typeof body === 'string') {
-          try { body = JSON.parse(body); } catch (e) {
-            reject(new Error('行情接口返回非 JSON'));
-            return;
-          }
-        }
-        resolve(body || {});
-      },
-      fail: function (err) {
-        var msg = (err && err.errMsg) || '网络请求失败';
-        if (msg.indexOf('domain list') >= 0) {
-          reject(new Error('行情域名未加白名单：push2his.eastmoney.com'));
-        } else {
-          reject(new Error(msg));
-        }
-      }
-    });
-  });
+/**
+ * 组装 /tv/history 请求（复刻 UDF datafeed 首次取数的请求形状）。
+ * @param {string} code 6 位代码
+ * @returns {string} 接口路径（含 query）
+ */
+function historyPath(code, countback) {
+  var to = Math.floor(Date.now() / 1000);
+  var cb = countback || COUNTBACK;
+  var from = to - cb * 86400;
+  return '/tv/history?symbol=' + encodeURIComponent('a:' + code)
+    + '&resolution=' + RESOLUTION
+    + '&from=' + from
+    + '&to=' + to
+    + '&countback=' + cb
+    + '&firstDataRequest=true'
+    + '&fq=qfq';
 }
 
 /* ============================================================
@@ -256,47 +241,42 @@ function buildInfo(d, meta) {
 }
 
 /* ============================================================
- * 日 K
+ * 日 K —— /tv/history（与站点 kline.html 同一接口）
  * ============================================================ */
 
-/** 日 K 线（klt=101） */
-function fetchKline(code, limit) {
-  return getJSON(KLINE_URL, {
-    secid: secid(code),
-    fields1: 'f1,f2,f3,f4,f5,f6',
-    fields2: 'f51,f52,f53,f54,f55,f56,f57',
-    klt: 101,
-    fqt: 1,
-    end: '20500101',
-    lmt: limit || 120,
-    ut: UT
-  }).then(function (r) {
-    var d = r && r.data;
-    if (!d || !d.klines || !d.klines.length) return [];
-    return d.klines.map(function (s) {
-      var p = String(s).split(',');
-      // f51 日期, f52 开, f53 收, f54 高, f55 低, f56 量, f57 额
-      return {
-        date: p[0],
-        open: Number(p[1]),
-        close: Number(p[2]),
-        high: Number(p[3]),
-        low: Number(p[4]),
-        volume: Number(p[5]),
-        amount: Number(p[6])
-      };
-    });
+/**
+ * 拉取日 K。
+ * 返回 Promise<Array<{date,open,high,low,close,volume}>>；
+ * s!=="ok" 或 t 为空 → 空数组（对应站点「暂无 K 线数据」）；
+ * 网络/HTTP 异常 → reject（对应站点「K线数据加载失败」）。
+ */
+function fetchKline(code) {
+  return api.request(historyPath(code), { auth: false, timeout: 20000 }).then(function (r) {
+    if (!r || r.s !== 'ok' || !r.t || !r.t.length) return [];
+    var out = [];
+    for (var i = 0; i < r.t.length; i++) {
+      // UDF 返回并列数组：t 秒级时间戳 / o 开 / h 高 / l 低 / c 收 / v 量
+      out.push({
+        date: fmtDate(r.t[i]),
+        open: Number(r.o[i]),
+        high: Number(r.h[i]),
+        low: Number(r.l[i]),
+        close: Number(r.c[i]),
+        volume: Number(r.v[i])
+      });
+    }
+    return out;
   });
 }
 
-/** 带 60s 内存缓存；force=true 强制绕过缓存 */
-function load(code, limit, force) {
+/** 带 60s 内存缓存（对齐站点 PULSE_MS 的刷新节奏）；force=true 强制绕过缓存 */
+function load(code, force) {
   var key = String(code);
   var hit = MEMO[key];
   if (!force && hit && Date.now() - hit.t < 60000) {
     return Promise.resolve(hit.data);
   }
-  return fetchKline(code, limit).then(function (klines) {
+  return fetchKline(code).then(function (klines) {
     MEMO[key] = { t: Date.now(), data: klines };
     return klines;
   });

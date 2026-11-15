@@ -14,7 +14,8 @@ var UP_COLOR = '#EF5350';    // 与 kline.html klineColors 一致
 var DOWN_COLOR = '#26A69A';
 var MA_COLORS = ['#c9a227', '#3b82c4', '#8a6fbf'];
 var DRAW_COLOR = '#2962FF';  // TradingView 手绘趋势线默认色
-var TREND_KEY = 'stock_trend_';
+var TREND_KEY = 'kline_draw_v1:';    // 对齐站点「symbol|级别」的画线存储口径
+var VISIBLE_BARS = 90;       // 绘制窗口（取数 300 根与站点一致，小程序无平移只画最近一段）
 
 function fixed(n, d) {
   if (n === null || n === undefined || isNaN(n)) return '—';
@@ -58,6 +59,7 @@ Page({
     info: null,
 
     status: 'loading',       // loading | ready | empty | error
+    chartTip: 'K线图加载中…',  // 与 kline.html #kline_tip 同文案，文字随状态切换
 
     drawMode: false,
     drawTool: 'h',           // h 水平线 | t 趋势线
@@ -136,33 +138,44 @@ Page({
     });
   },
 
-  /* ---------------- 日 K ---------------- */
+  /* ---------------- 日 K（/tv/history，与站点同一接口） ---------------- */
   load: function (force) {
     var self = this;
     var code = this.data.code;
     var seq = ++this._seq;
 
-    this.setData({ status: 'loading' });
+    this.setData({ status: 'loading', chartTip: 'K线图加载中…' });
     this._klines = [];
     this._pending = null;
 
-    return stock.load(code, 90, force).then(function (klines) {
+    return stock.load(code, force).then(function (klines) {
       if (seq !== self._seq) return;
       self._klines = klines || [];
       self._drawings = self.readDrawings();
-      self.setData({ status: self._klines.length ? 'ready' : 'empty' });
+      if (self._klines.length) {
+        self.setData({ status: 'ready' });
+      } else {
+        // 与站点 showKlineError 的 no_data 分支同文案
+        self.setData({ status: 'empty', chartTip: '暂无 K 线数据，请稍后重试' });
+      }
       self.initCanvas().then(function () { self.draw(); });
     }).catch(function () {
       if (seq !== self._seq) return;
-      self.setData({ status: 'error' });
+      // 与站点 showKlineError 的请求异常分支同文案
+      self.setData({ status: 'error', chartTip: 'K线数据加载失败，请稍后重试' });
       self.draw();
     });
   },
 
   /* ---------------- 本地画线（B 方案） ---------------- */
+  /** 存储键与站点一致按「symbol|级别」区分：kline_draw_v1:a:600519|1D */
+  drawKey: function () {
+    return TREND_KEY + 'a:' + this.data.code + '|1D';
+  },
+
   readDrawings: function () {
     try {
-      var raw = wx.getStorageSync(TREND_KEY + this.data.code);
+      var raw = wx.getStorageSync(this.drawKey());
       var arr = raw ? JSON.parse(raw) : [];
       return Array.isArray(arr) ? arr : [];
     } catch (e) { return []; }
@@ -170,7 +183,7 @@ Page({
 
   saveDrawings: function () {
     try {
-      wx.setStorageSync(TREND_KEY + this.data.code, JSON.stringify(this._drawings || []));
+      wx.setStorageSync(this.drawKey(), JSON.stringify(this._drawings || []));
     } catch (e) { /* 忽略 */ }
   },
 
@@ -240,12 +253,17 @@ Page({
 
     ctx.clearRect(0, 0, w, h);
 
-    var list = this._klines;
-    var n = list.length;
-    if (!n) {
+    var all = this._klines;
+    var total = all.length;
+    if (!total) {
       this.geo = null;
       return;
     }
+    // 绘制窗口：取数条数与站点一致（/tv/history countback=300），
+    // 小程序无平移，固定展示最近 VISIBLE_BARS 根，均线仍用全量数据计算。
+    var n = Math.min(total, VISIBLE_BARS);
+    var start = total - n;
+    var list = all.slice(start);
 
     var padL = 8;
     var padR = 54;
@@ -259,9 +277,9 @@ Page({
     var xStep = plotW / n;
     var candleW = Math.max(1, Math.min(xStep * 0.66, 14));
 
-    var ma5 = maList(list, 5);
-    var ma10 = maList(list, 10);
-    var ma20 = maList(list, 20);
+    var ma5 = maList(all, 5).slice(start);
+    var ma10 = maList(all, 10).slice(start);
+    var ma20 = maList(all, 20).slice(start);
 
     var minP = Infinity;
     var maxP = -Infinity;
@@ -291,8 +309,12 @@ Page({
     function yOf(p) {
       return padT + (maxP - p) / spanP * mainH;
     }
+    /** 全量数据里的绝对序号 → 画布 x（画线锚点按日期绑定，可能早于绘制窗口） */
+    function xOfAbs(absIdx) {
+      return padL + xStep * (absIdx - start + 0.5);
+    }
     function xOf(idx) {
-      return padL + xStep * (idx + 0.5);
+      return xOfAbs(start + idx);
     }
 
     // 价格网格 + 右侧价格标签（浅色主题：底 #fffdf7 / 线 #e6dcc6 / 字 #8a7a5f）
@@ -369,7 +391,7 @@ Page({
     // 手绘趋势线（本地保存，锚点用日期 + 价格）
     if (this._drawings && this._drawings.length) {
       var dateMap = {};
-      for (var mi = 0; mi < n; mi++) dateMap[list[mi].date] = mi;
+      for (var mi = 0; mi < total; mi++) dateMap[all[mi].date] = mi;
       var idxOf = function (pt) {
         if (!pt) return 0;
         if (pt.d && dateMap[pt.d] !== undefined) return dateMap[pt.d];
@@ -391,9 +413,9 @@ Page({
           ctx.lineTo(padL + plotW, hy);
           ctx.stroke();
         } else if (dr.t === 't' && dr.a && dr.b) {
-          var x1 = xOf(idxOf(dr.a));
+          var x1 = xOfAbs(idxOf(dr.a));
           var y1 = yOf(Number(dr.a.p));
-          var x2 = xOf(idxOf(dr.b));
+          var x2 = xOfAbs(idxOf(dr.b));
           var y2 = yOf(Number(dr.b.p));
           ctx.beginPath();
           ctx.moveTo(x1, y1);
@@ -409,7 +431,7 @@ Page({
       }
       // 趋势线第一个锚点
       if (this._pending) {
-        var px = xOf(idxOf(this._pending));
+        var px = xOfAbs(idxOf(this._pending));
         var py = yOf(Number(this._pending.p));
         ctx.beginPath();
         ctx.arc(px, py, 3.5, 0, Math.PI * 2);
@@ -472,6 +494,8 @@ Page({
       mainH: mainH,
       xStep: xStep,
       n: n,
+      start: start,     // 绘制窗口在全量数据里的起始序号
+      total: total,
       maxP: maxP,
       spanP: spanP
     };
@@ -522,14 +546,15 @@ Page({
     if (idx > geo.n - 1) idx = geo.n - 1;
 
     var price = geo.maxP - (pt.y - geo.padT) / geo.mainH * geo.spanP;
+    var absIdx = geo.start + idx;   // 锚点存全量数据绝对序号，日期用于重新定位
     var anchor = {
       p: Math.round(price * 100) / 100,
-      d: (this._klines[idx] || {}).date || '',
-      i: idx
+      d: (this._klines[absIdx] || {}).date || '',
+      i: absIdx
     };
 
     if (this.data.drawTool === 'h') {
-      this._drawings.push({ t: 'h', p: anchor.p, d: anchor.d, i: idx });
+      this._drawings.push({ t: 'h', p: anchor.p, d: anchor.d, i: absIdx });
       this.saveDrawings();
       this.draw();
       return;
