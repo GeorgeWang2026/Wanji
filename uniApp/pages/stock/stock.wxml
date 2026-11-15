@@ -1,105 +1,95 @@
 <!-- ============================================================
-     证券行情（原生页）
-     - 顶部：最新价 + 涨跌 + 今开/最高/最低/昨收/量/额
-     - 中部：代码查询 + 常用股票快捷切换
-     - 底部：日/周/月 K 线（canvas 2d）+ 三态遮罩
+     证券详情（原生页，DF-99）
+     参照物：网站 static/xiaoxuan.html 证券详情页
+       ① 信息区（#stockDetailInfo）：股票/涨跌幅/方向/级别/结构/态势/空间/行业
+       ② K 线区（kline.html simple 模式）：只做日 K，方形、满宽、无左右横向内边距
+       ③ 底部工具栏（预览提示词 / 关联到提问）：保持原样，不改动不重排
      ============================================================ -->
 <view class="page">
 
-  <!-- 行情头部 -->
-  <view class="hero">
-    <view class="hero-top">
-      <text class="q-name">{{name || '证券行情'}}</text>
-      <text class="q-code">{{code}}</text>
-    </view>
-
-    <view class="q-price-row">
-      <text class="q-price {{colorClass}}">{{priceText}}</text>
-      <text class="q-chg {{colorClass}}">{{changeText}}</text>
-      <text class="q-chg {{colorClass}}">{{pctText}}</text>
-    </view>
-
-    <view class="q-grid">
-      <view class="qg" wx:for="{{quoteRows}}" wx:key="k">
-        <text class="qg-l">{{item.k}}</text>
-        <text class="qg-v">{{item.v}}</text>
+  <!-- ① 信息区 -->
+  <view class="stock-info">
+    <text class="si-hint" wx:if="{{infoStatus === 'loading'}}">行情加载中…</text>
+    <text class="si-hint" wx:elif="{{infoStatus === 'empty' || !info}}">暂无该证券详情数据</text>
+    <block wx:else>
+      <view class="si-item">
+        <text class="si-l">股票</text>
+        <text class="si-name">{{info.name}}</text>
+        <text class="si-badge" wx:if="{{info.credit}}" style="background:{{info.creditBg}};">{{info.credit}}</text>
       </view>
-    </view>
+      <view class="si-item">
+        <text class="si-l">涨跌幅</text>
+        <text class="si-b" style="color:{{info.zdfColor}};">{{info.zdfText}}</text>
+      </view>
+      <view class="si-item">
+        <text class="si-l">方向</text>
+        <text class="si-b">{{info.dirText}}</text>
+      </view>
+      <view class="si-item" wx:if="{{info.grade}}">
+        <text class="si-l">级别</text>
+        <text class="si-b">{{info.grade}}</text>
+      </view>
+      <view class="si-item">
+        <text class="si-l">结构</text>
+        <text class="si-badge" wx:for="{{info.structs}}" wx:key="index" style="background:{{item.bg}};">{{item.t}}</text>
+      </view>
+      <view class="si-item">
+        <text class="si-l">态势</text>
+        <text class="si-badge" wx:for="{{info.trend}}" wx:key="index" style="background:{{item.bg}};">{{item.t}}</text>
+      </view>
+      <view class="si-item">
+        <text class="si-l">空间</text>
+        <text class="si-space">{{info.space}}</text>
+      </view>
+      <view class="si-item" wx:if="{{info.industry}}">
+        <text class="si-l">行业</text>
+        <text class="si-b">{{info.industry}}</text>
+      </view>
+    </block>
   </view>
 
-  <!-- 代码查询 -->
-  <view class="search">
-    <input
-      class="search-input"
-      type="number"
-      maxlength="6"
-      value="{{codeInput}}"
-      placeholder="输入 6 位股票代码，如 600519"
-      placeholder-class="ph"
-      bindinput="onCodeInput"
-      bindconfirm="onSearch"
-    />
-    <view class="search-btn" hover-class="press" bindtap="onSearch">查询</view>
+  <!-- ② K 线区：画线工具条（本地绘制/本地保存） -->
+  <view class="kline-tools">
+    <view class="kt {{drawMode ? 'on' : ''}}" bindtap="toggleDraw">画线</view>
+    <block wx:if="{{drawMode}}">
+      <view class="kt {{drawTool === 'h' ? 'on' : ''}}" bindtap="pickTool" data-tool="h">水平线</view>
+      <view class="kt {{drawTool === 't' ? 'on' : ''}}" bindtap="pickTool" data-tool="t">趋势线</view>
+      <view class="kt" bindtap="undoDraw">撤销</view>
+      <view class="kt" bindtap="clearDraw">清空</view>
+    </block>
   </view>
 
-  <scroll-view class="presets" scroll-x enhanced="{{true}}" show-scrollbar="{{false}}">
-    <view
-      class="preset {{code === item.code ? 'on' : ''}}"
-      wx:for="{{presets}}"
-      wx:key="code"
-      bindtap="onPreset"
-      data-code="{{item.code}}"
-    >{{item.name}} {{item.code}}</view>
-  </scroll-view>
-
-  <!-- 周期切换 -->
-  <view class="tabs">
-    <view
-      class="tab {{period === item.k ? 'on' : ''}}"
-      wx:for="{{periods}}"
-      wx:key="k"
-      bindtap="onPeriod"
-      data-k="{{item.k}}"
-    >{{item.t}}</view>
-  </view>
-
-  <!-- K 线 -->
   <view class="chart-wrap">
     <canvas
       type="2d"
       id="kline"
       class="chart"
-      bindtouchstart="onTouch"
-      bindtouchmove="onTouch"
+      bindtouchstart="onTouchStart"
+      bindtouchmove="onTouchMove"
       bindtouchend="onTouchEnd"
       bindtouchcancel="onTouchEnd"
     ></canvas>
 
-    <view class="chart-mask" wx:if="{{status === 'loading'}}">
-      <view class="spinner"></view>
-      <text class="mask-txt">正在拉取行情…</text>
-    </view>
-
-    <view class="chart-mask" wx:elif="{{status === 'empty'}}">
-      <text class="mask-txt">该周期暂无 K 线数据</text>
-      <text class="mask-sub">可能是新上市、停牌或代码不在沪深市场</text>
-    </view>
-
-    <view class="chart-mask err" wx:elif="{{status === 'error'}}" bindtap="onRetry">
-      <text class="mask-txt">行情加载失败</text>
-      <text class="mask-sub">{{errMsg}}</text>
-      <view class="err-btn">点击重试</view>
-    </view>
+    <view class="chart-tip" wx:if="{{status === 'loading'}}">K线图加载中…</view>
+    <view class="chart-tip err" wx:elif="{{status === 'empty' || status === 'error'}}">暂无 K 线数据，请稍后重试</view>
   </view>
 
-  <!-- 十字线数据 -->
-  <view class="cursor" wx:if="{{cursorText}}">{{cursorText}}</view>
-  <view class="ma-line" wx:if="{{status === 'ready'}}">{{maText}}</view>
+  <!-- ③ 底部工具栏：内容滚动时始终贴底不动（底部安全区已在 .bottom-bar 内计入） -->
+  <view class="bottom-bar" wx:if="{{!showHint && code}}">
+    <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+    <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
+  </view>
 
-  <view class="foot">
-    <text>数据来源：东方财富公开行情接口，仅供参考，不构成投资建议。</text>
-    <text class="foot-dim" wx:if="{{status === 'error'}}">
-      若提示「域名未加白名单」：小程序后台 → 开发管理 → 服务器域名 → request 合法域名，添加 push2.eastmoney.com 与 push2his.eastmoney.com；开发者工具里也可临时勾选「不校验合法域名」。
-    </text>
+  <!-- 提示词预览：全文展示，不截断 -->
+  <view class="qm-mask" wx:if="{{showHint}}" catchtap="closeHint">
+    <view class="qm-dialog" catchtap="noop">
+      <view class="qm-dialog-title">关联后后端将使用的盘面提示词</view>
+      <scroll-view scroll-y class="hint-scroll">
+        <text class="hint-text">{{hint}}</text>
+      </scroll-view>
+      <view class="dialog-actions">
+        <view class="qm-btn qm-btn-primary" bindtap="closeHint">关闭</view>
+      </view>
+    </view>
   </view>
 </view>

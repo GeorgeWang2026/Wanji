@@ -1,63 +1,24 @@
 /* ============================================================
- * 证券行情（原生页，canvas 2d 绘制 K 线）
+ * 证券详情（原生页，DF-99）
  * ------------------------------------------------------------
- * 入口：首页排盘圆钮第 4 个「📈 证券」→ openPaipan 跳 /uniApp/pages/stock/stock
- *
- * 数据接入（关键限制，正式发布前必须处理）：
- *   行情来自东方财富公开接口，代码见 utils/stock.js。
- *   1) 小程序后台「开发管理 → 服务器域名 → request 合法域名」需加入
- *      push2.eastmoney.com 与 push2his.eastmoney.com；
- *      开发者工具里可先勾「不校验合法域名」看效果。
- *   2) 公开接口无 SLA、无鉴权，字段可能变动。若后端补了行情代理，
- *      只改 utils/stock.js 里的 QUOTE_URL / KLINE_URL，本页无需改动。
- *   3) 取不到数据时不空转：页面给出明确的加载中 / 无数据 / 失败三态，
- *      失败态可直接点击重试，并提示域名白名单的排查路径。
- *
- * 与网页版的差异：
- *   - 小程序 canvas 2d 是静态绘制，没有逐帧动画；十字线跟随手指重绘。
- *   - 没有 iframe / web-view，纯原生绘制。
+ * 参照物：网站 static/xiaoxuan.html 的证券详情页（#stockDetailModal）
+ *   - 信息区 #stockDetailInfo（股票/涨跌幅/方向/级别/结构/态势/空间/行业）
+ *   - K 线 embed（kline.html，simple 模式）；单据要求：只做日 K、方形满宽
+ *   - 底部工具栏（预览提示词 / 关联到提问）保持原样
+ * 画线：B 方案 —— 小程序本地绘制、本地保存（wx.setStorageSync），不读网站已画线
  * ============================================================ */
 var stock = require('../../utils/stock.js');
+var paipan = require('../../utils/paipan.js');
 
-var PRESETS = [
-  { code: '600519', name: '贵州茅台' },
-  { code: '000001', name: '平安银行' },
-  { code: '600028', name: '中国石化' },
-  { code: '300750', name: '宁德时代' }
-];
-
-var PERIODS = [
-  { k: 'day', t: '日K' },
-  { k: 'week', t: '周K' },
-  { k: 'month', t: '月K' }
-];
-
-var UP_COLOR = '#ff6478';   // 红涨
-var DOWN_COLOR = '#50c88c'; // 绿跌
-var MA_COLORS = ['#e8b84a', '#b088e0', '#50a8ff'];
+var UP_COLOR = '#EF5350';    // 与 kline.html klineColors 一致
+var DOWN_COLOR = '#26A69A';
+var MA_COLORS = ['#c9a227', '#3b82c4', '#8a6fbf'];
+var DRAW_COLOR = '#2962FF';  // TradingView 手绘趋势线默认色
+var TREND_KEY = 'stock_trend_';
 
 function fixed(n, d) {
   if (n === null || n === undefined || isNaN(n)) return '—';
   return Number(n).toFixed(d === undefined ? 2 : d);
-}
-
-function signed(n, suffix) {
-  if (n === null || n === undefined || isNaN(n)) return '—';
-  return (n > 0 ? '+' : '') + Number(n).toFixed(2) + (suffix || '');
-}
-
-function fmtVol(v) {
-  if (v === null || v === undefined || isNaN(v)) return '—';
-  if (v >= 1e8) return (v / 1e8).toFixed(2) + '亿手';
-  if (v >= 1e4) return (v / 1e4).toFixed(2) + '万手';
-  return v + '手';
-}
-
-function fmtAmt(v) {
-  if (v === null || v === undefined || isNaN(v)) return '—';
-  if (v >= 1e8) return (v / 1e8).toFixed(2) + '亿';
-  if (v >= 1e4) return (v / 1e4).toFixed(2) + '万';
-  return fixed(v, 0);
 }
 
 function maList(list, n) {
@@ -71,32 +32,58 @@ function maList(list, n) {
   return out;
 }
 
+/** canvas 触摸点 → 画布内坐标 */
+function touchXY(e, left, top) {
+  var t = (e.touches && e.touches[0]) || (e.changedTouches && e.changedTouches[0]);
+  if (!t) return null;
+  var x = t.x;
+  var y = t.y;
+  if (typeof x !== 'number' || isNaN(x)) {
+    if (typeof t.clientX !== 'number') return null;
+    x = t.clientX - (left || 0);
+  }
+  if (typeof y !== 'number' || isNaN(y)) {
+    if (typeof t.clientY !== 'number') return null;
+    y = t.clientY - (top || 0);
+  }
+  return { x: x, y: y };
+}
+
 Page({
   data: {
-    code: '600519',
-    codeInput: '600519',
-    period: 'day',
-    periods: PERIODS,
-    presets: PRESETS,
-
+    code: '',
     name: '',
-    priceText: '—',
-    changeText: '—',
-    pctText: '—',
-    colorClass: 'flat',
-    quoteRows: [],
 
-    status: 'loading',   // loading | ready | empty | error
-    errMsg: '',
-    cursorText: '',
-    maText: 'MA5 —  MA10 —  MA20 —'
+    infoStatus: 'loading',   // loading | ready | empty
+    info: null,
+
+    status: 'loading',       // loading | ready | empty | error
+
+    drawMode: false,
+    drawTool: 'h',           // h 水平线 | t 趋势线
+
+    hint: '',
+    showHint: false
   },
 
-  onLoad: function () {
+  onLoad: function (options) {
     this._klines = [];
+    this._drawings = [];
+    this._pending = null;
     this._cursor = -1;
     this._seq = 0;
+
+    var opt = options || {};
+    var code = opt.code ? String(opt.code).trim() : '';
+    var name = opt.name ? String(opt.name).trim() : '';
+    var mm = code.match(/\d{6}/);
+    if (mm) code = mm[0];
+    if (!code) code = '600519';   // 无参进入时的兜底（与页面上线前一致）
+
+    this.setData({ code: code, name: name });
+    this.applyTitle();
     this.load();
+    this.loadInfo();
   },
 
   onReady: function () {
@@ -110,98 +97,110 @@ Page({
   },
 
   onPullDownRefresh: function () {
-    this.load(true).then(function () { wx.stopPullDownRefresh(); });
+    var self = this;
+    this.load(true).then(function () {
+      self.loadInfo();
+      wx.stopPullDownRefresh();
+    });
   },
 
-  /* ---------------- 数据 ---------------- */
+  /** 标题：与网站弹框标题同格式「📈 名称（代码）」 */
+  applyTitle: function () {
+    var name = this.data.name || this.data.code;
+    var code = this.data.code;
+    wx.setNavigationBarTitle({
+      title: '📈 ' + (name || '证券详情') + (code ? '（' + code + '）' : '')
+    });
+  },
+
+  /* ---------------- 详情信息 ---------------- */
+  loadInfo: function () {
+    var self = this;
+    var code = this.data.code;
+    if (!code) {
+      this.setData({ infoStatus: 'empty', info: null });
+      return;
+    }
+    this.setData({ infoStatus: 'loading', info: null });
+    stock.fetchDetail(code).then(function (d) {
+      var info = stock.buildInfo(d, { name: self.data.name, code: code });
+      if (!info) {
+        self.setData({ infoStatus: 'empty', info: null });
+        return;
+      }
+      self.setData({ infoStatus: 'ready', info: info, name: info.name || self.data.name });
+      self.applyTitle();
+    }).catch(function () {
+      // 与网站一致：接口失败按「暂无该证券详情数据」展示，不阻断 K 线
+      self.setData({ infoStatus: 'empty', info: null });
+    });
+  },
+
+  /* ---------------- 日 K ---------------- */
   load: function (force) {
     var self = this;
     var code = this.data.code;
-    var period = this.data.period;
     var seq = ++this._seq;
 
-    this.setData({ status: 'loading', errMsg: '', cursorText: '' });
-    this._cursor = -1;
+    this.setData({ status: 'loading' });
     this._klines = [];
+    this._pending = null;
 
-    return stock.load(code, period, 90, force).then(function (d) {
+    return stock.load(code, 90, force).then(function (klines) {
       if (seq !== self._seq) return;
-      var q = d.quote || {};
-      self.applyQuote(q);
-      self._klines = d.klines || [];
-      self.setData({
-        status: self._klines.length ? 'ready' : 'empty',
-        codeInput: code
-      });
+      self._klines = klines || [];
+      self._drawings = self.readDrawings();
+      self.setData({ status: self._klines.length ? 'ready' : 'empty' });
       self.initCanvas().then(function () { self.draw(); });
-    }).catch(function (err) {
+    }).catch(function () {
       if (seq !== self._seq) return;
-      self.setData({
-        status: 'error',
-        errMsg: (err && err.message) || '网络请求失败'
-      });
+      self.setData({ status: 'error' });
       self.draw();
     });
   },
 
-  applyQuote: function (q) {
-    var price = q.price;
-    var change = q.change;
-    var pct = q.changePct;
-    var cls = 'flat';
-    if (change > 0) cls = 'up';
-    else if (change < 0) cls = 'down';
-
-    this.setData({
-      name: q.name || '',
-      priceText: fixed(price),
-      changeText: signed(change),
-      pctText: signed(pct, '%'),
-      colorClass: cls,
-      quoteRows: [
-        { k: '今开', v: fixed(q.open) },
-        { k: '最高', v: fixed(q.high) },
-        { k: '最低', v: fixed(q.low) },
-        { k: '昨收', v: fixed(q.prevClose) },
-        { k: '成交量', v: fmtVol(q.volume) },
-        { k: '成交额', v: fmtAmt(q.amount) }
-      ]
-    });
+  /* ---------------- 本地画线（B 方案） ---------------- */
+  readDrawings: function () {
+    try {
+      var raw = wx.getStorageSync(TREND_KEY + this.data.code);
+      var arr = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr : [];
+    } catch (e) { return []; }
   },
 
-  /* ---------------- 交互 ---------------- */
-  onCodeInput: function (e) {
-    this.setData({ codeInput: String(e.detail.value || '').replace(/\D/g, '').slice(0, 6) });
+  saveDrawings: function () {
+    try {
+      wx.setStorageSync(TREND_KEY + this.data.code, JSON.stringify(this._drawings || []));
+    } catch (e) { /* 忽略 */ }
   },
 
-  onSearch: function () {
-    var code = this.data.codeInput;
-    if (!/^\d{6}$/.test(code)) {
-      wx.showToast({ title: '请输入 6 位股票代码', icon: 'none' });
-      return;
-    }
-    if (code === this.data.code && this.data.status === 'ready') return;
-    this.setData({ code: code });
-    this.load();
-  },
-
-  onPreset: function (e) {
-    var code = e.currentTarget.dataset.code;
-    if (code === this.data.code) return;
-    this.setData({ code: code, codeInput: code });
-    this.load();
-  },
-
-  onPeriod: function (e) {
-    var k = e.currentTarget.dataset.k;
-    if (k === this.data.period) return;
-    this.setData({ period: k, cursorText: '' });
+  toggleDraw: function () {
+    var on = !this.data.drawMode;
+    this._pending = null;
     this._cursor = -1;
-    this.load();
+    this.setData({ drawMode: on, drawTool: on ? (this.data.drawTool === 't' ? 't' : 'h') : 'none' });
+    this.draw();
   },
 
-  onRetry: function () {
-    this.load(true);
+  pickTool: function (e) {
+    var t = e.currentTarget.dataset.tool || 'h';
+    this._pending = null;
+    this.setData({ drawMode: true, drawTool: t });
+    this.draw();
+  },
+
+  undoDraw: function () {
+    if (!this._drawings.length) return;
+    this._drawings.pop();
+    this.saveDrawings();
+    this.draw();
+  },
+
+  clearDraw: function () {
+    if (!this._drawings.length) return;
+    this._drawings = [];
+    this.saveDrawings();
+    this.draw();
   },
 
   /* ---------------- Canvas ---------------- */
@@ -226,6 +225,7 @@ Page({
         self._cw = r.width;
         self._ch = r.height;
         self._canvasLeft = r.left || 0;
+        self._canvasTop = r.top || 0;
         resolve();
       });
     });
@@ -247,17 +247,17 @@ Page({
       return;
     }
 
-    var padL = 6;
-    var padR = 48;
-    var padT = 8;
-    var padB = 16;
+    var padL = 8;
+    var padR = 54;
+    var padT = 10;
+    var padB = 18;
     var chartH = h - padT - padB;
     var mainH = chartH * 0.72;
     var volH = chartH * 0.24;
     var volTop = padT + mainH + chartH * 0.04;
     var plotW = w - padL - padR;
     var xStep = plotW / n;
-    var candleW = Math.max(1, Math.min(xStep * 0.66, 12));
+    var candleW = Math.max(1, Math.min(xStep * 0.66, 14));
 
     var ma5 = maList(list, 5);
     var ma10 = maList(list, 10);
@@ -291,16 +291,16 @@ Page({
     function yOf(p) {
       return padT + (maxP - p) / spanP * mainH;
     }
-    function xOf(i) {
-      return padL + xStep * (i + 0.5);
+    function xOf(idx) {
+      return padL + xStep * (idx + 0.5);
     }
 
-    // 价格网格 + 右侧价格标签
+    // 价格网格 + 右侧价格标签（浅色主题：底 #fffdf7 / 线 #e6dcc6 / 字 #8a7a5f）
     ctx.font = '9px sans-serif';
     ctx.textBaseline = 'middle';
     ctx.textAlign = 'left';
     ctx.setLineDash([2, 3]);
-    ctx.strokeStyle = 'rgba(147,112,219,.18)';
+    ctx.strokeStyle = 'rgba(214,201,170,.9)';
     ctx.lineWidth = 1;
     for (var g = 0; g <= 4; g++) {
       var gy = padT + mainH * g / 4;
@@ -308,13 +308,13 @@ Page({
       ctx.moveTo(padL, gy);
       ctx.lineTo(padL + plotW, gy);
       ctx.stroke();
-      ctx.fillStyle = '#7f6fa8';
+      ctx.fillStyle = '#8a7a5f';
       ctx.fillText((maxP - spanP * g / 4).toFixed(2), padL + plotW + 6, gy);
     }
     ctx.setLineDash([]);
 
     // 成交量区基线
-    ctx.strokeStyle = 'rgba(147,112,219,.18)';
+    ctx.strokeStyle = 'rgba(214,201,170,.9)';
     ctx.beginPath();
     ctx.moveTo(padL, volTop);
     ctx.lineTo(padL + plotW, volTop);
@@ -337,7 +337,6 @@ Page({
       var top = yOf(Math.max(c.open, c.close));
       var bot = yOf(Math.min(c.open, c.close));
       var bodyH = Math.max(1, bot - top);
-      // 小尺寸下实心比空心更清晰，涨跌统一实心、以颜色区分
       ctx.fillRect(cx - candleW / 2, top, candleW, bodyH);
 
       if (maxV > 0) {
@@ -349,17 +348,17 @@ Page({
     }
 
     // 均线
-    function drawMA(arr, color) {
-      ctx.strokeStyle = color;
-      ctx.lineWidth = 1.2;
+    function drawMA(arr, color2) {
+      ctx.strokeStyle = color2;
+      ctx.lineWidth = 1;
       ctx.beginPath();
       var started = false;
       for (var m = 0; m < arr.length; m++) {
-        if (arr[m] === null) { started = false; continue; }
-        var px = xOf(m);
-        var py = yOf(arr[m]);
-        if (!started) { ctx.moveTo(px, py); started = true; }
-        else ctx.lineTo(px, py);
+        if (arr[m] === null) continue;
+        var mx = xOf(m);
+        var my = yOf(arr[m]);
+        if (!started) { ctx.moveTo(mx, my); started = true; }
+        else ctx.lineTo(mx, my);
       }
       ctx.stroke();
     }
@@ -367,13 +366,65 @@ Page({
     drawMA(ma10, MA_COLORS[1]);
     drawMA(ma20, MA_COLORS[2]);
 
+    // 手绘趋势线（本地保存，锚点用日期 + 价格）
+    if (this._drawings && this._drawings.length) {
+      var dateMap = {};
+      for (var mi = 0; mi < n; mi++) dateMap[list[mi].date] = mi;
+      var idxOf = function (pt) {
+        if (!pt) return 0;
+        if (pt.d && dateMap[pt.d] !== undefined) return dateMap[pt.d];
+        return pt.i || 0;
+      };
+      ctx.save();
+      ctx.beginPath();
+      ctx.rect(padL, padT, plotW, mainH);
+      ctx.clip();
+      ctx.strokeStyle = DRAW_COLOR;
+      ctx.fillStyle = DRAW_COLOR;
+      ctx.lineWidth = 1.5;
+      for (var di = 0; di < this._drawings.length; di++) {
+        var dr = this._drawings[di];
+        if (dr.t === 'h') {
+          var hy = yOf(Number(dr.p));
+          ctx.beginPath();
+          ctx.moveTo(padL, hy);
+          ctx.lineTo(padL + plotW, hy);
+          ctx.stroke();
+        } else if (dr.t === 't' && dr.a && dr.b) {
+          var x1 = xOf(idxOf(dr.a));
+          var y1 = yOf(Number(dr.a.p));
+          var x2 = xOf(idxOf(dr.b));
+          var y2 = yOf(Number(dr.b.p));
+          ctx.beginPath();
+          ctx.moveTo(x1, y1);
+          ctx.lineTo(x2, y2);
+          ctx.stroke();
+          ctx.beginPath();
+          ctx.arc(x1, y1, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+          ctx.beginPath();
+          ctx.arc(x2, y2, 2.5, 0, Math.PI * 2);
+          ctx.fill();
+        }
+      }
+      // 趋势线第一个锚点
+      if (this._pending) {
+        var px = xOf(idxOf(this._pending));
+        var py = yOf(Number(this._pending.p));
+        ctx.beginPath();
+        ctx.arc(px, py, 3.5, 0, Math.PI * 2);
+        ctx.fill();
+      }
+      ctx.restore();
+    }
+
     // 底部日期（首 / 中 / 末）
-    ctx.fillStyle = '#7f6fa8';
+    ctx.fillStyle = '#8a7a5f';
     ctx.textBaseline = 'top';
     var marks = [0, Math.floor((n - 1) / 2), n - 1];
     for (var t = 0; t < marks.length; t++) {
-      var idx = marks[t];
-      var label = String(list[idx].date || '').slice(2);
+      var idx2 = marks[t];
+      var label = String(list[idx2].date || '').slice(2);
       ctx.textAlign = t === 0 ? 'left' : (t === marks.length - 1 ? 'right' : 'center');
       ctx.fillText(label, t === 0 ? padL : (t === marks.length - 1 ? padL + plotW : padL + plotW / 2), padT + mainH + chartH * 0.04 + volH + 4);
     }
@@ -383,7 +434,7 @@ Page({
       var ci = this._cursor;
       var ccx = xOf(ci);
       var ccy = yOf(list[ci].close);
-      ctx.strokeStyle = 'rgba(232,224,240,.55)';
+      ctx.strokeStyle = 'rgba(107,91,62,.5)';
       ctx.setLineDash([3, 3]);
       ctx.lineWidth = 1;
       ctx.beginPath();
@@ -393,59 +444,149 @@ Page({
       ctx.lineTo(padL + plotW, ccy);
       ctx.stroke();
       ctx.setLineDash([]);
-      ctx.fillStyle = '#e8dff5';
+      ctx.fillStyle = '#6b5b3e';
       ctx.beginPath();
       ctx.arc(ccx, ccy, 2.5, 0, Math.PI * 2);
       ctx.fill();
     }
 
-    // MA 图例文本
-    var lastMa5 = ma5[ma5.length - 1];
-    var lastMa10 = ma10[ma10.length - 1];
-    var lastMa20 = ma20[ma20.length - 1];
-    var legend = 'MA5 ' + (lastMa5 === null ? '—' : lastMa5.toFixed(2))
-      + '  MA10 ' + (lastMa10 === null ? '—' : lastMa10.toFixed(2))
-      + '  MA20 ' + (lastMa20 === null ? '—' : lastMa20.toFixed(2));
-    if (legend !== this.data.maText) this.setData({ maText: legend });
+    // 图例（对齐 TradingView：左上角两行，含 OHLC 与均线值）
+    var bar = (this._cursor >= 0 && this._cursor < n) ? list[this._cursor] : list[n - 1];
+    var line1 = String(bar.date || '') + '  开 ' + fixed(bar.open) + '  高 ' + fixed(bar.high)
+      + '  低 ' + fixed(bar.low) + '  收 ' + fixed(bar.close);
+    var line2 = 'MA5 ' + fixed(ma5[n - 1]) + '  MA10 ' + fixed(ma10[n - 1]) + '  MA20 ' + fixed(ma20[n - 1]);
+    ctx.font = '9px sans-serif';
+    ctx.textBaseline = 'top';
+    ctx.textAlign = 'left';
+    var lw = Math.max(ctx.measureText(line1).width, ctx.measureText(line2).width);
+    ctx.fillStyle = 'rgba(255,253,247,.82)';
+    ctx.fillRect(padL, padT, lw + 6, 24);
+    ctx.fillStyle = '#6b5b3e';
+    ctx.fillText(line1, padL + 3, padT + 2);
+    ctx.fillText(line2, padL + 3, padT + 13);
 
     this.geo = {
       padL: padL,
+      padT: padT,
       plotW: plotW,
+      mainH: mainH,
       xStep: xStep,
-      n: n
+      n: n,
+      maxP: maxP,
+      spanP: spanP
     };
   },
 
-  /* ---------------- 十字线触摸 ---------------- */
-  onTouch: function (e) {
-    var geo = this.geo;
-    var list = this._klines;
-    if (!geo || !list.length) return;
-    var t = e.touches && e.touches[0];
-    if (!t) return;
-    var x = t.x;
-    if (typeof x !== 'number' || isNaN(x)) {
-      if (typeof t.clientX !== 'number') return;
-      x = t.clientX - (this._canvasLeft || 0);
-    }
-    var idx = Math.floor((x - geo.padL) / geo.xStep);
-    if (idx < 0) idx = 0;
-    if (idx > geo.n - 1) idx = geo.n - 1;
-    if (idx === this._cursor) return;
+  /* ---------------- 交互 ---------------- */
+  onTouchStart: function (e) {
+    if (this.data.drawMode) { this.addPoint(e); return; }
+    this.moveCross(e);
+  },
 
-    this._cursor = idx;
-    var c = list[idx];
-    this.setData({
-      cursorText: c.date + '　开 ' + fixed(c.open) + '　收 ' + fixed(c.close)
-        + '　高 ' + fixed(c.high) + '　低 ' + fixed(c.low) + '　量 ' + fmtVol(c.volume)
-    });
-    this.draw();
+  onTouchMove: function (e) {
+    if (this.data.drawMode) return;
+    this.moveCross(e);
   },
 
   onTouchEnd: function () {
+    if (this.data.drawMode) return;
     if (this._cursor < 0) return;
     this._cursor = -1;
-    this.setData({ cursorText: '' });
     this.draw();
+  },
+
+  moveCross: function (e) {
+    var geo = this.geo;
+    var list = this._klines;
+    if (!geo || !list.length) return;
+    var pt = touchXY(e, this._canvasLeft, this._canvasTop);
+    if (!pt) return;
+    var idx = Math.floor((pt.x - geo.padL) / geo.xStep);
+    if (idx < 0) idx = 0;
+    if (idx > geo.n - 1) idx = geo.n - 1;
+    if (idx === this._cursor) return;
+    this._cursor = idx;
+    this.draw();
+  },
+
+  /** 画线模式下的一次点击：水平线一次成线，趋势线两次成线 */
+  addPoint: function (e) {
+    var geo = this.geo;
+    if (!geo) return;
+    var pt = touchXY(e, this._canvasLeft, this._canvasTop);
+    if (!pt) return;
+    if (pt.y < geo.padT || pt.y > geo.padT + geo.mainH) return;
+
+    var idx = Math.floor((pt.x - geo.padL) / geo.xStep);
+    if (idx < 0) idx = 0;
+    if (idx > geo.n - 1) idx = geo.n - 1;
+
+    var price = geo.maxP - (pt.y - geo.padT) / geo.mainH * geo.spanP;
+    var anchor = {
+      p: Math.round(price * 100) / 100,
+      d: (this._klines[idx] || {}).date || '',
+      i: idx
+    };
+
+    if (this.data.drawTool === 'h') {
+      this._drawings.push({ t: 'h', p: anchor.p, d: anchor.d, i: idx });
+      this.saveDrawings();
+      this.draw();
+      return;
+    }
+
+    if (!this._pending) {
+      this._pending = anchor;
+      this.draw();
+      return;
+    }
+
+    this._drawings.push({ t: 't', a: this._pending, b: anchor });
+    this._pending = null;
+    this.saveDrawings();
+    this.draw();
+  },
+
+  /* ---------------- 置底工具条：提示词预览 / 关联到提问 ---------------- */
+  previewPrompt: function () {
+    var self = this;
+    var code = String(this.data.code || '').trim().toUpperCase();
+    if (!code) return;
+    wx.showLoading({ title: '生成中…' });
+    // 与网站 _buildPreviewPaipanDataFor('stock') 同结构：个股 + 天时 + 地利
+    paipan.fetchPromptText({
+      stock: {
+        name: this.data.name || code,
+        code: code,
+        zs_code: '',
+        zs_name: '',
+        bk_code: '',
+        bk_name: ''
+      }
+    }).then(function (r) {
+      wx.hideLoading();
+      // 网站只渲染后端 hint 全文（pre 原样展示），不做截断；空时给同一句占位
+      self.setData({ hint: r.hint || '（当前排盘数据组装为空）', showHint: true });
+    }).catch(function (e) {
+      wx.hideLoading();
+      wx.showToast({ title: (e && e.message) || '预览失败', icon: 'none' });
+    });
+  },
+
+  closeHint: function () { this.setData({ showHint: false }); },
+
+  noop: function () {},
+
+  onBind: function () {
+    var code = String(this.data.code || '').trim().toUpperCase();
+    if (!code) return;
+    var app = getApp();
+    app.globalData.paipan = app.globalData.paipan || {};
+    app.globalData.paipan.stock = {
+      stock: { name: this.data.name || code, code: code },
+      meta: { type: 'stock' }
+    };
+    wx.showToast({ title: '已关联到提问', icon: 'none' });
+    setTimeout(function () { wx.navigateBack(); }, 400);
   }
 });

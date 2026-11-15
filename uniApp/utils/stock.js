@@ -1,19 +1,16 @@
 /* ============================================================
- * stock.js —— 证券行情数据适配层
+ * stock.js —— 证券数据适配层（DF-99）
  * ------------------------------------------------------------
- * 数据源：东方财富公开行情接口（HTTPS + UTF-8 JSON，无需鉴权）
- *   实时快照：https://push2.eastmoney.com/api/qt/stock/get
- *   K 线：    https://push2his.eastmoney.com/api/qt/stock/kline/get
- *
- * 已知限制（正式发布前必须处理其中一条）：
- *   1. 小程序后台需把上面两个域名加入「request 合法域名」；
- *      开发者工具里可临时勾选「不校验合法域名」先看效果。
- *   2. 公开接口无 SLA，字段/参数可能调整；若后端补了行情代理，
- *      只需把 QUOTE_URL / KLINE_URL 换掉并保持下面的返回结构不变。
+ * 1) 详情信息：GET /api/v1/stocks/detail?code=
+ *    与网站 static/xiaoxuan.html 证券详情页（#stockDetailInfo）同一接口、
+ *    同一字段口径；渲染用的易学查找表照 static/mystock/yijing.js 同名函数移植。
+ * 2) 日 K：东方财富公开行情接口（仅日线，保持既有取数方式）
+ *    - 小程序后台「request 合法域名」需加入 push2his.eastmoney.com；
+ *    - 公开接口无 SLA；若后端补了行情代理，只改 KLINE_URL。
  * ============================================================ */
+var api = require('./api.js');
 
 var UT = 'fa5fd1943c7b386f172d6893dbfba10b';
-var QUOTE_URL = 'https://push2.eastmoney.com/api/qt/stock/get';
 var KLINE_URL = 'https://push2his.eastmoney.com/api/qt/stock/kline/get';
 
 var MEMO = {};
@@ -55,7 +52,7 @@ function getJSON(url, params) {
       fail: function (err) {
         var msg = (err && err.errMsg) || '网络请求失败';
         if (msg.indexOf('domain list') >= 0) {
-          reject(new Error('行情域名未加白名单：push2.eastmoney.com / push2his.eastmoney.com'));
+          reject(new Error('行情域名未加白名单：push2his.eastmoney.com'));
         } else {
           reject(new Error(msg));
         }
@@ -64,44 +61,211 @@ function getJSON(url, params) {
   });
 }
 
-/** 实时快照 */
-function fetchQuote(code) {
-  return getJSON(QUOTE_URL, {
-    secid: secid(code),
-    fields: 'f43,f44,f45,f46,f47,f48,f57,f58,f60,f169,f170',
-    ut: UT
-  }).then(function (r) {
-    var d = r && r.data;
-    if (!d) throw new Error('行情无返回（可能是非交易时段或代码不存在）');
-    return {
-      code: d.f57 || String(code),
-      name: d.f58 || '',
-      price: num(d.f43) === null ? null : num(d.f43) / 100,
-      high: num(d.f44) === null ? null : num(d.f44) / 100,
-      low: num(d.f45) === null ? null : num(d.f45) / 100,
-      open: num(d.f46) === null ? null : num(d.f46) / 100,
-      prevClose: num(d.f60) === null ? null : num(d.f60) / 100,
-      volume: num(d.f47),
-      amount: num(d.f48),
-      change: num(d.f169) === null ? null : num(d.f169) / 100,
-      changePct: num(d.f170) === null ? null : num(d.f170) / 100
-    };
+/* ============================================================
+ * 易学查找表 —— 与 static/mystock/yijing.js 同名函数逐条对齐
+ * ============================================================ */
+var GUA_TOTAL = {
+  '乾': '乾为天', '夬': '泽天夬', '大有': '火天大有', '大壮': '雷天大壮',
+  '小畜': '风天小畜', '需': '水天需', '大畜': '山天大畜', '泰': '地天泰',
+  '履': '天泽履', '兑': '兑为泽', '睽': '火泽睽', '归妹': '雷泽归妹',
+  '中孚': '风泽中孚', '节': '水泽节', '损': '山泽损', '临': '地泽临',
+  '同人': '天火同人', '革': '泽火革', '离': '离为火', '丰': '雷火丰',
+  '家人': '风火家人', '即济': '水火即济', '贲': '山火贲', '明夷': '地火明夷',
+  '无妄': '天雷无妄', '随': '泽雷随', '噬嗑': '火雷噬嗑', '震': '震为雷',
+  '益': '风雷益', '屯': '水雷屯', '颐': '山雷颐', '复': '地雷复',
+  '姤': '天风姤', '大过': '泽风大过', '鼎': '火风鼎', '恒': '雷风恒',
+  '巽': '巽为风', '井': '水风井', '蛊': '山风蛊', '升': '地风升',
+  '讼': '天水讼', '困': '泽水困', '未济': '火水未济', '解': '雷水解',
+  '涣': '风水涣', '坎': '坎为水', '蒙': '山水蒙', '师': '地水师',
+  '遁': '天山遁', '咸': '泽山咸', '旅': '火山旅', '小过': '雷山小过',
+  '渐': '风山渐', '蹇': '水山蹇', '艮': '艮为山', '谦': '地山谦',
+  '否': '天地否', '萃': '泽地萃', '晋': '火地晋', '豫': '雷地豫',
+  '观': '风地观', '比': '水地比', '剥': '山地剥', '坤': '坤为地'
+};
+
+var GUA_SYMBOL = {
+  '乾': '䷀', '夬': '䷪', '大有': '䷍', '大壮': '䷡',
+  '小畜': '䷈', '需': '䷄', '大畜': '䷙', '泰': '䷊',
+  '履': '䷉', '兑': '䷹', '睽': '䷥', '归妹': '䷵',
+  '中孚': '䷼', '节': '䷻', '损': '䷨', '临': '䷒',
+  '同人': '䷌', '革': '䷰', '离': '䷝', '丰': '䷶',
+  '家人': '䷤', '即济': '䷾', '贲': '䷕', '明夷': '䷣',
+  '无妄': '䷘', '随': '䷐', '噬嗑': '䷔', '震': '䷲',
+  '益': '䷩', '屯': '䷂', '颐': '䷚', '复': '䷗',
+  '姤': '䷫', '大过': '䷛', '鼎': '䷱', '恒': '䷟',
+  '巽': '䷸', '井': '䷯', '蛊': '䷑', '升': '䷭',
+  '讼': '䷅', '困': '䷮', '未济': '䷿', '解': '䷧',
+  '涣': '䷺', '坎': '䷜', '蒙': '䷃', '师': '䷆',
+  '遁': '䷠', '咸': '䷞', '旅': '䷷', '小过': '䷽',
+  '渐': '䷴', '蹇': '䷦', '艮': '䷳', '谦': '䷎',
+  '否': '䷋', '萃': '䷬', '晋': '䷢', '豫': '䷏',
+  '观': '䷓', '比': '䷇', '剥': '䷖', '坤': '䷁'
+};
+
+/** yijing.js get_color：按态势取徽标底色 */
+function getColor(situation) {
+  if (situation === null || situation === undefined) return '#AAAAAA';
+  var s = String(situation);
+  if (s === '少阴') return '#d9febb';
+  if (s === '少阳') return '#ffb2a2';
+  if ('乾,夬,大有,大壮,季,q,秋,机构'.indexOf(s) >= 0) return '#FFA500';
+  if ('兑,履,睽,归妹,中孚,节,损,临,小畜,需,大畜,泰,年,y,春,游资'.indexOf(s) >= 0) return '#FF11FF';
+  if ('离,同人,革,丰,家人,即济,贲,明夷,主力'.indexOf(s) >= 0) return '#DA70D6';
+  if ('震,无妄,随,噬嗑,益,屯,颐,复,遁,咸,旅,小过,周,w'.indexOf(s) >= 0) return '#0000FF';
+  if ('巽,姤,大过,鼎,恒,井,蛊,升,阳,太阳,月,m,1,夏,热钱'.indexOf(s) >= 0) return '#FF0000';
+  if ('坎,讼,困,未济,解,涣,蒙,师,冬,牛散'.indexOf(s) >= 0) return '#11FFFF';
+  if ('否,萃,晋,豫,艮,渐,蹇,谦'.indexOf(s) >= 0) return '#FFddaa';
+  if ('坤,观,比,剥,阴,太阴,天,d,0'.indexOf(s) >= 0) return '#00FF00';
+  // 网站原实现此处返回随机色（每次渲染都变）；小程序取同风格固定色，避免闪烁
+  return '#9a8ab8';
+}
+
+/** yijing.js get_yijing_total：单字态势 → 六十四卦名 */
+function getYijingTotal(situation) {
+  return GUA_TOTAL[situation] || '';
+}
+
+/** yijing.js get_high_symbol：态势 → 六十四卦符号 */
+function getHighSymbol(situation) {
+  return GUA_SYMBOL[situation] || '';
+}
+
+/** yijing.js get_level_name：周期频率 → 中文级别 */
+function getLevelName(frequency) {
+  if (frequency === null || frequency === undefined) return '无';
+  var f = String(frequency);
+  if ('y,Y,12M'.indexOf(f) >= 0) return '年';
+  if ('q,Q,3M'.indexOf(f) >= 0) return '季';
+  if ('m,M,1M'.indexOf(f) >= 0) return '月';
+  if ('w,W'.indexOf(f) >= 0) return '周';
+  if ('d,D'.indexOf(f) >= 0) return '日';
+  if ('60m,h,H'.indexOf(f) >= 0) return '时';
+  if ('15m,k,K'.indexOf(f) >= 0) return '刻';
+  return '无';
+}
+
+/** yijing.js get_season_symbol：季节 → 符号 */
+function getSeasonSymbol(season) {
+  if (season === '夏') return '☀';
+  if (season === '秋') return '☽';
+  if (season === '春') return '❀';
+  if (season === '冬') return '❄';
+  return '☼';
+}
+
+/** yijing.js get_direction：阴阳/态势 → 方向箭头 */
+function getDirection(s) {
+  if (s === null || s === undefined) return '↕';
+  var v = String(s);
+  if (v === '太阳') return '↟';
+  if (v === '太阴') return '↡';
+  if (v === '阳') return '↑';
+  if (v === '阴') return '↓';
+  if (parseInt(v, 10) === 1) return '↑';
+  if (parseInt(v, 10) === 0) return '↓';
+  if (v === '少阳') return '⇡';
+  if (v === '少阴') return '⇣';
+  return '↕';
+}
+
+/** yijing.js get_season：短/长态势 → 季节 */
+function getSeason(ss, ls) {
+  if (ss === null || ss === undefined || ls === null || ls === undefined) return '无';
+  var S = String(ss), L = String(ls);
+  var A = '乾,兑,离,巽,qian,dui,li,xun,0,1,2,3';
+  var B = '震,坎,艮,坤,zhen,kan,gen,kun,4,5,6,7';
+  if (A.indexOf(L) >= 0) {
+    if (A.indexOf(S) >= 0) return '夏';
+    if (B.indexOf(S) >= 0) return '秋';
+  }
+  if (B.indexOf(L) >= 0) {
+    if (A.indexOf(S) >= 0) return '春';
+    if (B.indexOf(S) >= 0) return '冬';
+  }
+  return '无';
+}
+
+/* ============================================================
+ * 详情信息
+ * ============================================================ */
+
+/** GET /stocks/detail?code= → data（与网站同接口、同字段） */
+function fetchDetail(code) {
+  return api.request('/stocks/detail?code=' + encodeURIComponent(code)).then(function (r) {
+    return (r && r.data) || {};
   });
 }
 
 /**
- * K 线
- * @param {string} code
- * @param {string} period day | week | month
- * @param {number} limit  条数
+ * 把 /stocks/detail 的 data 归一化成页面可直接渲染的结构。
+ * 逐行对齐 xiaoxuan.html _renderStockInfo（L6393-L6447）。
+ * @returns {object|null} data 无 code 时返回 null（页面显示空态）
  */
-function fetchKline(code, period, limit) {
-  var klt = { day: 101, week: 102, month: 103 }[period] || 101;
+function buildInfo(d, meta) {
+  d = d || {};
+  if (!d.code) return null;
+
+  var name = d.name || (meta && meta.name) || d.code || '';
+  var zdf = (d.zdf === null || d.zdf === undefined) ? NaN : Number(d.zdf);
+  var zdfText = isNaN(zdf) ? '—' : ((zdf > 0 ? '+' : '') + zdf.toFixed(2) + '%');
+  var zdfColor = isNaN(zdf) ? '#8a75b0' : (zdf >= 0 ? '#ff7b8a' : '#3ddc97');
+
+  // 结构：年/季/月/周/日/时（网站只渲染徽标，无文字标签）
+  var structKeys = ['y_situation', 'q_situation', 'm_situation', 'w_situation', 'd_situation', 'h_situation'];
+  var structs = [];
+  for (var i = 0; i < structKeys.length; i++) {
+    var sv = d[structKeys[i]];
+    structs.push({ t: getDirection(sv), bg: getColor(sv) });
+  }
+
+  // 方向 + 级别（刻 15m）
+  var dirText = (getDirection(d.k_situation) || '') + (getLevelName(d.k_level) || '');
+
+  // 态势变化趋势：当前态势 → 方向级别 → 目标态势
+  var se = getSeason(d.short_situation, d.long_situation);
+  var curName = d.total_situation ? (getYijingTotal(d.total_situation) || d.total_situation) : '';
+  var curGua = getSeasonSymbol(se) + ' ' + (getHighSymbol(d.total_situation) + curName);
+  var tgtGua = getHighSymbol(d.k_target_situation) + (d.k_target_situation ? (getYijingTotal(d.k_target_situation) || d.k_target_situation) : '');
+  var trend = [
+    { t: curGua, bg: getColor(d.total_situation) },
+    { t: dirText, bg: getColor(d.k_situation) },
+    { t: tgtGua, bg: getColor(d.k_target_situation) }
+  ];
+
+  // 空间提示
+  var isDown = (d.k_direction === 'down');
+  var spaceText = (isDown ? '向下踩' : '向上攻') + ' ' + (d.k_price == null ? '—' : d.k_price)
+    + ' ' + (isDown ? '支撑位' : '压力位') + '，最大' + (isDown ? '跌幅' : '涨幅') + ' '
+    + ((d.k_space == null ? '—' : Number(d.k_space).toFixed(1)) + '%');
+
+  var credit = d.credit || '';
+
+  return {
+    name: name || d.name || d.code,
+    credit: credit,
+    creditBg: getColor(d.target_direction || d.total_situation),
+    zdfText: zdfText,
+    zdfColor: zdfColor,
+    dirText: dirText || d.direction || '—',
+    grade: d.grade || '',
+    structs: structs,
+    trend: trend,
+    space: spaceText,
+    industry: d.industry_name || ''
+  };
+}
+
+/* ============================================================
+ * 日 K
+ * ============================================================ */
+
+/** 日 K 线（klt=101） */
+function fetchKline(code, limit) {
   return getJSON(KLINE_URL, {
     secid: secid(code),
     fields1: 'f1,f2,f3,f4,f5,f6',
     fields2: 'f51,f52,f53,f54,f55,f56,f57',
-    klt: klt,
+    klt: 101,
     fqt: 1,
     end: '20500101',
     lmt: limit || 120,
@@ -125,27 +289,22 @@ function fetchKline(code, period, limit) {
   });
 }
 
-/** 带 60s 内存缓存，避免切周期/返回页面时重复请求；force=true 强制绕过缓存 */
-function load(code, period, limit, force) {
-  var key = code + '|' + period;
+/** 带 60s 内存缓存；force=true 强制绕过缓存 */
+function load(code, limit, force) {
+  var key = String(code);
   var hit = MEMO[key];
   if (!force && hit && Date.now() - hit.t < 60000) {
     return Promise.resolve(hit.data);
   }
-  // 实时快照失败不阻断 K 线展示（两个接口不同域名，可能只有其一失败）
-  return Promise.all([
-    fetchQuote(code).catch(function () { return null; }),
-    fetchKline(code, period, limit)
-  ]).then(function (arr) {
-    var data = { quote: arr[0] || {}, klines: arr[1] };
-    MEMO[key] = { t: Date.now(), data: data };
-    return data;
+  return fetchKline(code, limit).then(function (klines) {
+    MEMO[key] = { t: Date.now(), data: klines };
+    return klines;
   });
 }
 
 module.exports = {
-  secid: secid,
-  fetchQuote: fetchQuote,
+  fetchDetail: fetchDetail,
+  buildInfo: buildInfo,
   fetchKline: fetchKline,
   load: load
 };
