@@ -78,8 +78,15 @@ Page({
     var opt = options || {};
     var code = opt.code ? String(opt.code).trim() : '';
     var name = opt.name ? String(opt.name).trim() : '';
-    var mm = code.match(/\d{6}/);
-    if (mm) code = mm[0];
+    // 市场前缀优先用数据源给的字段（自选表 / 路由参数），没有则由 utils 按代码规则推断
+    var pfx = code.toUpperCase().match(/^(?:A:)?([A-Z]{2})\.(\d{6})$/);
+    this._market = opt.market || opt.exchange || (pfx ? pfx[1] : '');
+    if (pfx) {
+      code = pfx[2];
+    } else {
+      var mm = code.match(/\d{6}/);
+      if (mm) code = mm[0];
+    }
     if (!code) code = '600519';   // 无参进入时的兜底（与页面上线前一致）
 
     this.setData({ code: code, name: name });
@@ -124,7 +131,7 @@ Page({
       return;
     }
     this.setData({ infoStatus: 'loading', info: null });
-    stock.fetchDetail(code).then(function (d) {
+    stock.fetchDetail(code, this._market).then(function (d) {
       var info = stock.buildInfo(d, { name: self.data.name, code: code });
       if (!info) {
         self.setData({ infoStatus: 'empty', info: null });
@@ -148,7 +155,7 @@ Page({
     this._klines = [];
     this._pending = null;
 
-    return stock.load(code, force).then(function (klines) {
+    return stock.load(code, force, this._market).then(function (klines) {
       if (seq !== self._seq) return;
       self._klines = klines || [];
       self._drawings = self.readDrawings();
@@ -577,12 +584,14 @@ Page({
     var self = this;
     var code = String(this.data.code || '').trim().toUpperCase();
     if (!code) return;
+    // 与网站一致：paipan_data.stock.code 用的就是带市场前缀的证券代码
+    var full = stock.withMarket(code, this._market) || code;
     wx.showLoading({ title: '生成中…' });
     // 与网站 _buildPreviewPaipanDataFor('stock') 同结构：个股 + 天时 + 地利
     paipan.fetchPromptText({
       stock: {
         name: this.data.name || code,
-        code: code,
+        code: full,
         zs_code: '',
         zs_name: '',
         bk_code: '',
@@ -605,10 +614,11 @@ Page({
   onBind: function () {
     var code = String(this.data.code || '').trim().toUpperCase();
     if (!code) return;
+    var full = stock.withMarket(code, this._market) || code;
     var app = getApp();
     app.globalData.paipan = app.globalData.paipan || {};
     app.globalData.paipan.stock = {
-      stock: { name: this.data.name || code, code: code },
+      stock: { name: this.data.name || code, code: full },
       meta: { type: 'stock' }
     };
     wx.showToast({ title: '已关联到提问', icon: 'none' });

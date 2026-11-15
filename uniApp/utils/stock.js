@@ -29,8 +29,30 @@ function fmtDate(tSec) {
 }
 
 /**
+ * 代码补市场前缀（后端只接受 SH./SZ. 形式，与网站一致：a:SH.600519）。
+ * 已有前缀则原样返回；给了 market/exchange 优先用；否则按代码规则推断：
+ * 6/9 → SH.，0/3 → SZ.
+ * @param {string} code 600519 / SH.600519 / a:SH.600519
+ * @param {string} [market] 数据源已给的市场字段，如 SH / SZ / SSE / SZSE
+ * @returns {string} 带前缀代码，如 SH.600519
+ */
+function withMarket(code, market) {
+  var raw = String(code || '').trim().toUpperCase();
+  var pre = raw.match(/^A:([A-Z]{2})\.(\d{6})$/);
+  if (pre) return pre[1] + '.' + pre[2];
+  var full = raw.match(/^([A-Z]{2})\.(\d{6})$/);
+  if (full) return full[1] + '.' + full[2];
+  var digits = raw.replace(/\D/g, '').slice(0, 6);
+  if (!digits) return '';
+  var m = String(market || '').trim().toUpperCase();
+  if (m === 'SSE' || m === 'SH' || m === '1' || m === '沪' || m === '上海') return 'SH.' + digits;
+  if (m === 'SZSE' || m === 'SZ' || m === '0' || m === '深' || m === '深圳') return 'SZ.' + digits;
+  return ((digits.charAt(0) === '6' || digits.charAt(0) === '9') ? 'SH.' : 'SZ.') + digits;
+}
+
+/**
  * 组装 /tv/history 请求（复刻 UDF datafeed 首次取数的请求形状）。
- * @param {string} code 6 位代码
+ * @param {string} code 带市场前缀的代码（SH.600519）
  * @returns {string} 接口路径（含 query）
  */
 function historyPath(code, countback) {
@@ -175,8 +197,9 @@ function getSeason(ss, ls) {
  * ============================================================ */
 
 /** GET /stocks/detail?code= → data（与网站同接口、同字段） */
-function fetchDetail(code) {
-  return api.request('/stocks/detail?code=' + encodeURIComponent(code)).then(function (r) {
+function fetchDetail(code, market) {
+  var full = withMarket(code, market);
+  return api.request('/stocks/detail?code=' + encodeURIComponent(full)).then(function (r) {
     return (r && r.data) || {};
   });
 }
@@ -250,8 +273,8 @@ function buildInfo(d, meta) {
  * s!=="ok" 或 t 为空 → 空数组（对应站点「暂无 K 线数据」）；
  * 网络/HTTP 异常 → reject（对应站点「K线数据加载失败」）。
  */
-function fetchKline(code) {
-  return api.request(historyPath(code), { auth: false, timeout: 20000 }).then(function (r) {
+function fetchKline(code, market) {
+  return api.request(historyPath(withMarket(code, market)), { auth: false, timeout: 20000 }).then(function (r) {
     if (!r || r.s !== 'ok' || !r.t || !r.t.length) return [];
     var out = [];
     for (var i = 0; i < r.t.length; i++) {
@@ -270,19 +293,21 @@ function fetchKline(code) {
 }
 
 /** 带 60s 内存缓存（对齐站点 PULSE_MS 的刷新节奏）；force=true 强制绕过缓存 */
-function load(code, force) {
-  var key = String(code);
+function load(code, force, market) {
+  var full = withMarket(code, market);
+  var key = String(full);
   var hit = MEMO[key];
   if (!force && hit && Date.now() - hit.t < 60000) {
     return Promise.resolve(hit.data);
   }
-  return fetchKline(code).then(function (klines) {
+  return fetchKline(full).then(function (klines) {
     MEMO[key] = { t: Date.now(), data: klines };
     return klines;
   });
 }
 
 module.exports = {
+  withMarket: withMarket,
   fetchDetail: fetchDetail,
   buildInfo: buildInfo,
   fetchKline: fetchKline,
