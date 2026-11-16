@@ -78,6 +78,13 @@ module.exports = [
     "lang": "zh"
   },
   {
+    "text": "知而不行，只是未知。",
+    "translation": "",
+    "speech": "知而不行，只是未知。",
+    "author": "王阳明",
+    "lang": "zh"
+  },
+  {
     "text": "祸福无门，惟人自召。",
     "translation": "",
     "speech": "祸福无门，惟人自召。",
