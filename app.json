@@ -1,13 +1,11 @@
 {
   "pages": [
-    "uniApp/pages/chat/chat",
-    "uniApp/pages/qimen/qimen",
-    "uniApp/pages/bazi/bazi",
-    "uniApp/pages/meihua/meihua",
-    "uniApp/pages/gua/gua",
-    "uniApp/pages/stock/stock",
-    "uniApp/pages/stock-chart/stock-chart",
-    "uniApp/pages/my-stocks/my-stocks"
+    "uniApp/pages/core/chat/chat",
+    "uniApp/pages/assist/qimen/qimen",
+    "uniApp/pages/assist/meihua/meihua",
+    "uniApp/pages/core/stock/stock",
+    "uniApp/pages/core/stock-chart/stock-chart",
+    "uniApp/pages/core/my-stocks/my-stocks"
   ],
   "window": {
     "navigationBarBackgroundColor": "#1a0f2e",

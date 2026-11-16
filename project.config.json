@@ -71,6 +71,14 @@
         "type": "folder"
       },
       {
+        "value": "uniApp/pages/occult",
+        "type": "folder"
+      },
+      {
+        "value": "uniApp/pages/aux",
+        "type": "folder"
+      },
+      {
         "value": "project.private.config.json",
         "type": "file"
       },
@@ -98,13 +106,13 @@
       "list": [
         {
           "name": "首页 · 对话",
-          "pathName": "uniApp/pages/chat/chat",
+          "pathName": "uniApp/pages/core/chat/chat",
           "query": "",
           "scene": null
         },
         {
           "name": "奇门遁甲",
-          "pathName": "uniApp/pages/qimen/qimen",
+          "pathName": "uniApp/pages/assist/qimen/qimen",
           "query": "",
           "scene": null
         }

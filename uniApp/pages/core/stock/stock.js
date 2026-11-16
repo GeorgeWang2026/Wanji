@@ -7,8 +7,8 @@
  *     图表与画线能力由站点 TV 组件提供，小程序不再自绘）
  *   - 底部工具栏（预览提示词 / 关联到提问）保持原样
  * ============================================================ */
-var stock = require('../../utils/stock.js');
-var paipan = require('../../utils/paipan.js');
+var stock = require('../../../utils/stock.js');
+var paipan = require('../../../utils/paipan.js');
 
 Page({
   data: {
@@ -103,7 +103,7 @@ Page({
     if (!code) return;
     var full = stock.withMarket(code, this._market) || code;
     wx.navigateTo({
-      url: '/uniApp/pages/stock-chart/stock-chart?code=' + encodeURIComponent(full)
+      url: '/uniApp/pages/core/stock-chart/stock-chart?code=' + encodeURIComponent(full)
         + '&name=' + encodeURIComponent(this.data.name || '')
     });
   },
@@ -221,7 +221,7 @@ Page({
       wx.navigateBack({ delta: pages.length - 1 - target });
     } else {
       // 兜底：栈里没有 chat 页（如分享/重进直达证券详情）则重启到首页
-      wx.reLaunch({ url: '/uniApp/pages/chat/chat' });
+      wx.reLaunch({ url: '/uniApp/pages/core/chat/chat' });
     }
   }
 });

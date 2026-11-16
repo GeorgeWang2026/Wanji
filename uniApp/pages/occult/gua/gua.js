@@ -2,8 +2,8 @@
  * 卦典详情页
  * 复刻网页版 _mhOpenGuaDetail：先取缓存 Markdown，未命中再触发抓取
  * ============================================================ */
-var api = require('../../utils/api.js');
-var md = require('../../utils/markdown.js');
+var api = require('../../../utils/api.js');
+var md = require('../../../utils/markdown.js');
 
 Page({
   data: {

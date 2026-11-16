@@ -7,7 +7,7 @@
  * 说明：web-view 需要在小程序后台把 estock.space 配为「业务域名」，
  *      未配置时页面打不开（账号级配置，代码无法绕过）。
  * ============================================================ */
-var stock = require('../../utils/stock.js');
+var stock = require('../../../utils/stock.js');
 
 var KLINE_BASE = 'https://estock.space/mystock/kline.html';
 

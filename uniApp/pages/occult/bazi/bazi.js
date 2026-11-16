@@ -2,10 +2,10 @@
  * 四柱八字页（对应 xiaoxuan.html 的八字弹窗）
  * 算法全部复用工程根 yishu.js：getBazi / calcDayun / dayMasterProfile / dayunTendency
  * ============================================================ */
-var Y = require('../../utils/yishu.js');
-var paipan = require('../../utils/paipan.js');
+var Y = require('../../../utils/yishu.js');
+var paipan = require('../../../utils/paipan.js');
 /* DF-85：档案栏公共逻辑（与奇门页共用一套，见 utils/archives.js） */
-var ARCH = require('../../utils/archives.js');
+var ARCH = require('../../../utils/archives.js');
 
 function p2(n) { return n < 10 ? '0' + n : '' + n; }
 
@@ -349,7 +349,7 @@ Page({
     if (target >= 0) {
       wx.navigateBack({ delta: pages.length - 1 - target });
     } else {
-      wx.reLaunch({ url: '/uniApp/pages/chat/chat' });
+      wx.reLaunch({ url: '/uniApp/pages/core/chat/chat' });
     }
   }
 });

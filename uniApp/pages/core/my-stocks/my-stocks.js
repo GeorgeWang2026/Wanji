@@ -11,7 +11,7 @@
  *     · 板块/指数候选 GET /bkgn/sectors、GET /bkgn/indexes，选股后反查 GET /bkgn/industry?code=
  * 复用 DF-68 已定的取数/字段/绑定/详情带参，不新增第二套 stock 写入逻辑。
  * ============================================================ */
-var api = require('../../utils/api.js');
+var api = require('../../../utils/api.js');
 
 Page({
   data: {
@@ -132,7 +132,7 @@ Page({
     if (!code) return;
     // 天时/地利代码一起带过去，详情页拼提示词时与网站 selectStock 同口径
     wx.navigateTo({
-      url: '/uniApp/pages/stock/stock?code=' + encodeURIComponent(code)
+      url: '/uniApp/pages/core/stock/stock?code=' + encodeURIComponent(code)
         + '&name=' + encodeURIComponent(name)
         + '&zs_code=' + encodeURIComponent(ds.zsCode || '')
         + '&zs_name=' + encodeURIComponent(ds.zsName || '')

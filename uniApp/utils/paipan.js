@@ -62,8 +62,8 @@ function buildBazi(yy, mm, dd, hh, mi, gender, name) {
   };
   var meta = {
     type: 'bazi',
-    label: '四柱八字',
-    summary: [pb.year, pb.month, pb.day, pb.hour].join(' ') + ' · ' + (gender || '男') + '命',
+    label: '干支历法',
+    summary: [pb.year, pb.month, pb.day, pb.hour].join(' ') + ' · ' + (gender || '男'),
     y: yy, m: mm, d: dd, h: hh, mi: mi || 0,
     gender: gender || '男',
     name: name || ''

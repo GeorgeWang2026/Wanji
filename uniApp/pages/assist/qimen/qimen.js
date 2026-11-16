@@ -2,13 +2,13 @@
  * 奇门遁甲页（对应 xiaoxuan.html 的奇门弹窗）
  * 算法全部复用工程根 yishu.js：getBazi + qimenPaiPan
  * ============================================================ */
-var Y = require('../../utils/yishu.js');
-var paipan = require('../../utils/paipan.js');
-var api = require('../../utils/api.js');
+var Y = require('../../../utils/yishu.js');
+var paipan = require('../../../utils/paipan.js');
+var api = require('../../../utils/api.js');
 /* DF-82：时间栏参数（年/月/日/时/分）与梅花同源，统一走 timebar */
-var TB = require('../../utils/timebar.js');
+var TB = require('../../../utils/timebar.js');
 /* DF-85：档案栏公共逻辑（与八字页共用一套，见 utils/archives.js） */
-var ARCH = require('../../utils/archives.js');
+var ARCH = require('../../../utils/archives.js');
 
 var GONG_CELL = [4, 9, 2, 3, 5, 7, 8, 1, 6];
 var CLS = { 4: 'c-mu', 9: 'c-huo', 2: 'c-tu', 3: 'c-mu', 5: 'center', 7: 'c-jin', 8: 'c-tu', 1: 'c-shui', 6: 'c-jin' };
@@ -325,7 +325,7 @@ Page({
     if (target >= 0) {
       wx.navigateBack({ delta: pages.length - 1 - target });
     } else {
-      wx.reLaunch({ url: '/uniApp/pages/chat/chat' });
+      wx.reLaunch({ url: '/uniApp/pages/core/chat/chat' });
     }
   }
 });

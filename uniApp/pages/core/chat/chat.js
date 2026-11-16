@@ -11,31 +11,40 @@
  *   - localStorage → wx.setStorageSync
  *   - 语音识别后不自动发送（涉及扣积分，交回用户确认）
  * ============================================================ */
-var api = require('../../utils/api.js');
-var env = require('../../utils/env.js');
-var md = require('../../utils/markdown.js');
-var tts = require('../../utils/tts.js');
-var asr = require('../../utils/asr.js');
-var paipanUtil = require('../../utils/paipan.js');
-var avatarMouth = require('../../utils/avatar-mouth.js');
-var freeTalk = require('../../utils/free-talk.js');   // DF-97：头像连续对话通道（WebSocket 流式播报）
-var QUOTES = require('../../data/quotes.js');   // DF-64：等待期/空闲期金句池（自动生成）
+var api = require('../../../utils/api.js');
+var env = require('../../../utils/env.js');
+var md = require('../../../utils/markdown.js');
+var tts = require('../../../utils/tts.js');
+var asr = require('../../../utils/asr.js');
+var paipanUtil = require('../../../utils/paipan.js');
+var avatarMouth = require('../../../utils/avatar-mouth.js');
+var freeTalk = require('../../../utils/free-talk.js');   // DF-97：头像连续对话通道（WebSocket 流式播报）
+var QUOTES = require('../../../data/quotes.js');   // DF-64：等待期/空闲期金句池（自动生成）
 // DF-67：证券条件池（仅当当前线程关联了证券信息卡片时并入轮播）；缺失/为空/解析失败自动降级为主力池
 var QUOTES_STOCK = [];
-try { QUOTES_STOCK = require('../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
+try { QUOTES_STOCK = require('../../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
 if (!Array.isArray(QUOTES_STOCK)) QUOTES_STOCK = [];
-var quickQA = require('../../utils/quick-qa.js');   // DF-81：首页快捷问题池（关联证券后自动带证券名）
+var quickQA = require('../../../utils/quick-qa.js');   // DF-81：首页快捷问题池（关联证券后自动带证券名）
+
+// 页面路径映射（目录分层后：core 证券+对话 / assist 奇门梅花 / occult 八字卦典隐藏）
+var SKILL_PAGE = {
+  qimen: '/uniApp/pages/assist/qimen/qimen',
+  meihua: '/uniApp/pages/assist/meihua/meihua',
+  bazi: '/uniApp/pages/occult/bazi/bazi',
+  gua: '/uniApp/pages/occult/gua/gua'
+};
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
 var SYSTEM_PROMPT = '你是万机决策助手，九天玄女化身的智能助手。你同时擅长：健康咨询、学业辅导、工作助理、情感顾问、战略决策。'
   + '回复温柔聪慧，中文，简洁友好。'
-  + '若用户是在分析页面，你可以调用奇门遁甲/八字/梅花易数排盘来辅助判断。';
+  + '若用户是在分析页面，你可以调用奇门遁甲/梅花易数等传统分析工具来辅助判断。'
+  + '所有输出仅作传统文化交流与趣味参考，不构成任何决策或投资建议。';
 
 // FB-48：积分确认框点「取消」后走免费引导对话（不扣积分、按免费流口径落库（DF-72））
-var GUIDANCE_PROMPT = '本轮为免费引导，未扣除积分、未做深度命理推演。'
+var GUIDANCE_PROMPT = '本轮为免费引导，未扣除积分、未做深度分析。'
   + '请用温柔简洁的中文说明这一点，并针对用户的问题指出哪些信息还不够具体，'
   + '给出 2-3 条可执行建议；若用户缺少出生信息，提示其前往「个人中心 → 我的档案」补充生日；'
-  + '若问题与证券相关，提示其先去证券页添加关注标的；不要承诺任何命理结论。';
+  + '若问题与证券相关，提示其先去证券页添加关注标的；不要承诺任何确定性结论，并说明内容仅供传统文化交流与趣味参考。';
 
 var MSG_SEQ = 0;
 
@@ -44,7 +53,7 @@ var SHORT_TEXT_MIN = 1;
 var SHORT_TEXT_MAX = 3;
 
 // DF-63：等待期思考提示语三组词库（照抄 xiaoxuan.html _THINK_VERBS/_THINK_OBJS/_THINK_TAILS，各 6 条，组合 216）
-var THINK_VERBS = ['正在推演', '正在思考', '正在分析', '正在琢磨', '正在揣摩', '正在洞察'];
+var THINK_VERBS = ['正在分析', '正在思考', '正在整理', '正在琢磨', '正在核对', '正在洞察'];
 var THINK_OBJS = ['你的问题', '其中的趋势', '这件事的走向', '潜在的变量', '背后的格局', '关键的节点'];
 var THINK_TAILS = ['，请稍候', '，请稍待片刻', '，很快就好', '，稍等一下', '，正在为你准备', '，请耐心等待'];
 var HINT_GAP_MS = 300;                       // 提示语句间间隔（对齐网站 2431-2448）
@@ -78,11 +87,11 @@ var ARCH_DEFAULT_RELATION_IDX = RELATION_KEYS.indexOf('other');
 // DF-81：首页快捷问题改为动态池（utils/quick-qa.js），不再写死三条
 
 // 技能 key → 展示名（/credits/questions 的 usages[].tool 即这几个 key）
-var TOOL_LABELS = { qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券' };
+var TOOL_LABELS = { qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券' };
 // 技能卡片图标/配色（照抄参考页 _paipanCardHtml 的 toolMeta）
 var TOOL_CHIPS = {
   qimen: { icon: '☯', cls: 'qm' },
-  bazi: { icon: '命', cls: 'bazi' },
+  bazi: { icon: '历', cls: 'bazi' },
   meihua: { icon: '☰', cls: 'meihua' },
   stock: { icon: '📈', cls: 'stock' }
 };
@@ -2271,7 +2280,7 @@ Page({
       sign: isConsume ? '-' : '+',
       amountCls: isConsume ? 'amt-consume' : 'amt-increase',
       reasonText: it.reason_text || (isConsume ? '积分消耗' : '积分增加'),
-      question: isConsume ? (q || '排盘推演') : '',
+      question: isConsume ? (q || '综合分析') : '',
       tool: it.tool || '',
       timeText: fmtFullTime(it.created_at),
       clickable: isConsume && !!it.root_question_id,
@@ -2985,10 +2994,10 @@ Page({
       var qs = [];
       if (s.code) qs.push('code=' + encodeURIComponent(s.code));
       if (s.name) qs.push('name=' + encodeURIComponent(s.name));
-      wx.navigateTo({ url: '/uniApp/pages/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      wx.navigateTo({ url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
       return;
     }
-    wx.navigateTo({ url: '/uniApp/pages/' + type + '/' + type });
+    wx.navigateTo({ url: SKILL_PAGE[type] });
   },
 
   onChipClose: function (e) {
@@ -3010,10 +3019,10 @@ Page({
     // DF-69：证券按钮改为进入「我的证券」全屏列表页（未登录先弹登录，登录后进入）
     if (type === 'stock') {
       if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }
-      wx.navigateTo({ url: '/uniApp/pages/my-stocks/my-stocks' });
+      wx.navigateTo({ url: '/uniApp/pages/core/my-stocks/my-stocks' });
       return;
     }
-    wx.navigateTo({ url: '/uniApp/pages/' + type + '/' + type });
+    wx.navigateTo({ url: SKILL_PAGE[type] });
   },
 
   /**
@@ -3124,7 +3133,7 @@ Page({
 
       if (consume && consume.code === 402) {
         this.setData({ typing: false, sending: false });
-        this.pushMsg('assistant', '积分不足（当前剩余 ' + (consume.balance || 0) + '），请先在网页版充值后再来推演。');
+        this.pushMsg('assistant', '积分不足（当前剩余 ' + (consume.balance || 0) + '），请先在网页版充值后再来分析。');
         this.updateScroll();
         return;
       }
@@ -3147,8 +3156,8 @@ Page({
 
       if (cdata.cost > 0) {
         this.pushMsg('assistant', '已消耗 ' + cdata.cost + ' 积分（剩余 ' + cdata.balance + '），正在为你用「'
-          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券投资' })[t] || t; }).join('、')
-          + '」推演「' + text + '」…', { plainOnly: true });
+          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券投资' })[t] || t; }).join('、')
+          + '」分析「' + text + '」…', { plainOnly: true });
       }
       this.updateScroll();
 
@@ -3283,7 +3292,7 @@ Page({
   confirmCost: function (text, bundle) {
     var self = this;
     var typeNames = bundle.types.map(function (t) {
-      return ({ qimen: '奇门遁甲', bazi: '四柱八字', meihua: '梅花易数', stock: '证券投资' })[t] || t;
+      return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券投资' })[t] || t;
     }).join('、');
     return new Promise(function (resolve) {
       self._costResolve = resolve;
@@ -3317,7 +3326,7 @@ Page({
     if (this.data.sending || this.data.typing) return;
     var text = (this.freeQuestion || '').trim() || (this.data.lastQuestion || '').trim();
     if (!text) {
-      wx.showToast({ title: '先说说你想推算的事', icon: 'none' });
+      wx.showToast({ title: '先说说你想咨询的事', icon: 'none' });
       return;
     }
     if (!this.data.loggedIn) {
@@ -3616,7 +3625,7 @@ Page({
       return;
     }
     if (action === 'stock') {
-      wx.navigateTo({ url: '/uniApp/pages/my-stocks/my-stocks' });
+      wx.navigateTo({ url: '/uniApp/pages/core/my-stocks/my-stocks' });
       return;
     }
     // DF-97：登录前点头像的意图 = 登录后直接进连续对话
@@ -3723,6 +3732,6 @@ Page({
   },
 
   onShareAppMessage: function () {
-    return { title: '万机决策助手', path: '/uniApp/pages/chat/chat' };
+    return { title: '万机决策助手', path: '/uniApp/pages/core/chat/chat' };
   }
 });

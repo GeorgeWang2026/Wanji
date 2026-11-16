@@ -103,7 +103,7 @@ function goCreate() {
   if (getCurrentPages().length > 1) {
     wx.navigateBack();
   } else {
-    wx.reLaunch({ url: '/uniApp/pages/chat/chat?openNewArchive=1' });
+    wx.reLaunch({ url: '/uniApp/pages/core/chat/chat?openNewArchive=1' });
   }
 }
 
