@@ -13,7 +13,10 @@ var KLINE_BASE = 'https://estock.space/mystock/kline.html';
 
 Page({
   data: {
-    src: ''
+    src: '',
+    name: '',
+    code: '',
+    loadError: false      // DF-99：web-view 加载失败（业务域名未配置等）→ 降级为复制链接
   },
 
   onLoad: function (options) {
@@ -27,7 +30,21 @@ Page({
       + '?symbol=' + encodeURIComponent('a:' + full)
       + '&interval=1D&simple=1';
 
-    this.setData({ src: src });
+    this.setData({ src: src, name: name, code: full });
     wx.setNavigationBarTitle({ title: '📈 ' + (name || full) + ' 日K' });
+  },
+
+  // web-view 打不开（最常见：estock.space 未配为「业务域名」）→ 显示降级提示
+  onWebError: function () {
+    this.setData({ loadError: true });
+  },
+
+  copyLink: function () {
+    wx.setClipboardData({
+      data: this.data.src,
+      success: function () {
+        wx.showToast({ title: '链接已复制，请用浏览器打开', icon: 'none' });
+      }
+    });
   }
 });

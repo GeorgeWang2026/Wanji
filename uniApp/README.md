@@ -153,6 +153,8 @@ const _keys = Object.keys(typeof window !== "undefined" && window ? window : glo
 
 **以上三个列表都要加 `https://estock.space`**（`request` / `uploadFile` / `downloadFile` 是相互独立的列表，只配一个不够）。
 
+另外，证券「日K线图」页用 `web-view` 加载 `https://estock.space/mystock/kline.html`，需要在 **微信公众平台 → 开发 → 开发管理 → 业务域名** 里单独再加 `https://estock.space`（业务域名与上面三个「服务器域名」是两套独立配置，只配服务器域名不够）。未配置时页面会提示「不支持打开链接地址」，小程序端已做降级处理（显示「复制链接，用浏览器打开」）。
+
 要求：**HTTPS + 已备案 + 不带宽口**（只能 443）。域名有变动时改两处：
 
 1. `uniApp/utils/env.js` 里的 `CONFIG.prod.API_ORIGIN`；

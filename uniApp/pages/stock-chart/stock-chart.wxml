@@ -1,2 +1,8 @@
-<!-- web-view 自动铺满整页，只承载站点 kline.html（TV 组件与画线能力原样使用） -->
-<web-view src="{{src}}"></web-view>
+<!-- web-view 自动铺满整页，只承载站点 kline.html（TV 组件与画线能力原样使用）。
+     加载失败（estock.space 未配为「业务域名」）时降级为复制链接提示 -->
+<web-view src="{{src}}" wx:if="{{!loadError}}" binderror="onWebError"></web-view>
+<view class="chart-fallback" wx:if="{{loadError}}">
+  <text class="cf-title">日K线图暂无法在小程序内打开</text>
+  <text class="cf-desc">需在微信公众平台把 estock.space 配置为「业务域名」后，才能在此查看。</text>
+  <view class="cf-btn" hover-class="cf-btn-press" catchtap="copyLink">复制链接，用浏览器打开</view>
+</view>
