@@ -292,11 +292,15 @@ Page({
 
   onBind: function () {
     if (!this.result || this.data.bound) return;
+    var self = this;
     var app = getApp();
     app.globalData.paipan = app.globalData.paipan || {};
     app.globalData.paipan.qimen = { payload: this.result.payload, meta: this.result.meta };
     this.setData({ bound: true });
     wx.showToast({ title: '已关联到提问', icon: 'none' });
+    // DF-72：回主界面后自动展开咨询面板 + 问题列表，便于看到刚关联的排盘卡片
+    app.globalData._openPanelOnChat = true;
+    setTimeout(function () { self._backToChat(); }, 400);
   },
 
   onUnbind: function () {
@@ -305,5 +309,23 @@ Page({
     if (app.globalData.paipan) { delete app.globalData.paipan.qimen; }
     this.setData({ bound: false });
     wx.showToast({ title: '已取消关联', icon: 'none' });
+  },
+
+  /** DF-72：关联到提问后直接回主界面：在页面栈里找 chat 首页，一路 navigateBack 过去 */
+  _backToChat: function () {
+    var pages = getCurrentPages() || [];
+    var target = -1;
+    for (var i = pages.length - 1; i >= 0; i--) {
+      var r = (pages[i] && pages[i].route) || '';
+      if (r.indexOf('pages/chat/chat') >= 0) {
+        target = i;
+        break;
+      }
+    }
+    if (target >= 0) {
+      wx.navigateBack({ delta: pages.length - 1 - target });
+    } else {
+      wx.reLaunch({ url: '/uniApp/pages/chat/chat' });
+    }
   }
 });

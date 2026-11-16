@@ -101,12 +101,13 @@
     </scroll-view>
 
     <view class="tip">命运曲线（逐年起伏）依赖 canvas 绘制，暂未迁移；大运趋势已按引擎评分给出。</view>
-
-    <view class="actions">
-      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
-      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
-    </view>
   </block>
+
+  <!-- 固定浮底工具条：内容滚动时始终贴底不动；底部安全区已在 .bottom-bar 内计入 -->
+  <view class="bottom-bar" wx:if="{{built}}">
+    <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+    <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
+  </view>
 
   <!-- 提示词预览 -->
   <view class="qm-mask" wx:if="{{showHint}}" catchtap="closeHint">

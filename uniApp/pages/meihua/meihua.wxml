@@ -129,15 +129,16 @@
         <text class="qinfo-val">{{summary.bian}}</text>
       </view>
     </view>
-
-    <view class="actions">
-      <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
-      <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
-    </view>
   </block>
 
   <view class="empty" wx:else>
     <text>选择起卦方式后点「起卦」。</text>
+  </view>
+
+  <!-- 固定浮底工具条：内容滚动时始终贴底不动；底部安全区已在 .bottom-bar 内计入 -->
+  <view class="bottom-bar" wx:if="{{built}}">
+    <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+    <view class="qm-btn qm-btn-primary" bindtap="onBind">关联到提问</view>
   </view>
 
   <!-- 提示词预览 -->

@@ -212,3 +212,22 @@ view, text, scroll-view, button, input, textarea {
 }
 .arch-bar .arch-empty { display: flex; justify-content: center; flex: 1; }
 .arch-bar .arch-empty .qm-btn { width: 240rpx; }
+
+/* ---------- 详情页固定浮底工具条（八字 / 奇门 / 梅花 / 证券详情共用一套） ---------- */
+/* 贴底不随内容滚动；底部安全区由 env(safe-area-inset-bottom) 兜底。
+   对应页面需在 .page 上预留 padding-bottom，避免滚到底时末行被遮住。 */
+.bottom-bar {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  z-index: 60;
+  display: flex;
+  align-items: center;
+  padding: 16rpx 24rpx calc(16rpx + env(safe-area-inset-bottom));
+  background: rgba(24, 13, 44, .96);
+  border-top: 1rpx solid rgba(180, 140, 220, .18);
+  box-shadow: 0 -10rpx 30rpx rgba(0, 0, 0, .38);
+}
+.bottom-bar .qm-btn { flex: 1; margin-right: 16rpx; }
+.bottom-bar .qm-btn:last-child { margin-right: 0; }

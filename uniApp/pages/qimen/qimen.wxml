@@ -58,20 +58,13 @@
         <text class="qinfo-val">{{info.bazi}}</text>
         <text class="badge">{{info.jieqi}}</text>
       </view>
-      <view class="qinfo-row">
+      <view class="qinfo-row qinfo-row-merge">
         <text class="qinfo-label">定局</text>
         <text class="qinfo-val">{{info.yuan}} · {{info.dun}}</text>
         <text class="badge badge-ju">{{info.ju}} 局</text>
-        <view class="qinfo-btns">
-          <view class="qinfo-btn" wx:if="{{!bound}}" bindtap="onBind">关联</view>
-          <view class="qinfo-btn qinfo-btn-cancel" wx:if="{{bound}}" bindtap="onUnbind">取消</view>
-          <view class="qinfo-btn" bindtap="previewPrompt">提示词</view>
-        </view>
-      </view>
-      <view class="qinfo-row">
-        <text class="qinfo-label">值符</text>
+        <text class="qinfo-label qinfo-label-sub">值符</text>
         <text class="qinfo-val">{{info.zf}}</text>
-        <text class="qinfo-label">值使</text>
+        <text class="qinfo-label qinfo-label-sub">值使</text>
         <text class="qinfo-val">{{info.zs}}</text>
       </view>
     </view>
@@ -113,6 +106,13 @@
 
   <view class="empty" wx:else>
     <text>调整年 / 月 / 日 / 时后（时精确到分钟）将自动排出奇门九宫盘。</text>
+  </view>
+
+  <!-- 固定浮底工具条：内容滚动时始终贴底不动；打开宫位详情/提示词全屏页时隐藏 -->
+  <view class="bottom-bar" wx:if="{{built && !detail && !showHint}}">
+    <view class="qm-btn qm-btn-ghost" bindtap="previewPrompt">预览提示词</view>
+    <view class="qm-btn qm-btn-primary" wx:if="{{!bound}}" bindtap="onBind">关联到提问</view>
+    <view class="qm-btn qm-btn-primary" wx:else bindtap="onUnbind">取消关联</view>
   </view>
 
   <!-- 宫位详情：全屏页面形态（左返回 + 居中标题，无 ✕） -->

@@ -1,4 +1,4 @@
-.page { padding: 20rpx 24rpx 40rpx; }
+.page { padding: 20rpx 24rpx calc(180rpx + env(safe-area-inset-bottom)); }
 
 /* 起卦方式 */
 .tabs {
@@ -177,10 +177,6 @@
   background: rgba(232, 184, 74, .12);
   border: 1rpx solid rgba(232, 184, 74, .3);
 }
-
-.actions { display: flex; }
-.actions .qm-btn { flex: 1; margin-right: 16rpx; }
-.actions .qm-btn:last-child { margin-right: 0; }
 
 .empty { padding: 100rpx 20rpx; text-align: center; font-size: 26rpx; color: #8f7cb0; }
 

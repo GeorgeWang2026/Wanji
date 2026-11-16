@@ -1,4 +1,4 @@
-.page { padding: 20rpx 24rpx 40rpx; }
+.page { padding: 20rpx 24rpx calc(180rpx + env(safe-area-inset-bottom)); }
 
 .cond {
   padding: 20rpx;
@@ -117,11 +117,6 @@
 .t-flat { color: #b9a8d6; }
 
 .tip { font-size: 22rpx; color: #8f7cb0; margin: 16rpx 0; line-height: 1.6; }
-
-.actions { display: flex; }
-
-.actions .qm-btn { flex: 1; margin-right: 16rpx; }
-.actions .qm-btn:last-child { margin-right: 0; }
 
 .empty { padding: 100rpx 20rpx; text-align: center; font-size: 26rpx; color: #8f7cb0; }
 

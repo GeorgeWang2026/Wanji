@@ -185,6 +185,7 @@ Page({
   noop: function () {},
 
   onBind: function () {
+    var self = this;
     var code = String(this.data.code || '').trim().toUpperCase();
     if (!code) return;
     // 与网站 selectStock 一致：绑定数据里同时带个股/大盘/板块三个 detail
@@ -196,9 +197,31 @@ Page({
         meta: { type: 'stock' }
       };
       wx.showToast({ title: '已关联到提问', icon: 'none' });
-      setTimeout(function () { wx.navigateBack(); }, 400);
+      // DF-72：回主界面后自动展开咨询面板 + 问题列表，便于看到刚关联的证券信息卡片
+      app.globalData._openPanelOnChat = true;
+      // 关联成功后直接回到主界面（对话首页），跳过中间的证券列表
+      setTimeout(function () { self._backToChat(); }, 400);
     }).catch(function () {
       wx.showToast({ title: '关联失败', icon: 'none' });
     });
+  },
+
+  /** 选中证券关联到提问后直接回主界面：在页面栈里找 chat 首页，一路 navigateBack 过去 */
+  _backToChat: function () {
+    var pages = getCurrentPages() || [];
+    var target = -1;
+    for (var i = pages.length - 1; i >= 0; i--) {
+      var r = (pages[i] && pages[i].route) || '';
+      if (r.indexOf('pages/chat/chat') >= 0) {
+        target = i;
+        break;
+      }
+    }
+    if (target >= 0) {
+      wx.navigateBack({ delta: pages.length - 1 - target });
+    } else {
+      // 兜底：栈里没有 chat 页（如分享/重进直达证券详情）则重启到首页
+      wx.reLaunch({ url: '/uniApp/pages/chat/chat' });
+    }
   }
 });
