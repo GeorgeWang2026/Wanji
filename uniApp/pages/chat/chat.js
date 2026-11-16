@@ -379,8 +379,11 @@ Page({
       self.setData({ speaking: speaking });
       if (speaking) {
         self._startMouth();
-        // DF-72：播报时问题列表自动折叠（自由对话区与问题列表互斥）
-        self.setData({ pinnedOpen: false, ttsMin: false });
+        // DF-72：正式解读播报时问题列表自动折叠（自由对话区与问题列表互斥）；
+        //        收尾引导语播报时 _formalTts 已置 false，不再折叠，保持解读结束后的展开态
+        if (self._formalTts) {
+          self.setData({ pinnedOpen: false, ttsMin: false });
+        }
       } else {
         self._stopMouth();
       }
@@ -711,6 +714,16 @@ Page({
       onError: function (e) {
         wx.showToast({ title: (e && e.message) || '语音对话连接失败', icon: 'none' });
         self.exitFreeTalk();
+      },
+      // DF-104：WS session.ready 下发权威 session_id，回写页面会话，供正式提问扣费关联。
+      // 与网站 xiaoxuan.html onReady 一致：确保「进入主页后没等 ensure 返回就提问」也能带上 session。
+      onReady: function (data) {
+        var sid = data && data.session_id;
+        if (!sid) return;
+        self.agentSessionId = sid;
+        self.setData({ agentSessionId: sid });
+        // 同步 freeTalk 层字段（与 _restartSession 口径一致），供重连/扣费关联
+        if (self._ft) self._ft.sessionId = sid;
       }
     });
     this._ft.start();
@@ -1345,13 +1358,15 @@ Page({
     }
   },
 
-  /** DF-72：正式解读播报结束/打断后的收尾——刷新问题列表、清空字幕、播报引导语 */
+  /** DF-72：正式解读播报结束/打断后的收尾——刷新问题列表、收起自由对话区、展开问题列表、播报引导语 */
   _afterFormalTts: function () {
     this._formalTts = false;
     // 自动刷新问题列表（对齐 startFlow 原来播报后立即执行的 _refreshPanel）
     this._refreshPanel(this.rootQuestionId);
+    // 解读结束 → 自由对话区自动收起（tts 卡片最小态）、问题列表自动展开（两者互斥）
+    this.setData({ pinnedOpen: true, ttsMin: true });
     // 清空正式解读字幕，只留提示文字并播报，然后继续等待语音输入
-    var hint = '您还有什么问题可以继续问';
+    var hint = '请点我头像继续对话';
     this._ttsText = hint;
     this.setData({ ttsText: hint });
     tts.speak(hint);
@@ -3078,6 +3093,11 @@ Page({
         paipan_types: bundle.types,
         target_id: this.rootQuestionId || null
       };
+      // DF-104：带上智能体会话 id，后端 question_records.session_id 据此关联到会话
+      // （与网站 assistant-widget.js 一致）。为空时不传，行为与现状一致。
+      if (this.agentSessionId) {
+        consumeData.session_id = String(this.agentSessionId);
+      }
       // DF-72：免费引导流确认付费 → 携带 reuse_question_id 复用同一条 free 记录回填，
       //        不新建行、不重复扣分（后端 DF-70 原子 free→paid）。freeQuestionId 未落地时为 null，
       //        走既有新建根记录路径，行为零变化。

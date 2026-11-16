@@ -187,6 +187,8 @@ function FreeTalk(opts) {
   this.onError = opts.onError || noop;
   // DF-104：client.event 服务端回执（草稿编辑 / 深度解读提交确认等）
   this.onClientEventAck = opts.onClientEventAck || noop;
+  // DF-104：WS session.ready 下发的权威 session_id 回调，供页面回写扣费关联
+  this.onReady = opts.onReady || noop;
   // DF-104：续用页面进入时建立的会话（/agent/sessions/ensure 的 session_id）
   this.sessionId = opts.sessionId || '';
   // DF-97：AI 文字逐句上屏（与播报同一份分段、同一时刻），页面只需把它写进字幕区
@@ -404,6 +406,8 @@ FreeTalk.prototype.start = function () {
       if (state === 'ready') {
         self._mark('session.ready');
         console.log('[ft] 通道就绪');
+        // DF-104：session.ready 下发的 session_id 是权威值，透传回页面（channel 内部已同步）
+        try { self.onReady(detail); } catch (e) { /* 忽略 */ }
         // 硬约束：ready 分支禁止清本轮计数（_replyDelta / _sawDelta / _segSeq 都不能动）。
         // assistant.end 在通道里是先 emit('ready') 再回调 onEnd 的，
         // 在 ready 里清计数会让 onEnd 误判「本轮没有 delta」，把整段回复再补播一遍
