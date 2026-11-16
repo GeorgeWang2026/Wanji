@@ -32,6 +32,7 @@ App({
     // 还原本地登录态
     this.user = api.readUser();
     console.log('[app] launched, api =', env.getApiOrigin(), ', logged in =', !!this.user);
+    console.log('[build]', env.BUILD_TAG);
   },
 
   /** 登录态变化时刷新内存态（登录页 / 退出登录后调用） */
