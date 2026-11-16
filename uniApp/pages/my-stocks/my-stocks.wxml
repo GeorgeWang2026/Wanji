@@ -2,7 +2,7 @@
      我的证券（DF-69，原生全屏页，替代 DF-68 的弹层列表）
      - 列表：名称 / 代码·大盘·板块 / 涨跌幅（红正绿负）/ 级别
      - 点行＝进入证券详情页；长按行＝确认删除
-     - 底部悬浮「新增」：名称+代码，代码必填，联想候选回填
+     - 底部悬浮「新增」：名称+代码+所属板块+相关指数，代码必填，联想候选回填
      - 复用 .fs-page/.fs-header（app.wxss）与 qd-*（复制自 chat.wxss）
      ============================================================ -->
 <view class="fs-page" style="padding-top:{{statusBarH}}px;">
@@ -75,6 +75,30 @@
         <view class="ms-sug" wx:if="{{sugs.length}}">
           <view class="ms-sug-item" wx:for="{{sugs}}" wx:key="code"
                 hover-class="ms-sug-press" data-index="{{index}}" bindtap="pickSug">
+            <text class="ms-sug-name">{{item.name}}</text>
+            <text class="ms-sug-code">{{item.code}}</text>
+          </view>
+        </view>
+        <view class="ms-field">
+          <text class="ms-label">所属板块</text>
+          <input class="ms-input" value="{{addBk}}" placeholder="如：白酒（可选）" placeholder-class="ms-ph"
+                 bindinput="onAddBk" />
+        </view>
+        <view class="ms-sug" wx:if="{{bkSugs.length}}">
+          <view class="ms-sug-item" wx:for="{{bkSugs}}" wx:key="code"
+                hover-class="ms-sug-press" data-index="{{index}}" bindtap="pickBkSug">
+            <text class="ms-sug-name">{{item.name}}</text>
+            <text class="ms-sug-code">{{item.code}}</text>
+          </view>
+        </view>
+        <view class="ms-field">
+          <text class="ms-label">相关指数</text>
+          <input class="ms-input" value="{{addZs}}" placeholder="如：上证指数（可选）" placeholder-class="ms-ph"
+                 bindinput="onAddZs" />
+        </view>
+        <view class="ms-sug" wx:if="{{zsSugs.length}}">
+          <view class="ms-sug-item" wx:for="{{zsSugs}}" wx:key="code"
+                hover-class="ms-sug-press" data-index="{{index}}" bindtap="pickZsSug">
             <text class="ms-sug-name">{{item.name}}</text>
             <text class="ms-sug-code">{{item.code}}</text>
           </view>
