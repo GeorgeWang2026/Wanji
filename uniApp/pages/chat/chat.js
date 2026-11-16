@@ -142,6 +142,30 @@ function fmtTime(v) {
   return p(d.getMonth() + 1) + '/' + p(d.getDate()) + ' ' + p(d.getHours()) + ':' + p(d.getMinutes());
 }
 
+/** DF-72/追加：会话聊天记录时间，可读格式（取 created_at，兼容毫秒时间戳数字 / ISO 字符串）。
+ *  当天 → 今天 HH:mm；昨天 → 昨天 HH:mm；同年更早 → M月D日 HH:mm；跨年 → YYYY年M月D日 HH:mm。 */
+function fmtSlTime(v) {
+  if (!v) return '';
+  var d;
+  if (typeof v === 'number') {
+    d = new Date(v < 1e12 ? v * 1000 : v);   // 秒级/毫秒级时间戳统一按毫秒解析
+  } else {
+    d = new Date(String(v));
+  }
+  if (isNaN(d.getTime())) return String(v);
+  function p(n) { return n < 10 ? '0' + n : '' + n; }
+  var hhmm = p(d.getHours()) + ':' + p(d.getMinutes());
+  var now = new Date();
+  function dayStart(x) { return new Date(x.getFullYear(), x.getMonth(), x.getDate()).getTime(); }
+  var diff = Math.round((dayStart(now) - dayStart(d)) / 86400000);
+  if (diff === 0) return '今天 ' + hhmm;
+  if (diff === 1) return '昨天 ' + hhmm;
+  if (d.getFullYear() === now.getFullYear()) {
+    return (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hhmm;
+  }
+  return d.getFullYear() + '年' + (d.getMonth() + 1) + '月' + d.getDate() + '日 ' + hhmm;
+}
+
 /** 参考页 _chatState.items 同时包含根与追问（追问 target_id = 根 id）；
  *  分页「还剩 N 条」按 items.length 计算，这里同样把已加载追问计入。 */
 function countShown(list) {
@@ -227,6 +251,8 @@ Page({
     /* ---- 界面状态（对齐 xiaoxuan.html 布局） ---- */
     statusBarH: 0,
     topOpen: true,
+    pinnedOpen: true,     // DF-72：问题列表（您的问题）展开/折叠状态
+    ttsMin: false,        // DF-72：AI 语音播报卡片最小态（与问题列表互斥）
     inputOpen: false,
     showHistory: false,
     /* FB-51：咨询记录未读回复数（数字角标，来自 storage 「unread_replies:<uid>」） */
@@ -281,6 +307,14 @@ Page({
     freeMode: false,       // 是否处于免费引导流（未付费、无 rootQuestionId）
     freeQuestion: '',      // 免费流最近一句问题（CTA 复用，无需重输）
     deepReadingCost: 1,    // 单次深度解读积分（= paipanUtil.DEEP_READING_COST，CTA 展示用）
+    /* ---- DF-104：智能体会话（/agent/sessions/ensure）+ 会话问题列表 + 置顶草稿 ---- */
+    agentSessionId: '',    // 当前智能体会话 id（页面进入即建立）
+    sessionLog: [],        // 当前会话消息流（/agent/session/messages，时间正序）
+    sessionLogLoading: false,
+    showSessionLog: false, // 会话问题列表弹层（复用咨询记录弹层样式）
+    deepDraft: '',         // 置顶「当前问题」草稿文本（DEEP_DRAFT 通知写入）
+    deepDraftVersion: 0,   // 草稿版本号（放弃/编辑用 CAS）
+    showDeepDraft: false,  // 草稿确认区是否显示（自由对话区顶部）
   },
 
   /* ---------------- 生命周期 ---------------- */
@@ -316,10 +350,12 @@ Page({
     this.chatMsgId = null;      // 上一条回复的 chat_messages.id（作为追问的 target_id）
     this.autoMetas = [];        // 本轮兜底自动起的盘
     this._ttsText = '';         // 最近一条被播报的文本（暂停后恢复用）
+    this._formalTts = false;    // DF-72：当前播报是否为正式解读（播完/打断后收尾）
     this.freeQuestionId = null; // DF-72：免费引导记录 id（后端落库 free 后返回，付费时 reuse）
     this.freeVersion = null;    // DF-72：该免费记录 version（409 乐观锁重试用）
     this._freeCtaIntent = false;// DF-72：本次 startFlow 由免费流 CTA 触发（取消时不重进免费流）
     this._deepDraftIntent = false;// DF-72：本次 startFlow 由 DEEP_DRAFT 通知直连触发（取消时停在当前对话）
+    this.agentSessionId = null;   // DF-104：当前智能体会话 id（instance，区别于 data 展示）
     // DF-63/DF-64：等待期提示语轮播状态（单一实例，全页唯一）
     this._hintActive = false;
     this._hintEpoch = 0;
@@ -341,10 +377,20 @@ Page({
     tts.setStateCallback(function (state) {
       var speaking = state === 'playing';
       self.setData({ speaking: speaking });
-      if (speaking) { self._startMouth(); } else { self._stopMouth(); }
+      if (speaking) {
+        self._startMouth();
+        // DF-72：播报时问题列表自动折叠（自由对话区与问题列表互斥）
+        self.setData({ pinnedOpen: false, ttsMin: false });
+      } else {
+        self._stopMouth();
+      }
       // DF-63：一句等待提示语播完 → 释放挂起的 promise，推进下一句
       if (state === 'end' && self._hintResolve) {
         var r = self._hintResolve; self._hintResolve = null; r();
+      }
+      // DF-72：正式解读播报结束 → 刷新问题列表 + 清空字幕 + 播报收尾引导语
+      if (state === 'end' && self._formalTts) {
+        self._afterFormalTts();
       }
     });
 
@@ -352,6 +398,8 @@ Page({
       this.pushMsg('assistant', '提示：Markdown 渲染库加载失败，回复将以纯文本展示。请确认工程根 markdown.js 未被小程序打包忽略。');
     }
     this.loadBalance();
+    // DF-104：页面进入即建立/续用智能体会话，拿到 session_id 后加载当前会话问题列表
+    this.ensureAgentSession();
   },
 
   onShow: function () {
@@ -371,6 +419,11 @@ Page({
     this._pendingNewArchive = false;
     if (g) g._openNewArchive = false;
     if (wantNewArchive) this._openNewArchiveFlow();
+    // DF-72：从证券/排盘详情「关联到提问」返回时，自动展开咨询面板 + 问题列表，展示刚关联的信息卡片
+    if (g && g._openPanelOnChat) {
+      g._openPanelOnChat = false;
+      this.setData({ topOpen: true, pinnedOpen: true });
+    }
     // DF-64：回到前台若无覆盖层、在等待/空闲切换时按条件恢复空闲期文字轮播
     this._maybeStartIdleHint();
     // DF-81：回到前台恢复快捷问题 30 秒轮换（页面生命周期驱动，避免常驻）
@@ -577,6 +630,7 @@ Page({
     });
 
     this._ft = freeTalk.create({
+      sessionId: this.agentSessionId,   // DF-104：续用页面进入建立的会话
       onState: function (state) {
         if (state === 'failed' || state === 'closed' || state === 'idle') {
           self.exitFreeTalk();
@@ -592,7 +646,14 @@ Page({
           speaking: ['🔊 正在回答…', 'speaking']
         };
         var row = map[state];
-        if (row) self.setData({ ftStatus: row[0], ftPhase: row[1] });
+        if (row) {
+          self.setData({ ftStatus: row[0], ftPhase: row[1] });
+          // 自由对话「轮到你说（接收语音）」阶段，咨询面板必须展开，否则看不到自由对话区
+          if (row[1] === 'listening') self.setData({ topOpen: true });
+          // DF-72 追加：生成中（已发送等回复空档）期间，AI 播报卡显示随机金句/提示语
+          if (row[1] === 'thinking') self._startFtThinkingHint();
+          else self._stopFtThinkingHint();
+        }
       },
       onLog: function (items) {
         var list = items || [];
@@ -633,14 +694,15 @@ Page({
         if (on) self._startMouth(); else self._stopMouth();
       },
       onNotice: function (n) {
-        // DF-72：后端收口下发的深度解读草稿 → 直接拉起既有确认流程（不经过输入框、不等点发送）
+        // DF-104：后端收口下发的深度解读草稿 → 写入置顶「草稿确认区」，由用户点确认/放弃
         if (n && n.code === 'DEEP_DRAFT') {
           if (!self.data.loggedIn || self.data.sending) return;  // 未登录/正在发送：丢弃这一帧
           var draft = String(n.draft || '').trim();
-          if (!draft) return;
-          self._deepDraftIntent = true;                  // 取消扣费时停在当前对话，不转免费引导流
-          if (self.data.freeTalk) self.exitFreeTalk();   // 腾出页面，确认框与对话区可见
-          self.startFlow(draft);
+          if (n.action === 'clear' || !draft) {
+            self.setData({ showDeepDraft: false, deepDraft: '', deepDraftVersion: 0 });
+            return;
+          }
+          self.setData({ showDeepDraft: true, deepDraft: draft, deepDraftVersion: Number(n.version) || 0 });
           return;
         }
         if (!n || !n.message) return;
@@ -658,6 +720,7 @@ Page({
   exitFreeTalk: function () {
     if (this._ft) { this._ft.stop(); this._ft = null; }
     this._stopMouth();
+    this._stopFtThinkingHint();
     this.setData({ freeTalk: false, ftUserText: '', ftCountdown: '', ttsText: '', ftStatus: '', ftPhase: '', ftTurnHint: false });
     this._maybeStartIdleHint();
   },
@@ -718,6 +781,32 @@ Page({
       self._hintResolve = resolve;
       tts.speak(text);
     });
+  },
+
+  /** DF-72 追加：自由对话「生成中」空档的 AI 播报卡金句/提示语轮播（纯文字，不占用 TTS） */
+  _startFtThinkingHint: function () {
+    var self = this;
+    this._stopFtThinkingHint();
+    this._ftThinking = true;
+    this._hintSeq = 0;
+    this._quotePool = (QUOTES || []).slice();
+    this._stockHintPool = this._stockLinked ? (this._stockPool || []).slice() : [];
+    var loop = function () {
+      if (!self._ftThinking || self.data.ftPhase !== 'thinking') return;
+      var hint = self._nextHint();
+      self.setData({
+        typingText: hint.text,
+        hintQuote: hint.isQuote ? { text: hint.text, author: hint.author, translation: hint.translation } : null
+      });
+      self._ftHintTimer = setTimeout(loop, 3000);
+    };
+    loop();
+  },
+  _stopFtThinkingHint: function () {
+    if (!this._ftThinking && !this._ftHintTimer) return;
+    this._ftThinking = false;
+    if (this._ftHintTimer) { clearTimeout(this._ftHintTimer); this._ftHintTimer = null; }
+    this.setData({ hintQuote: null });
   },
 
   /* ================= DF-64：金句轮播 / 空闲期文字轮播 ================= */
@@ -852,9 +941,33 @@ Page({
   /* ---------------- 界面交互（面板 / 头像 / 记录） ---------------- */
   toggleTop: function () {
     var open = !this.data.topOpen;
+    // 自由对话接收语音阶段不能折叠（否则用户看不到自由对话区），但允许展开
+    if (!open && this.data.freeTalk && this.data.ftPhase === 'listening') return;
     this.setData({ topOpen: open });
     if (open) { this._maybeStartIdleHint(); }
     else { this._stopIdleHint(); }
+  },
+
+  /** DF-72：点击面板外任意区域折叠咨询面板（面板内部用 catchtap 拦截，不触发） */
+  collapseTop: function () {
+    // 自由对话接收语音阶段不折叠
+    if (this.data.freeTalk && this.data.ftPhase === 'listening') return;
+    if (this.data.topOpen) {
+      this.setData({ topOpen: false });
+      this._stopIdleHint();
+    }
+  },
+
+  /** DF-72：用「您的问题」这行标题展开/折叠问题列表（与 AI 语音播报卡片互斥） */
+  togglePinned: function () {
+    var open = !this.data.pinnedOpen;
+    if (open) {
+      // 展开问题列表 → AI 语音播报卡片收到最小态（超出部分截断）
+      this.setData({ pinnedOpen: true, ttsMin: true });
+    } else {
+      // 折叠问题列表时保持播报卡片现状，等待用户点击内容区再展开
+      this.setData({ pinnedOpen: false });
+    }
   },
 
   toggleInput: function () {
@@ -1121,6 +1234,127 @@ Page({
 
   retryHistory: function () {
     this.loadHistory(this.data.historyRecords.length > 0);
+  },
+
+  /* ================= DF-104：智能体会话 / 会话问题列表 / 置顶草稿 ================= */
+
+  /** 页面进入即建立/续用智能体会话，拿到 session_id 后拉当前会话问题列表 */
+  ensureAgentSession: function () {
+    var self = this;
+    api.request('/agent/sessions/ensure', { method: 'POST', data: {} })
+      .then(function (res) {
+        if (!res || res.code !== 0 || !res.data) throw new Error((res && (res.detail || res.msg)) || '会话建立失败');
+        var sid = res.data.session_id || '';
+        self.agentSessionId = sid;
+        if (sid) {
+          self.setData({ agentSessionId: sid });
+          self.loadSessionMessages(sid);
+        }
+      })
+      .catch(function (err) {
+        // 会话建立失败不阻断主流程（无 session 时问题列表为空、自由对话仍可用）
+        console.warn('[chat] sessions/ensure 失败：', (err && err.message) || err);
+      });
+  },
+
+  /** 拉取当前会话消息流（原有问题先显示，自由对话区在其下方） */
+  loadSessionMessages: function (sid) {
+    var self = this;
+    this.setData({ sessionLogLoading: true });
+    api.request('/agent/session/messages?session_id=' + encodeURIComponent(sid || this.agentSessionId || '') + '&limit=50')
+      .then(function (res) {
+        if (!res || res.code !== 0 || !res.data) throw new Error((res && (res.detail || res.msg)) || '加载失败');
+        var msgs = (res.data.messages || []).map(function (m, i) {
+          return {
+            role: m.role,                 // 'user' | 'assistant'
+            content: m.content || '',
+            timeText: fmtSlTime(m.created_at),
+            seq: m.seq,
+            _i: i                         // 稳定渲染 key（seq 可能缺省）
+          };
+        });
+        self.setData({ sessionLog: msgs, sessionLogLoading: false });
+      })
+      .catch(function (err) {
+        self.setData({ sessionLogLoading: false });
+        console.warn('[chat] session/messages 失败：', (err && err.message) || err);
+      });
+  },
+
+  /** 打开会话问题列表弹层（复用咨询记录弹层） */
+  openSessionLog: function () {
+    if (!this.data.loggedIn) {
+      this.pendingAction = 'sessionLog';
+      this.setData({ showLogin: true });
+      return;
+    }
+    this.setData({ showSessionLog: true, inputOpen: false });
+    this._stopIdleHint();
+    if (!this.data.sessionLog.length && this.agentSessionId) {
+      this.loadSessionMessages(this.agentSessionId);
+    }
+  },
+
+  closeSessionLog: function () {
+    this.setData({ showSessionLog: false });
+    this._maybeStartIdleHint();
+  },
+
+  /** 草稿确认区——放弃：清空草稿并尽力通知后端（无通道时仅本地清空，不打断） */
+  onDeepDraftAbandon: function () {
+    var ver = this.data.deepDraftVersion;
+    if (this._ft) {
+      try { this._ft.sendEvent('deep.abandon', { version: ver }); } catch (e) { /* 忽略 */ }
+    }
+    this.setData({ showDeepDraft: false, deepDraft: '', deepDraftVersion: 0 });
+  },
+
+  /** 草稿确认区——确认咨询：走既有扣费链路（startFlow），复用已收敛的付费问答 */
+  onDeepDraftSubmit: function () {
+    var draft = String(this.data.deepDraft || '').trim();
+    if (!draft) return;
+    this.setData({ showDeepDraft: false, deepDraft: '', deepDraftVersion: 0 });
+    this._deepDraftIntent = true;                  // 取消扣费时停在当前对话，不转免费引导流
+    if (this.data.freeTalk) this.exitFreeTalk();   // 腾出页面，确认框与对话区可见
+    this.startFlow(draft);
+  },
+
+  /** 录音文字区——点 ✕ 清空：撤掉倒计时并清空当前转写，不再到点发出 */
+  onRecUserClear: function () {
+    if (this._ft) {
+      try { this._ft.cancelUser(); } catch (e) { /* 忽略 */ }
+    }
+    this.setData({ ftUserText: '', ftCountdown: '' });
+  },
+
+  /** AI 回复播报区——点播报文字：正式解读打断 → 自由对话打断 → 最小态展开 */
+  onTtsTextTap: function () {
+    // DF-72：正式解读播报中点击文字 → 打断并收尾（刷新问题列表 + 播收尾引导语）
+    if (this._formalTts && this.data.speaking) {
+      this.stopSpeaking('点播报文字');
+      this._afterFormalTts();
+      return;
+    }
+    if (this.data.freeTalk && this._ft && this.data.speaking) {
+      this._ft.interrupt('点播报文字');
+      return;
+    }
+    // DF-72：ttsBody 最小态时点内容区 → 展开字幕，问题列表随之折叠（互斥）
+    if (this.data.ttsMin) {
+      this.setData({ ttsMin: false, pinnedOpen: false });
+    }
+  },
+
+  /** DF-72：正式解读播报结束/打断后的收尾——刷新问题列表、清空字幕、播报引导语 */
+  _afterFormalTts: function () {
+    this._formalTts = false;
+    // 自动刷新问题列表（对齐 startFlow 原来播报后立即执行的 _refreshPanel）
+    this._refreshPanel(this.rootQuestionId);
+    // 清空正式解读字幕，只留提示文字并播报，然后继续等待语音输入
+    var hint = '您还有什么问题可以继续问';
+    this._ttsText = hint;
+    this.setData({ ttsText: hint });
+    tts.speak(hint);
   },
 
   /** 为带 followup_count 的根记录补拉 /credits/questions/{id}，注入追问列表 */
@@ -1705,6 +1939,8 @@ Page({
       pinned: this._pinnedFromRecord(rec)
     });
     this._restoreThread(rootId);
+    // DF-104 补充：切换根问题/追问后换绑新 session，避免「聊天记录」仍显示旧会话内容
+    this._restartSession();
     wx.showToast({ title: '已衔接该记录，可直接提问', icon: 'none' });
   },
 
@@ -2362,6 +2598,37 @@ Page({
     this.setData({ avatarErr: true, mouthRect: null });
   },
 
+  /**
+   * DF-104 补充：换绑新会话（拿到新 session_id 并同步 freeTalk 通道 + 重新拉取聊天记录）。
+   * 重新开始提问、从咨询列表切换根问题/追问时都会用到，保证「聊天记录」跟随当前问题上下文。
+   * @param {object} opts { failText: string } 非空则失败时弹 toast；否则静默
+   */
+  _restartSession: function (opts) {
+    var self = this;
+    opts = opts || {};
+    self.setData({ sessionLog: [] });
+    api.request('/agent/session/restart', { method: 'POST', data: {} })
+      .then(function (res) {
+        if (!res || res.code !== 0 || !res.data || !res.data.session_id) {
+          throw new Error((res && (res.detail || res.msg)) || '会话重启失败');
+        }
+        var sid = res.data.session_id;
+        self.agentSessionId = sid;
+        // DF-104：与网站 _xbApplyRestartSession 一致——服务端把活跃连接上的 Session
+        // 原地换绑，前端同步 freeTalk 通道与 AgentChannel 的 session_id，供重连/扣费关联。
+        if (self._ft) {
+          self._ft.sessionId = sid;
+          if (self._ft._channel) self._ft._channel.sessionId = sid;
+        }
+        self.setData({ agentSessionId: sid });
+        self.loadSessionMessages(sid);
+      })
+      .catch(function (err) {
+        console.warn('[chat] session/restart 失败：', (err && err.message) || err);
+        if (opts.failText) wx.showToast({ title: opts.failText, icon: 'none' });
+      });
+  },
+
   onRestart: function () {
     var self = this;
     wx.showModal({
@@ -2406,15 +2673,21 @@ Page({
           scrollTo: '',
           showHistory: false,
           topOpen: true,
+          pinnedOpen: true,
+          ttsMin: false,
           chips: [],
           skillActive: { qimen: false, bazi: false, meihua: false, stock: false },
           freeMode: false,
-          freeQuestion: ''
+          freeQuestion: '',
+          sessionLog: []         // DF-104：清空旧会话记录，等新 session 重新拉取
         });
         tts.stop(true);
         self._ttsText = '';
+        self._formalTts = false;   // DF-72：重新开始后清空正式解读收尾状态
         // DF-63/DF-64：重新开始后清空提示语轮播，并在空闲态按条件恢复顶部轮播
         self._stopThinking();
+        // DF-104：真正调用会话重启接口换新 session，成功后换绑界面并重新拉取聊天记录
+        self._restartSession({ failText: '重新开始失败，请重试' });
         self._maybeStartIdleHint();
       }
     });
@@ -2728,63 +3001,18 @@ Page({
     wx.navigateTo({ url: '/uniApp/pages/' + type + '/' + type });
   },
 
-  /* ---------------- 语音播报控制（tts-line 音量图标） ---------------- */
-  // 单击：正在播 → 暂停这一条；已暂停/空闲 → 从头恢复上一条；已关闭 → 重新开启
-  onTtsIcon: function () {
-    // DF-103：自由对话播报中，点按播报图标 = 打断（停止播报 + 清待播队列 + 转等待输入，不自动续播）
-    if (this.data.freeTalk && this._ft && this.data.speaking) {
-      this._ft.interrupt('点按播报图标');
-      return;
-    }
-    if (this.data.speaking) {
-      this.stopSpeaking('pause');
-      wx.showToast({ title: '已暂停播报', icon: 'none' });
-      return;
-    }
-    if (!this.data.ttsOn) {
-      this.setData({ ttsOn: true });
-      if (app().globalData) app().globalData.ttsOn = true;
-      wx.showToast({ title: '已开启自动播报', icon: 'none' });
-      return;
-    }
-    var text = this._ttsText || this.lastReplyText();
-    if (!text) {
-      wx.showToast({ title: '暂无可播报的内容', icon: 'none' });
-      return;
-    }
-    tts.speak(text);
-  },
-
-  // 长按：彻底关闭自动播报（本轮及后续新回复都不再自动播）
-  onTtsOff: function () {
-    if (!this.data.ttsOn) return;
-    this.stopSpeaking('off');
-    if (app().globalData) app().globalData.ttsOn = false;
-    this.setData({ ttsOn: false });
-    wx.showToast({ title: '已关闭自动播报', icon: 'none' });
-  },
-
   /**
-   * DF-63：统一停止播报（单击暂停 / 长按关闭 / 开始录音 / 重新发送 / 离开页面 均走这里）
+   * DF-63：统一停止播报（开始录音 / 重新发送 / 离开页面 均走这里）
    * 语义（对齐网站）：停止等待期提示语轮播（置 hintActive=false、epoch+1、清 timer）、
    * 立即停 TTS、复位口型，避免残留回调继续推进提示语。
    */
   stopSpeaking: function (reason) {
     this._stopThinking();
+    this._formalTts = false;   // DF-72：主动停止（录音/重发/离页）不再触发收尾引导
     tts.stop();
     this.setData({ speaking: false, typing: false });
     this._stopMouth();
     return reason;
-  },
-
-  // 最近一条真正回复的纯文本（恢复播报用）
-  lastReplyText: function () {
-    var list = this.data.messages || [];
-    for (var i = list.length - 1; i >= 0; i--) {
-      var m = list[i];
-      if (m.role === 'assistant' && m.html && (m.plain || m.text)) return m.plain || m.text;
-    }
-    return '';
   },
 
   /* ---------------- 主流程 ---------------- */
@@ -2934,10 +3162,17 @@ Page({
         var plain = (item && item.plain) || md.plain(res.reply);
         this._ttsText = plain;
         this.setData({ ttsText: plain });
+        // DF-72：正式解读播报——非空文本才标记 formal，播报结束/打断后刷新问题列表并播收尾引导
+        this._formalTts = !!(plain && String(plain).trim());
         tts.speak(plain);
+      } else {
+        this._formalTts = false;
       }
       // 5) 回复落地：把 #sentPreview 换成置顶上下文（参考页 _xbRefreshConsultPanelAfterReply）
-      this._refreshPanel(this.rootQuestionId);
+      // DF-72：正式解读走播报时，问题列表刷新延迟到播报结束/打断后（_afterFormalTts）
+      if (!this._formalTts) {
+        this._refreshPanel(this.rootQuestionId);
+      }
     } catch (e) {
       console.error('[chat] 流程失败', e);
       this._stopThinking();
@@ -3004,6 +3239,7 @@ Page({
         var plain = (item && item.plain) || md.plain(res.reply);
         this._ttsText = plain;
         this.setData({ ttsText: plain });
+        this._formalTts = false;   // DF-72：免费引导不做「正式解读」收尾
         tts.speak(plain);
       }
     } catch (e) {
@@ -3329,6 +3565,8 @@ Page({
     });
     if (app().globalData) app().globalData.user = data;
     this.loadBalance();
+    // DF-104：登录 / 切账号后重建该账号的智能体会话
+    this.ensureAgentSession();
     // FB-51：登录 / 切账号后按 uid 恢复未读角标
     this._syncUnread();
     // FB-49：按登录前唯一意图分发；无意图默认停在主页，不再被残留标记劫持
@@ -3343,6 +3581,10 @@ Page({
     }
     if (action === 'history') {
       this.openHistory();
+      return;
+    }
+    if (action === 'sessionLog') {
+      this.openSessionLog();
       return;
     }
     if (action === 'credits') {
@@ -3412,6 +3654,8 @@ Page({
     this.rootQuestionId = null;
     this.questionId = null;
     this.chatMsgId = null;
+    // DF-104：退出登录清空智能体会话与问题列表
+    this.agentSessionId = null;
     this.setData({
       loggedIn: false,
       userName: '',
@@ -3424,7 +3668,14 @@ Page({
       sessionRecords: [],
       historyTotal: 0,
       historyPage: 0,
-      historyError: ''
+      historyError: '',
+      // DF-104：清空智能体会话/问题列表/置顶草稿
+      agentSessionId: '',
+      sessionLog: [],
+      showSessionLog: false,
+      showDeepDraft: false,
+      deepDraft: '',
+      deepDraftVersion: 0
     });
     wx.showToast({ title: '已退出', icon: 'none' });
   },

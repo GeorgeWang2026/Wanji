@@ -185,6 +185,10 @@ function FreeTalk(opts) {
   this.onSpeaking = opts.onSpeaking || noop;
   this.onNotice = opts.onNotice || noop;
   this.onError = opts.onError || noop;
+  // DF-104：client.event 服务端回执（草稿编辑 / 深度解读提交确认等）
+  this.onClientEventAck = opts.onClientEventAck || noop;
+  // DF-104：续用页面进入时建立的会话（/agent/sessions/ensure 的 session_id）
+  this.sessionId = opts.sessionId || '';
   // DF-97：AI 文字逐句上屏（与播报同一份分段、同一时刻），页面只需把它写进字幕区
   this.onAiText = opts.onAiText || noop;
   // 发送倒计时：'即将发送…2' 显示在用户文字区；'' 表示撤掉。不新增控件。
@@ -392,6 +396,7 @@ FreeTalk.prototype.start = function () {
     // 语音转写常超过后端 auto 判 deep 的 80 字阈值，不显式指定会被判成 deep（TTFT 数秒到十几秒）。
     // 只影响这一条通道的换票，不动其它业务请求的档位。
     scenario: 'chat',
+    sessionId: self.sessionId,   // DF-104：续用 ensure 到的会话（连接时带 session_id 续传）
     onState: function (state, detail) {
       // 启动耗时分解：换票 → 建连 → session.ready（供真机日志核对空窗去向）
       if (state === 'ticketing') self._mark('换票请求');
@@ -571,6 +576,9 @@ FreeTalk.prototype.start = function () {
     },
     onError: function (e, detail) {
       try { self.onError(e, detail); } catch (err) { /* 忽略 */ }
+    },
+    onClientEventAck: function (data) {
+      try { self.onClientEventAck(data); } catch (err) { /* 忽略 */ }
     },
     onUserText: function () { /* 通道回显由本地先展示，避免重复 */ }
   });
@@ -2002,6 +2010,13 @@ FreeTalk.prototype._syncTurnState = function (why) {
     this._holdTurnState(why + '|等收音恢复');
     return;
   }
+  // DF-103：问候语还没说完（待播 _greetPending / 正在播 _preRoll）时先不宣布「轮到你说」。
+  // 否则通道 ready 阶段会提前把 _hintShownTurn 消耗成当前轮，问候播完再进 _enterTurn 时
+  // 被「同轮只提示一次」拦截，导致首轮问候结束不显示「可以开始说话了」。
+  if (this._greetPending || this._preRoll) {
+    this._holdTurnState(why + '|等问候播完');
+    return;
+  }
   this._clearHold();
   this._enterTurn(why);
 };
@@ -2045,7 +2060,7 @@ FreeTalk.prototype._showTurnHint = function () {
     console.log('[ft-diag] 轮到你说提示暂不显示 | 原因 = 正在倒计时');
     return;
   }
-  var t = '可以开始说话了';
+  var t = '您可以开始说话了';
   if (this._countText === t && this._hintOn) return;
   this._hintOn = true;
   this._countText = t;
@@ -2073,6 +2088,23 @@ FreeTalk.prototype.interrupt = function (reason) {
   this._clearReplyTimer();
   this._resetSpeech();           // 停播 + 清待播队列 + 恢复收音
   this._syncTurnState(reason || '点按打断');
+  return true;
+};
+
+/** DF-104：草稿确认区上报 client.event（deep.abandon / deep.draft.edit / deep.submitted）。
+ *  无连接返回 false，调用方据此提示或走 HTTP 兜底。 */
+FreeTalk.prototype.sendEvent = function (name, data) {
+  return this._channel ? this._channel.sendEvent(name, data) : false;
+};
+
+/** DF-104：录音文字区「点 ✕ 清空」——撤掉倒计时、清空当前转写（interim/final 都清），不再到点发出。 */
+FreeTalk.prototype.cancelUser = function () {
+  if (!this._active) return false;
+  this._setCountdown(-1);    // 撤掉倒计时：不再到点自动发出
+  this._clearUserLine();     // 清空当前用户行并刷新 UI（复用既有唯一清空入口）
+  try { this.onCountdown(''); } catch (e) { /* 忽略 */ }
+  // 清空后重新提示「可以开始说话了」，避免用户行空无一物
+  this._showTurnHint();
   return true;
 };
 

@@ -37,6 +37,7 @@ function AgentChannel(opts) {
   this.onNotice = opts.onNotice || noop;
   this.onError = opts.onError || noop;
   this.onUserText = opts.onUserText || noop;
+  this.onClientEventAck = opts.onClientEventAck || noop;   // DF-104：client.event 服务端回执
 
   this.state = 'idle';
   this.sessionId = opts.sessionId || '';
@@ -81,6 +82,19 @@ AgentChannel.prototype._send = function (type, data) {
   } catch (e) {
     return false;
   }
+};
+
+/** DF-104：上报 client.event（草稿编辑 / 深度解读提交确认 / 放弃草稿）。
+ *  返回 false 表示当前没有可用连接，调用方据此提示或走 HTTP 兜底。 */
+AgentChannel.prototype.sendEvent = function (name, data) {
+  var payload = {};
+  if (data && typeof data === 'object') {
+    for (var k in data) {
+      if (Object.prototype.hasOwnProperty.call(data, k)) payload[k] = data[k];
+    }
+  }
+  payload.name = name;
+  return this._send('client.event', payload);
 };
 
 /** 换票：POST /agent/ws-ticket，用小程序自身登录态鉴权 */
@@ -293,6 +307,10 @@ AgentChannel.prototype._onFrame = function (raw) {
   }
   if (type === 'system.notice') {
     try { this.onNotice(data); } catch (e) { /* 忽略 */ }
+    return;
+  }
+  if (type === 'client.event.ack') {
+    try { this.onClientEventAck(data); } catch (e) { /* 忽略 */ }
     return;
   }
   if (type === 'error') {
