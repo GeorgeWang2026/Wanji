@@ -207,6 +207,7 @@ Page({
     userName: '',
     chips: [],
     skillActive: { qimen: false, bazi: false, meihua: false, stock: false },
+    subCards: [],          // 语音/文字提问后，后端回传的排盘技能卡片（查看深度解读入口）
     ttsOn: true,
     speaking: false,
     recording: false,
@@ -2987,6 +2988,45 @@ Page({
     return this._chipOf(meta.type, { meta: meta });
   },
 
+  /**
+   * 语音/文字提问后，把后端 /chat 回传的 analysis_ids 渲染成技能信息卡片（查看深度解读入口）。
+   * 照抄网站 analysis.html renderSubCards：每类一个卡片，点击进 _openSkillAnalysis(type, analysis_id)。
+   * analysis_ids 形如 {"qimen":"hash16","meihua":"hash16"}；feishuDocUrl 为空则不点亮报告徽标。
+   */
+  _syncSubCards: function (analysisIds, feishuDocUrl) {
+    var cards = [];
+    var order = (this.threadTypes && this.threadTypes.length)
+      ? this.threadTypes
+      : ['qimen', 'bazi', 'meihua', 'stock'];
+    Object.keys(analysisIds || {}).forEach(function (t) {
+      var aid = analysisIds[t];
+      if (!t || !aid) return;
+      var meta = TOOL_CHIPS[t] || { icon: '📐', cls: '' };
+      cards.push({
+        type: t,
+        analysisId: String(aid),
+        label: TOOL_LABELS[t] || t,
+        icon: meta.icon,
+        cls: meta.cls || 'qm'
+      });
+    });
+    cards.sort(function (a, b) {
+      var ai = order.indexOf(a.type); if (ai < 0) ai = 99;
+      var bi = order.indexOf(b.type); if (bi < 0) bi = 99;
+      return ai - bi;
+    });
+    var patch = { subCards: cards };
+    if (feishuDocUrl) patch.sentFeishuUrl = feishuDocUrl;
+    this.setData(patch);
+  },
+
+  onSubCardTap: function (e) {
+    var type = e.currentTarget.dataset.type;
+    var aid = e.currentTarget.dataset.analysisId;
+    if (!type || !aid) return;
+    this._openSkillAnalysis(type, aid);
+  },
+
   onChipTap: function (e) {
     var type = e.currentTarget.dataset.type;
     // DF-68：证券标签点击进入详情页，并携带当前绑定 code/name（stock.js 按 ?code= 加载）
@@ -3074,7 +3114,7 @@ Page({
     }
 
     // 参考页 #sentPreview：确认扣费后先把本轮问题置顶展示，回复落地后换成置顶上下文
-    this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '' });
+    this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '', subCards: [] });
 
     // 用户消息带上本轮技能 types，咨询记录卡片用它渲染技能信息
     var userMsgId = this.pushMsg('user', text, {
@@ -3179,6 +3219,9 @@ Page({
       }
       if (res.msg_id) this.chatMsgId = res.msg_id;
 
+      // 后端已自动完成排盘并回传 analysis_ids + 飞书报告 → 立即渲染技能信息卡片（查看深度解读入口）
+      this._syncSubCards(res.analysis_ids, res.feishu_doc_url);
+
       this._stopThinking();
       this.setData({ typing: false });
       var id = this.pushMsg('assistant', res.reply, {
@@ -3230,7 +3273,7 @@ Page({
     this.freeQuestion = text;
     this.setData({ freeMode: true, freeQuestion: text });
     // DF-63：免费路径同样展示「已发送」卡片（定稿口径）
-    this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '' });
+    this.setData({ sentVisible: true, sentContent: text, sentFeishuUrl: '', subCards: [] });
     // 用户这句作为普通消息展示，不带技能标记，不进咨询记录卡片
     this.pushMsg('user', text, { types: [], auto: false });
     this.setData({ typing: true });

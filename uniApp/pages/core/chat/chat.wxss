@@ -384,6 +384,66 @@
   overflow-y: auto;
 }
 
+/* ---- 语音/文字提问后，后端排盘回传的技能信息卡片（对应参考页 renderSubCards） ---- */
+.sub-cards {
+  margin-bottom: 8rpx;
+}
+
+.sub-card {
+  display: flex;
+  align-items: center;
+  padding: 20rpx 28rpx;
+  margin-bottom: 12rpx;
+  background: rgba(147, 112, 219, .12);
+  border: 2rpx solid rgba(147, 112, 219, .3);
+  border-radius: 20rpx;
+}
+
+.sub-card-press {
+  background: rgba(147, 112, 219, .22);
+  border-color: rgba(179, 136, 255, .5);
+}
+
+.sc-icon {
+  width: 64rpx;
+  height: 64rpx;
+  line-height: 64rpx;
+  text-align: center;
+  font-size: 34rpx;
+  border-radius: 16rpx;
+  background: rgba(147, 112, 219, .22);
+  margin-right: 20rpx;
+  flex-shrink: 0;
+}
+
+.sc-body {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+}
+
+.sc-label {
+  font-size: 24rpx;
+  line-height: 1.5;
+  color: #c8b8e8;
+  margin-bottom: 10rpx;
+}
+
+.sc-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  align-self: flex-start;
+  height: 56rpx;
+  padding: 0 24rpx;
+  border-radius: 28rpx;
+  font-size: 24rpx;
+  font-weight: 600;
+  color: #fff;
+  background: linear-gradient(135deg, #b388ff, #7c4dff);
+  box-shadow: 0 6rpx 18rpx rgba(147, 112, 219, .3);
+}
+
 /* ---- DF-72：免费引导流「开始推算」手动确认 CTA（语音不算授权，必须点击） ---- */
 .free-cta {
   padding: 20rpx 28rpx;

@@ -74,6 +74,19 @@
         <view class="sent-content" id="sentContent">{{sentContent}}</view>
       </view>
 
+      <!-- 语音/文字提问后，后端自动排盘回传的技能信息卡片（对应参考页 renderSubCards） -->
+      <view class="sub-cards" wx:if="{{subCards.length > 0}}">
+        <view class="sub-card {{item.cls}}" wx:for="{{subCards}}" wx:key="type"
+              hover-class="sub-card-press" catchtap="onSubCardTap"
+              data-type="{{item.type}}" data-analysis-id="{{item.analysisId}}">
+          <text class="sc-icon">{{item.icon}}</text>
+          <view class="sc-body">
+            <text class="sc-label">{{item.label}} · 深度解读已生成</text>
+            <view class="sc-btn">📖 查看深度解读</view>
+          </view>
+        </view>
+      </view>
+
       <!-- DF-72：免费引导流 → 手动确认进入深度解读（口述/语音不算授权，必须点此按钮） -->
       <view class="free-cta" wx:if="{{freeMode && !pinned && !sending && !typing}}">
         <view class="free-cta-tip">已为你记录问题，准备好后点击下方按钮开始深度解读</view>
