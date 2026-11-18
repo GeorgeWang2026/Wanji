@@ -69,7 +69,7 @@ Page({
     var name = this.data.name || this.data.code;
     var code = this.data.code;
     wx.setNavigationBarTitle({
-      title: '📈 ' + (name || '证券详情') + (code ? '（' + code + '）' : '')
+      title: '📈 ' + (name || '投资详情') + (code ? '（' + code + '）' : '')
     });
   },
 

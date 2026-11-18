@@ -10,7 +10,7 @@
   <!-- ① 信息区 -->
   <view class="stock-info">
     <text class="si-hint" wx:if="{{infoStatus === 'loading'}}">行情加载中…</text>
-    <text class="si-hint" wx:elif="{{infoStatus === 'empty' || !info}}">暂无该证券详情数据</text>
+    <text class="si-hint" wx:elif="{{infoStatus === 'empty' || !info}}">暂无该投资详情数据</text>
     <block wx:else>
       <view class="si-item">
         <text class="si-l">股票</text>

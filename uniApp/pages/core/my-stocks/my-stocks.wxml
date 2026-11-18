@@ -11,7 +11,7 @@
     <view class="fs-back" hover-class="fs-back-press" bindtap="onBack">
       <text class="fs-back-ico">‹</text>
     </view>
-    <text class="fs-title">我的证券</text>
+    <text class="fs-title">我的投资</text>
   </view>
 
   <view class="fs-body ms-body">
@@ -128,7 +128,7 @@
   <view class="qd-mask" wx:if="{{needLogin}}">
     <view class="qd-box" catchtap="noop">
       <view class="qd-title">需要登录</view>
-      <view class="qd-content">请先登录后再管理我的证券。</view>
+      <view class="qd-content">请先登录后再管理我的投资。</view>
       <view class="qd-actions">
         <view class="qd-btn ok" hover-class="qd-btn-press" bindtap="onBack">返回</view>
       </view>

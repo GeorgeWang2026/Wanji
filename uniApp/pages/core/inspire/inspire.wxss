@@ -1,0 +1,41 @@
+/* ============================================================
+   灵感（闪念胶囊）占位页样式
+   - 与 core 页统一暗紫渐变背景，居中占位提示
+   ============================================================ */
+
+.insp-page {
+  min-height: 100vh;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 0 60rpx;
+  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+}
+
+.insp-icon {
+  font-size: 96rpx;
+  line-height: 1;
+}
+
+.insp-title {
+  margin-top: 32rpx;
+  font-size: 40rpx;
+  font-weight: 600;
+  color: #e8dff5;
+  letter-spacing: 2rpx;
+}
+
+.insp-sub {
+  margin-top: 12rpx;
+  font-size: 28rpx;
+  color: #c9a3ff;
+  letter-spacing: 1rpx;
+}
+
+.insp-hint {
+  margin-top: 40rpx;
+  font-size: 24rpx;
+  color: rgba(224, 208, 240, .5);
+}

@@ -5,7 +5,8 @@
     "uniApp/pages/assist/meihua/meihua",
     "uniApp/pages/core/stock/stock",
     "uniApp/pages/core/stock-chart/stock-chart",
-    "uniApp/pages/core/my-stocks/my-stocks"
+    "uniApp/pages/core/my-stocks/my-stocks",
+    "uniApp/pages/core/inspire/inspire"
   ],
   "window": {
     "navigationBarBackgroundColor": "#1a0f2e",

@@ -31,7 +31,8 @@ var SKILL_PAGE = {
   qimen: '/uniApp/pages/assist/qimen/qimen',
   meihua: '/uniApp/pages/assist/meihua/meihua',
   bazi: '/uniApp/pages/occult/bazi/bazi',
-  gua: '/uniApp/pages/occult/gua/gua'
+  gua: '/uniApp/pages/occult/gua/gua',
+  inspire: '/uniApp/pages/core/inspire/inspire'
 };
 
 // 与 assistant-widget.js 的 XIAOXUAN_DEFAULT_SYSTEM 保持一致
@@ -87,13 +88,14 @@ var ARCH_DEFAULT_RELATION_IDX = RELATION_KEYS.indexOf('other');
 // DF-81：首页快捷问题改为动态池（utils/quick-qa.js），不再写死三条
 
 // 技能 key → 展示名（/credits/questions 的 usages[].tool 即这几个 key）
-var TOOL_LABELS = { qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券' };
+var TOOL_LABELS = { qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '投资', inspire: '灵感' };
 // 技能卡片图标/配色（照抄参考页 _paipanCardHtml 的 toolMeta）
 var TOOL_CHIPS = {
   qimen: { icon: '☯', cls: 'qm' },
   bazi: { icon: '历', cls: 'bazi' },
   meihua: { icon: '☰', cls: 'meihua' },
-  stock: { icon: '📈', cls: 'stock' }
+  stock: { icon: '📈', cls: 'stock' },
+  inspire: { icon: '💡', cls: 'inspire' }
 };
 
 /** 参考页 _xbFeishuBtnHtml 的三种文案 */
@@ -3156,7 +3158,7 @@ Page({
 
       if (cdata.cost > 0) {
         this.pushMsg('assistant', '已消耗 ' + cdata.cost + ' 积分（剩余 ' + cdata.balance + '），正在为你用「'
-          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券投资' })[t] || t; }).join('、')
+          + bundle.types.map(function (t) { return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '投资' })[t] || t; }).join('、')
           + '」分析「' + text + '」…', { plainOnly: true });
       }
       this.updateScroll();
@@ -3292,7 +3294,7 @@ Page({
   confirmCost: function (text, bundle) {
     var self = this;
     var typeNames = bundle.types.map(function (t) {
-      return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '证券投资' })[t] || t;
+      return ({ qimen: '奇门遁甲', bazi: '干支历法', meihua: '梅花易数', stock: '投资' })[t] || t;
     }).join('、');
     return new Promise(function (resolve) {
       self._costResolve = resolve;

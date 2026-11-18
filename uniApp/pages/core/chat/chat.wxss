@@ -820,6 +820,8 @@
 
 .paipan-btn .p-icon { font-size: 34rpx; line-height: 1; }
 
+.paipan-btn .p-icon-img { width: 34rpx; height: 34rpx; }
+
 .paipan-btn .p-label {
   margin-top: 4rpx;
   font-size: 20rpx;
