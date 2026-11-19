@@ -3169,7 +3169,8 @@ Page({
     }
     var store = this._df141CardStore();
     var prev = store[skill];
-    if (prev && cardId && prev.card_id === cardId) return;   // 幂等：同 card_id 不重复
+    // 幂等：同一任务重投只绑一次；replace=true 时放行（改卡重排需覆盖同一条卡）
+    if (prev && cardId && prev.card_id === cardId && n.replace !== true) return;
     store[skill] = {
       skill: skill,
       card_id: cardId,
