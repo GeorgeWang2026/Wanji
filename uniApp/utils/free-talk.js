@@ -575,7 +575,8 @@ FreeTalk.prototype.start = function () {
     },
     onNotice: function (n) {
       // DF-72：DEEP_DRAFT 不带 message（带 draft/cards），不能按「无 message 丢弃」处理
-      if (!n || (!n.message && n.code !== 'DEEP_DRAFT')) return;
+      // DF-141：SKILL_CARD / SKILL_CLEAR 同样不带 message（带 skill/card/... 或 skill），一并放行
+      if (!n || (!n.message && n.code !== 'DEEP_DRAFT' && n.code !== 'SKILL_CARD' && n.code !== 'SKILL_CLEAR')) return;
       try { self.onNotice(n); } catch (e) { /* 忽略 */ }
     },
     onError: function (e, detail) {
