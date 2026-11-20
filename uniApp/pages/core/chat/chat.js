@@ -3310,9 +3310,15 @@ Page({
     this.enterFreeTalk();
   },
 
-  /** 四工具入口 4/4：健康 —— 规划中，先给提示 */
-  openHealth: function () {
-    wx.showToast({ title: '健康工具开发中，敬请期待', icon: 'none' });
+  /** 未实现入口统一占位：投资 / 灵感 / 健康 */
+  openComingSoon: function () {
+    wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+  },
+
+  /** 个人中心 · 我的证券 —— 未登录先弹登录，回来后由 pendingAction 接续 */
+  onMyStocks: function () {
+    if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }
+    wx.navigateTo({ url: '/uniApp/pages/core/my-stocks/my-stocks' });
   },
 
   openPaipan: function (e) {

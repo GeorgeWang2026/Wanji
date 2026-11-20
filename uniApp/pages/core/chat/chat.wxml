@@ -177,16 +177,16 @@
         <text class="p-icon">💬</text>
         <text class="p-label">咨询</text>
       </view>
-      <view class="paipan-btn {{skillActive.stock ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="stock">
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
         <text class="p-icon">📈</text>
         <text class="p-label">投资</text>
       </view>
-      <view class="paipan-btn {{skillActive.inspire ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="inspire">
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
         <image class="p-icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNlOGRmZjUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTUgMTRjLjItMSAuNy0xLjcgMS41LTIuNSAxLS45IDEuNS0yLjIgMS41LTMuNUE2IDYgMCAwIDAgNiA4YzAgMS4zLjUgMi42IDEuNSAzLjUuOC44IDEuMyAxLjUgMS41IDIuNSIvPjxwYXRoIGQ9Ik05IDE4aDYiLz48cGF0aCBkPSJNMTAgMjJoNCIvPjwvc3ZnPg==" mode="aspectFit" />
         <text class="p-label">灵感</text>
       </view>
-      <!-- 四工具入口 4/4：健康（规划中，暂给提示） -->
-      <view class="paipan-btn" hover-class="press-zone" bindtap="openHealth">
+      <!-- 四工具入口 4/4：健康（规划中，统一占位提示） -->
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
         <text class="p-icon">✚</text>
         <text class="p-label">健康</text>
       </view>
@@ -431,6 +431,21 @@
           <view class="profile-item" hover-class="item-press" bindtap="onProfileHistory">
             <text class="pi-icon">📜</text>
             <text class="pi-text">我的咨询记录</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="onMyStocks">
+            <text class="pi-icon">📈</text>
+            <text class="pi-text">我的证券</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="openComingSoon">
+            <text class="pi-icon">💡</text>
+            <text class="pi-text">我的灵感</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="openComingSoon">
+            <text class="pi-icon">📊</text>
+            <text class="pi-text">我的指标</text>
             <text class="pi-arrow">›</text>
           </view>
           <view class="profile-item" hover-class="item-press" bindtap="onProfileCredits">
