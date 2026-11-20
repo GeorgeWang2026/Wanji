@@ -6,6 +6,8 @@ var Y = require('../../../utils/yishu.js');
 var paipan = require('../../../utils/paipan.js');
 /* DF-82：时间栏参数（年/月/日/时/分）与奇门同源，统一走 timebar */
 var TB = require('../../../utils/timebar.js');
+/* 送审期隐藏功能总开关：卦典页未注册时点入口只提示，不留死按钮 */
+var FEATURES = require('../../../utils/features.js');
 
 /** DF-82：数字起卦取值 1-99；非数字/0/负数 → 1，大于 99 → 99（静默钳制，不弹错误） */
 function clampNum(v) {
@@ -263,6 +265,11 @@ Page({
     var num = Number(e.currentTarget.dataset.num);
     var yao = Number(e.currentTarget.dataset.yao || 0);
     if (!num) { wx.showToast({ title: '未找到卦序', icon: 'none' }); return; }
+    /* 送审期卦典页未注册，跳过去只会无声失败；先给一致的气泡提示 */
+    if (!FEATURES.OCCULT_PAGES_ENABLED) {
+      wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+      return;
+    }
     wx.navigateTo({ url: '/uniApp/pages/occult/gua/gua?num=' + num + '&yao=' + yao });
   },
 

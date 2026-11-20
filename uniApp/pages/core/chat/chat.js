@@ -25,6 +25,7 @@ var QUOTES_STOCK = [];
 try { QUOTES_STOCK = require('../../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
 if (!Array.isArray(QUOTES_STOCK)) QUOTES_STOCK = [];
 var quickQA = require('../../../utils/quick-qa.js');   // DF-81：首页快捷问题池（关联证券后自动带证券名）
+var FEATURES = require('../../../utils/features.js');   // 送审期隐藏功能总开关（八字详情/卦典）
 
 // 页面路径映射（目录分层后：core 证券+对话 / assist 奇门梅花 / occult 八字卦典隐藏）
 var SKILL_PAGE = {
@@ -3032,10 +3033,20 @@ Page({
     this.setData(patch);
   },
 
+  /** 送审期隐藏功能闸门：八字详情、卦典都未注册进 app.json，点入口只给气泡，
+   *  不留死按钮。返回 true 表示已拦截；过审后把 utils/features.js 的开关打开即放行。 */
+  _occultGate: function (type) {
+    if (type !== 'bazi' && type !== 'gua') return false;
+    if (FEATURES.OCCULT_PAGES_ENABLED) return false;
+    wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+    return true;
+  },
+
   /** 点卡片本体 → 进入该技能的详情页（卡片上的「查看深度解读」按钮仍走 onSubCardTap） */
   onCardOpenDetail: function (e) {
     var type = e.currentTarget.dataset.type;
     if (!type) return;
+    if (this._occultGate(type)) return;
     var bound = (app().globalData && app().globalData.paipan) || {};
     if (type === 'stock') {
       var s = (bound.stock && bound.stock.stock) || {};
@@ -3060,6 +3071,7 @@ Page({
 
   onChipTap: function (e) {
     var type = e.currentTarget.dataset.type;
+    if (this._occultGate(type)) return;
     // DF-68：证券标签点击进入详情页，并携带当前绑定 code/name（stock.js 按 ?code= 加载）
     if (type === 'stock') {
       var bound = (app().globalData && app().globalData.paipan) || {};
@@ -3384,6 +3396,7 @@ Page({
 
   openPaipan: function (e) {
     var type = e.currentTarget.dataset.type;
+    if (this._occultGate(type)) return;
     // DF-69：证券按钮改为进入「我的证券」全屏列表页（未登录先弹登录，登录后进入）
     if (type === 'stock') {
       if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }
