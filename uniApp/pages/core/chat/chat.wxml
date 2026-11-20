@@ -430,7 +430,7 @@
           </view>
           <view class="profile-item" hover-class="item-press" bindtap="onProfileHistory">
             <text class="pi-icon">📜</text>
-            <text class="pi-text">我的咨询记录</text>
+            <text class="pi-text">我的咨询</text>
             <text class="pi-arrow">›</text>
           </view>
           <view class="profile-item" hover-class="item-press" bindtap="onMyStocks">
