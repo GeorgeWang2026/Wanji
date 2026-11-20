@@ -3032,6 +3032,23 @@ Page({
     this.setData(patch);
   },
 
+  /** 点卡片本体 → 进入该技能的详情页（卡片上的「查看深度解读」按钮仍走 onSubCardTap） */
+  onCardOpenDetail: function (e) {
+    var type = e.currentTarget.dataset.type;
+    if (!type) return;
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    if (type === 'stock') {
+      var s = (bound.stock && bound.stock.stock) || {};
+      var qs = [];
+      if (s.code) qs.push('code=' + encodeURIComponent(s.code));
+      if (s.name) qs.push('name=' + encodeURIComponent(s.name));
+      wx.navigateTo({ url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      return;
+    }
+    if (!SKILL_PAGE[type]) { this._onCardErr('该技能暂无详情页', '技能类型：' + type); return; }
+    wx.navigateTo({ url: SKILL_PAGE[type] });
+  },
+
   onSubCardTap: function (e) {
     var type = e.currentTarget.dataset.type;
     var aid = e.currentTarget.dataset.analysisId;

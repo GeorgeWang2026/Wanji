@@ -77,12 +77,12 @@
       <!-- 语音/文字提问后，后端自动排盘回传的技能信息卡片（对应参考页 renderSubCards） -->
       <view class="sub-cards" wx:if="{{subCards.length > 0}}">
         <view class="sub-card {{item.cls}}" wx:for="{{subCards}}" wx:key="type"
-              hover-class="sub-card-press" catchtap="onSubCardTap"
+              hover-class="sub-card-press" catchtap="onCardOpenDetail"
               data-type="{{item.type}}" data-analysis-id="{{item.analysisId}}">
           <text class="sc-icon">{{item.icon}}</text>
           <view class="sc-body">
             <text class="sc-label">{{item.label}} · 深度解读已生成</text>
-            <view class="sc-btn">📖 查看深度解读</view>
+            <view class="sc-btn" catchtap="onSubCardTap" data-type="{{item.type}}" data-analysis-id="{{item.analysisId}}">📖 查看深度解读</view>
           </view>
         </view>
       </view>
