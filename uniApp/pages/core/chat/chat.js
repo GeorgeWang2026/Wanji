@@ -3044,8 +3044,9 @@ Page({
 
   /** 点卡片本体 → 进入该技能的详情页（卡片上的「查看深度解读」按钮仍走 onSubCardTap） */
   onCardOpenDetail: function (e) {
+    var self = this;
     var type = e.currentTarget.dataset.type;
-    if (!type) return;
+    if (!type) { this._onCardErr('卡片缺少技能类型', '这条卡没有 data-type，无法跳转'); return; }
     if (this._occultGate(type)) return;
     var bound = (app().globalData && app().globalData.paipan) || {};
     if (type === 'stock') {
@@ -3053,11 +3054,18 @@ Page({
       var qs = [];
       if (s.code) qs.push('code=' + encodeURIComponent(s.code));
       if (s.name) qs.push('name=' + encodeURIComponent(s.name));
-      wx.navigateTo({ url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      wx.navigateTo({
+        url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : ''),
+        fail: function (err) { self._onCardErr('证券页打不开', (err && err.errMsg) || '请稍后重试'); }
+      });
       return;
     }
     if (!SKILL_PAGE[type]) { this._onCardErr('该技能暂无详情页', '技能类型：' + type); return; }
-    wx.navigateTo({ url: SKILL_PAGE[type] });
+    /* 跳转失败不再静默：把 errMsg 抛到界面上，避免「点了没反应」查不出原因 */
+    wx.navigateTo({
+      url: SKILL_PAGE[type],
+      fail: function (err) { self._onCardErr('详情页打不开', (err && err.errMsg) || ('技能类型：' + type)); }
+    });
   },
 
   onSubCardTap: function (e) {
@@ -3070,6 +3078,7 @@ Page({
   },
 
   onChipTap: function (e) {
+    var self = this;
     var type = e.currentTarget.dataset.type;
     if (this._occultGate(type)) return;
     // DF-68：证券标签点击进入详情页，并携带当前绑定 code/name（stock.js 按 ?code= 加载）
@@ -3079,10 +3088,17 @@ Page({
       var qs = [];
       if (s.code) qs.push('code=' + encodeURIComponent(s.code));
       if (s.name) qs.push('name=' + encodeURIComponent(s.name));
-      wx.navigateTo({ url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      wx.navigateTo({
+        url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : ''),
+        fail: function (err) { self._onCardErr('证券页打不开', (err && err.errMsg) || '请稍后重试'); }
+      });
       return;
     }
-    wx.navigateTo({ url: SKILL_PAGE[type] });
+    if (!SKILL_PAGE[type]) { this._onCardErr('该技能暂无详情页', '技能类型：' + type); return; }
+    wx.navigateTo({
+      url: SKILL_PAGE[type],
+      fail: function (err) { self._onCardErr('详情页打不开', (err && err.errMsg) || ('技能类型：' + type)); }
+    });
   },
 
   onChipClose: function (e) {
