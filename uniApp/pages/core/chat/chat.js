@@ -3295,6 +3295,26 @@ Page({
     console.warn('[DF-141] skill card:', title, detail || '');
   },
 
+  /** 四工具入口 1/4：咨询 —— 复用自由对话通道（不排盘、不计费、不建正式提问） */
+  openConsult: function () {
+    if (this.data.freeTalk) return;
+    if (this.data.recording) {
+      wx.showToast({ title: '正在录音，请先结束录音', icon: 'none' });
+      return;
+    }
+    if (!api.getToken()) {
+      this.pendingAction = 'freeTalk';
+      this.setData({ showLogin: true });
+      return;
+    }
+    this.enterFreeTalk();
+  },
+
+  /** 四工具入口 4/4：健康 —— 规划中，先给提示 */
+  openHealth: function () {
+    wx.showToast({ title: '健康工具开发中，敬请期待', icon: 'none' });
+  },
+
   openPaipan: function (e) {
     var type = e.currentTarget.dataset.type;
     // DF-69：证券按钮改为进入「我的证券」全屏列表页（未登录先弹登录，登录后进入）
