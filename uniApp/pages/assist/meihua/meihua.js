@@ -64,8 +64,17 @@ Page({
       csNames: csNames,
       csIdx: Math.max(0, this.chenshiIdxOfHour(d.getHours()) - 1)
     });
-    this._setTime({ y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes() });
+    this._setTime(this._cardTime() || { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes() });
     this.buildGua();
+  },
+
+  /** 从聊天技能卡点进来时，取卡片已有时间（无则返回 null，走当前时间） */
+  _cardTime: function () {
+    var app = getApp();
+    var b = app.globalData && app.globalData.paipan && app.globalData.paipan.meihua;
+    var t = b && ((b.meta && b.meta.time) || b.payload);
+    if (!t || !t.y) return null;
+    return { y: t.y, m: t.m, d: t.d, h: (typeof t.h === 'number' ? t.h : 0), mi: (typeof t.mi === 'number' ? t.mi : 0) };
   },
 
   noop: function () {},

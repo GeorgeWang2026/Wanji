@@ -44,6 +44,13 @@ Page({
     var t = (saved && saved.y)
       ? { y: saved.y, m: saved.m, d: saved.d, h: saved.h, mi: (typeof saved.mi === 'number' ? saved.mi : 0) }
       : { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate(), h: now.getHours(), mi: now.getMinutes() };
+    // 从聊天里的技能卡点进来：带上卡片已有参数，别用「上次时间/当前时间」顶替
+    var app0 = getApp();
+    var boundPan = app0.globalData && app0.globalData.paipan && app0.globalData.paipan.qimen;
+    var bt = boundPan && ((boundPan.payload && boundPan.payload.solar_time) || boundPan.meta);
+    if (bt && bt.y) {
+      t = { y: bt.y, m: bt.m, d: bt.d, h: bt.h, mi: (typeof bt.mi === 'number' ? bt.mi : 0) };
+    }
     this._setTime(t, { silent: true });
     this.buildPan();
   },
