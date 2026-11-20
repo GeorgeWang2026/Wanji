@@ -799,6 +799,12 @@ function bindPluginManager() {
         '| start 在途 =', wasStarting ? 'yes（插件还没回 onStart）' : 'no',
         '| 判定 =',
         errPlayback ? '音频焦点/录音器被播报占用（时序冲突）' : '录音器未就绪或被其它录音句柄占用（非用户语音问题）');
+      // -30001 且上一条 start 还在途：插件句柄没释放，光退避再 start 只会继续撞 -30001。
+      // 直接重建实例（丢弃旧句柄 → 重绑回调 → 延时 start），别把 6 次退避白白耗光。
+      if (startFail && wasStarting && contRebuilds < CONT_REBUILD_MAX) {
+        rebuildPluginManager('启动失败且 start 在途（-30001）');
+        return;
+      }
       if (contErrStreak >= CONT_ERR_MAX) {
         degradeRecorder('连续 ' + contErrStreak + ' 次' + (startFail ? '录音器启动失败' : '录音错误'),
           startFail ? '麦克风启动失败，请退出对话后重新进入' : '麦克风异常，请退出对话后重新进入');
