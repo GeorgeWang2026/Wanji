@@ -3179,6 +3179,9 @@ Page({
     }
     var card = n.card && typeof n.card === 'object' ? n.card : {};
     var cardId = String(n.card_id || n.notice_id || '');
+    // 主公口径（2026-11-20）：分类对就先出卡。服务端缺参时下发 incomplete 卡，
+    // 这里挂「待补充参数」卡头，参数靠对话补或点卡进详情页补，不丢卡、不静默。
+    if (n.incomplete) { this._onSkillCardPending(skill, n); return; }
     // 必填不齐：可见提示，不落半张空卡（对齐网页 _xbOnSkillCard 的失败分支）
     if (!this._cardRequiredOk(skill, card)) {
       this._onCardErr('已排好，但卡片信息不完整', '请补充更明确的条件后重试');
@@ -3219,6 +3222,36 @@ Page({
     if (n.degraded) this._onCardErr('已排好，部分派生信息稍后补齐', '');
   },
 
+  /** 缺参卡：分类已定、参数待补 —— 先挂卡头，点卡进详情页补，或在对话里补后重排 */
+  _onSkillCardPending: function (skill, n) {
+    var store = this._df141CardStore();
+    var missing = (n && n.missing) || [];
+    store[skill] = {
+      skill: skill,
+      card_id: String((n && n.card_id) || ('pending:' + skill)),
+      card: {},
+      pending: true,
+      missing: missing,
+      analysisId: '',
+      at: Date.now()
+    };
+    var meta = TOOL_CHIPS[skill] || { icon: '📐', cls: 'qm' };
+    var item = {
+      type: skill,
+      analysisId: '',
+      pending: true,
+      missingText: missing.join('、'),
+      label: TOOL_LABELS[skill] || skill,
+      icon: meta.icon,
+      cls: meta.cls || 'qm'
+    };
+    var cur = (this.data.subCards || []).slice();
+    var idx = -1;
+    for (var i = 0; i < cur.length; i++) { if (cur[i].type === skill) { idx = i; break; } }
+    if (idx >= 0) cur[idx] = item; else cur.push(item);
+    this.setData({ subCards: cur });
+  },
+
   /** 渲染：卡集投影 → 复用现有 sub-cards 槽与字段（界面零改动）。
    *  仅当服务端已给出深度解读分析号时才落 sub-card；卡片本体由 chips（bound-tag）承载，
    *  避免在 sub-cards 槽里出现与实际不符的「深度解读已生成」文案。 */
@@ -3226,7 +3259,18 @@ Page({
     var store = this._skillCards || {};
     var cur = (this.data.subCards || []).slice();
     Object.keys(store).forEach(function (t) {
-      var aid = String((store[t] || {}).analysisId || '');
+      var e = store[t] || {};
+      // 缺参卡：保留「待补充参数」卡头，不被渲染清掉
+      if (e.pending) {
+        var pmeta = TOOL_CHIPS[t] || { icon: '📐', cls: 'qm' };
+        var pitem = { type: t, analysisId: '', pending: true, missingText: (e.missing || []).join('、'),
+          label: TOOL_LABELS[t] || t, icon: pmeta.icon, cls: pmeta.cls || 'qm' };
+        var pidx = -1;
+        for (var k = 0; k < cur.length; k++) { if (cur[k].type === t) { pidx = k; break; } }
+        if (pidx >= 0) cur[pidx] = pitem; else cur.push(pitem);
+        return;
+      }
+      var aid = String(e.analysisId || '');
       if (!aid) return;   // 解读未就绪：不占 sub-cards 槽
       var meta = TOOL_CHIPS[t] || { icon: '📐', cls: 'qm' };
       var item = { type: t, analysisId: aid, label: TOOL_LABELS[t] || t, icon: meta.icon, cls: meta.cls || 'qm' };
