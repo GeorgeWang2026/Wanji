@@ -5,7 +5,7 @@
 2. 分支开发，绿了才合，合完删分支。（《协作契约》第四章 代码与写入 https://jian-pei.feishu.cn/docx/H2dzdN2XDojBajxqXKQcGsOknof）
 3. 云文档我建、陈平整理、别人只读；建单归我。（《协作契约》第十章 写权归属 https://jian-pei.feishu.cn/docx/H2dzdN2XDojBajxqXKQcGsOknof）
 4. 交付回复在任务线程下；@ 只用于叫人干活；单条 ≤10 行。（《架构说明》§十七 v2 https://jian-pei.feishu.cn/docx/NWJ7dtwQtoA9Xqx92o4cHChpnSh）
-5. 不猜：拿不准标「待确认」，宁可问。（待补）
-6. 开工先读铁律，回执填版本号与读取时间；超 12 小时重读。（《开工必读清单》https://jian-pei.feishu.cn/docx/H4h6dKn5oo8CwcxaBToc4bILnA5，待补铁律条目）
+5. 不猜：拿不准标「待确认」，宁可问。（《文档作业规范》§9 不猜 https://jian-pei.feishu.cn/docx/FrxZdGkDqoGXC8xwp83cWklAnSN）
+6. 开工先读铁律，回执填版本号与读取时间；超 12 小时重读。（《开工必读清单》〇、铁律 v1 https://jian-pei.feishu.cn/docx/H4h6dKn5oo8CwcxaBToc4bILnA5）
 
 详情见上述链接；本文件为唯一可编辑版本，其他仓库为副本，禁止手改。
