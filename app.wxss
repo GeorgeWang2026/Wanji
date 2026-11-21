@@ -2,10 +2,46 @@
  * 全局样式（暗色紫金主题，取自 xiaoxuan.html 的视觉基调）
  * 只作用于小程序；网页版样式仍在 xiaoxuan.html 内联 <style> 里，互不影响。
  * ============================================================ */
+/* ---------- DF-156：主题变量（卡片/问卷复用，禁止再写死颜色） ---------- */
 page {
-  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+  --qm-bg-start: #1e1033;
+  --qm-bg-mid: #2d1b4e;
+  --qm-bg-end: #1a0f2e;
+  --qm-text: #e8e0f0;
+  --qm-text-strong: #efe6ff;
+  --qm-text-soft: #cdb8f0;
+  --qm-muted: #9f8ac0;
+  --qm-text-dim: #b8a5d5;
+  --qm-accent: #9370db;
+  --qm-accent-2: #ff8fb5;
+  --qm-accent-line: rgba(147, 112, 219, .6);
+  --qm-on-accent: #ffffff;
+  --qm-gold: #e8b84a;
+  --qm-gold-border: rgba(232, 184, 74, .4);
+  --qm-warn: #ffb03c;
+  --qm-danger: #ff6060;
+  --qm-card-bg: rgba(255, 255, 255, .05);
+  --qm-card-bg-soft: rgba(255, 255, 255, .04);
+  --qm-card-border: rgba(147, 112, 219, .28);
+  --qm-line: rgba(147, 112, 219, .18);
+  --qm-line-soft: rgba(147, 112, 219, .12);
+  --qm-chip-bg: rgba(147, 112, 219, .16);
+  --qm-btn-bg: rgba(255, 255, 255, .08);
+  --qm-btn-border: rgba(147, 112, 219, .38);
+  --qm-warn-bg: rgba(255, 176, 60, .12);
+  --qm-warn-border: rgba(255, 176, 60, .3);
+  --qm-danger-bg: rgba(255, 96, 96, .12);
+  --qm-danger-border: rgba(255, 96, 96, .32);
+  --qm-json-bg: rgba(10, 5, 25, .35);
+  --qm-shadow-accent: rgba(147, 112, 219, .38);
+  --qm-radius: 20rpx;
+  --qm-radius-sm: 14rpx;
+}
+
+page {
+  background: linear-gradient(160deg, var(--qm-bg-start) 0%, var(--qm-bg-mid) 40%, var(--qm-bg-end) 100%);
   min-height: 100%;
-  color: #e8e0f0;
+  color: var(--qm-text);
   font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
   font-size: 28rpx;
   line-height: 1.6;
@@ -17,9 +53,9 @@ view, text, scroll-view, button, input, textarea {
 
 /* ---------- 通用卡片 / 按钮 ---------- */
 .qm-card {
-  background: rgba(255, 255, 255, .05);
-  border: 1rpx solid rgba(147, 112, 219, .28);
-  border-radius: 20rpx;
+  background: var(--qm-card-bg);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius);
   padding: 20rpx 22rpx;
 }
 
@@ -30,27 +66,27 @@ view, text, scroll-view, button, input, textarea {
   height: 76rpx;
   border-radius: 38rpx;
   font-size: 28rpx;
-  color: #efe6ff;
-  background: rgba(255, 255, 255, .08);
-  border: 1rpx solid rgba(147, 112, 219, .38);
+  color: var(--qm-text-strong);
+  background: var(--qm-btn-bg);
+  border: 1rpx solid var(--qm-btn-border);
 }
 
 .qm-btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #9370db, #ff8fb5);
+  color: var(--qm-on-accent);
+  background: linear-gradient(135deg, var(--qm-accent), var(--qm-accent-2));
   border: none;
-  box-shadow: 0 8rpx 24rpx rgba(147, 112, 219, .38);
+  box-shadow: 0 8rpx 24rpx var(--qm-shadow-accent);
 }
 
 .qm-btn-ghost {
-  color: #b8a5d5;
+  color: var(--qm-text-dim);
   background: transparent;
-  border: 1rpx solid rgba(147, 112, 219, .3);
+  border: 1rpx solid var(--qm-btn-border);
 }
 
-.qm-muted { color: #9f8ac0; }
-.qm-gold { color: #e8b84a; }
-.qm-danger { color: #ff8fb5; }
+.qm-muted { color: var(--qm-muted); }
+.qm-gold { color: var(--qm-gold); }
+.qm-danger { color: var(--qm-accent-2); }
 
 /* ---------- 全屏页面形态（弹层统一容器） ---------- */
 /* 左返回 + 居中标题 + 无 ✕；铺满视口、无遮罩留白、无圆角卡片感 */
@@ -64,7 +100,7 @@ view, text, scroll-view, button, input, textarea {
   display: flex;
   flex-direction: column;
   overflow: hidden;
-  background: linear-gradient(160deg, #1e1033 0%, #2d1b4e 40%, #1a0f2e 100%);
+  background: linear-gradient(160deg, var(--qm-bg-start) 0%, var(--qm-bg-mid) 40%, var(--qm-bg-end) 100%);
 }
 
 .fs-header {

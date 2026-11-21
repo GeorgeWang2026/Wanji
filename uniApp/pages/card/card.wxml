@@ -18,16 +18,17 @@
   </view>
 </template>
 
-<!-- 3. 按键组 -->
+<!-- 3. 按键组（外观复用全局 .qm-btn，未知样式只落默认态） -->
 <template name="t-buttons">
   <view class="cx-btns">
     <view
       wx:for="{{item.items}}"
+      wx:for-item="b"
       wx:key="action_id"
-      class="cx-btn {{item.style === 'primary' ? 'cx-btn-primary' : ''}}"
-      data-action-id="{{item.action_id}}"
+      class="qm-btn cx-btn {{b.style === 'primary' ? 'qm-btn-primary' : ''}}"
+      data-action-id="{{b.action_id}}"
       bindtap="onTapAction"
-    >{{item.label}}</view>
+    >{{b.label}}</view>
   </view>
 </template>
 
@@ -119,7 +120,7 @@
   <!-- 整卡被拒 -->
   <view wx:elif="{{status === 'rejected'}}" class="cx-block">
     <view class="cx-notice cx-notice-error">{{message}}</view>
-    <view class="cx-btn cx-btn-primary cx-retry" bindtap="onRetry">重试</view>
+    <view class="qm-btn qm-btn-primary cx-btn cx-retry" bindtap="onRetry">重试</view>
   </view>
 
   <!-- 解析异常 -->

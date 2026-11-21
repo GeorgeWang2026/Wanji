@@ -1,4 +1,6 @@
-/* DF-156 · 问卷 demo 样式（沿用全局暗紫底，只做选择题排版） */
+/* DF-156 · 问卷 demo 样式
+   颜色一律取 app.wxss 的 --qm-* 主题变量，禁止硬编码；
+   按钮复用全局 .qm-btn / .qm-btn-primary。 */
 
 .sv-page {
   padding: 24rpx 24rpx 64rpx;
@@ -7,20 +9,51 @@
 .sv-title {
   font-size: 34rpx;
   font-weight: 600;
-  color: #efe6ff;
+  color: var(--qm-text-strong);
 }
 
 .sv-intro {
   margin-top: 10rpx;
   font-size: 24rpx;
   line-height: 1.6;
-  color: rgba(232, 224, 240, .6);
+  color: var(--qm-muted);
+}
+
+.sv-progress {
+  margin-top: 14rpx;
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 22rpx;
+  color: var(--qm-muted);
+}
+
+.sv-progress-bar {
+  flex: 1 1 auto;
+  height: 8rpx;
+  margin-left: 16rpx;
+  border-radius: 4rpx;
+  background: var(--qm-line);
+  overflow: hidden;
+}
+
+.sv-progress-text {
+  flex: 0 0 auto;
+  font-size: 22rpx;
+  color: var(--qm-muted);
+}
+
+.sv-progress-inner {
+  height: 100%;
+  border-radius: 4rpx;
+  background: linear-gradient(90deg, var(--qm-accent), var(--qm-accent-2));
 }
 
 .sv-q {
   margin-top: 24rpx;
   padding: 20rpx 0 8rpx;
-  border-top: 1rpx solid rgba(147, 112, 219, .18);
+  border-top: 1rpx solid var(--qm-line);
 }
 
 .sv-q-head {
@@ -33,12 +66,12 @@
 .sv-q-index {
   margin-right: 8rpx;
   font-size: 28rpx;
-  color: #cdb8f0;
+  color: var(--qm-text-soft);
 }
 
 .sv-q-title {
   font-size: 28rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
   font-weight: 500;
 }
 
@@ -47,22 +80,22 @@
   padding: 0 10rpx;
   font-size: 20rpx;
   line-height: 32rpx;
-  color: #ffd08a;
-  border: 1rpx solid rgba(255, 176, 60, .4);
+  color: var(--qm-gold);
+  border: 1rpx solid var(--qm-gold-border);
   border-radius: 8rpx;
 }
 
 .sv-type {
   margin-left: auto;
   font-size: 22rpx;
-  color: rgba(232, 224, 240, .45);
+  color: var(--qm-muted);
 }
 
 .sv-opts {
   margin-top: 12rpx;
-  background: rgba(255, 255, 255, .04);
-  border: 1rpx solid rgba(147, 112, 219, .22);
-  border-radius: 18rpx;
+  background: var(--qm-card-bg-soft);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius-sm);
   padding: 4rpx 0;
 }
 
@@ -71,7 +104,7 @@
   flex-direction: row;
   align-items: flex-start;
   padding: 18rpx 22rpx;
-  border-top: 1rpx solid rgba(147, 112, 219, .12);
+  border-top: 1rpx solid var(--qm-line-soft);
 }
 
 .sv-opt:first-child {
@@ -79,7 +112,7 @@
 }
 
 .sv-opt-on {
-  background: rgba(147, 112, 219, .16);
+  background: var(--qm-chip-bg);
 }
 
 .sv-mark {
@@ -88,7 +121,7 @@
   margin-top: 6rpx;
   margin-right: 16rpx;
   border-radius: 50%;
-  border: 2rpx solid rgba(147, 112, 219, .6);
+  border: 2rpx solid var(--qm-accent-line);
   flex: 0 0 auto;
   box-sizing: border-box;
 }
@@ -99,7 +132,7 @@
 
 .sv-mark-on {
   border-color: transparent;
-  background: linear-gradient(135deg, #9370db, #ff8fb5);
+  background: linear-gradient(135deg, var(--qm-accent), var(--qm-accent-2));
 }
 
 .sv-opt-body {
@@ -110,18 +143,11 @@
 
 .sv-opt-label {
   font-size: 28rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
 }
 
 .sv-opt-skip {
-  color: rgba(232, 224, 240, .62);
-}
-
-.sv-opt-desc {
-  margin-top: 4rpx;
-  font-size: 22rpx;
-  color: rgba(232, 224, 240, .55);
-  line-height: 1.5;
+  color: var(--qm-muted);
 }
 
 .sv-note {
@@ -129,10 +155,10 @@
   padding: 14rpx 20rpx;
   font-size: 24rpx;
   line-height: 1.6;
-  color: #cdb8f0;
-  background: rgba(147, 112, 219, .16);
-  border: 1rpx solid rgba(147, 112, 219, .32);
-  border-radius: 14rpx;
+  color: var(--qm-text-soft);
+  background: var(--qm-chip-bg);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius-sm);
 }
 
 .sv-hint {
@@ -140,10 +166,10 @@
   padding: 16rpx 20rpx;
   font-size: 24rpx;
   line-height: 1.6;
-  color: #ffd08a;
-  background: rgba(255, 176, 60, .12);
-  border: 1rpx solid rgba(255, 176, 60, .3);
-  border-radius: 14rpx;
+  color: var(--qm-warn);
+  background: var(--qm-warn-bg);
+  border: 1rpx solid var(--qm-warn-border);
+  border-radius: var(--qm-radius-sm);
 }
 
 .sv-actions {
@@ -153,22 +179,15 @@
   flex-wrap: wrap;
 }
 
-.sv-btn {
+.sv-actions .qm-btn {
+  flex: 1 1 auto;
+  min-width: 200rpx;
   margin: 0 14rpx 14rpx 0;
   padding: 0 30rpx;
-  height: 76rpx;
-  line-height: 76rpx;
-  font-size: 28rpx;
-  color: #efe6ff;
-  background: rgba(255, 255, 255, .08);
-  border: 1rpx solid rgba(147, 112, 219, .38);
-  border-radius: 38rpx;
 }
 
-.sv-btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #9370db, #ff8fb5);
-  border-color: transparent;
+.sv-actions .qm-btn:last-child {
+  margin-right: 0;
 }
 
 .sv-btn-busy {
@@ -178,7 +197,7 @@
 .sv-meta {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: rgba(232, 224, 240, .45);
+  color: var(--qm-muted);
   word-break: break-all;
 }
 
@@ -188,22 +207,22 @@
 
 .sv-result-title {
   font-size: 26rpx;
-  color: #cdb8f0;
+  color: var(--qm-text-soft);
 }
 
 .sv-json {
   margin-top: 10rpx;
   max-height: 480rpx;
   padding: 16rpx 20rpx;
-  background: rgba(0, 0, 0, .28);
-  border: 1rpx solid rgba(147, 112, 219, .22);
-  border-radius: 14rpx;
+  background: var(--qm-json-bg);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius-sm);
 }
 
 .sv-json-text {
   font-size: 22rpx;
   line-height: 1.6;
-  color: #d9cdf0;
+  color: var(--qm-text-soft);
   white-space: pre-wrap;
   word-break: break-all;
 }

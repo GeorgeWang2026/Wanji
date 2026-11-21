@@ -5,7 +5,15 @@
     <view class="sv-title">{{title}}</view>
     <view wx:if="{{intro}}" class="sv-intro">{{intro}}</view>
 
-    <view wx:for="{{questions}}" wx:for-item="q" wx:key="id" class="sv-q">
+    <!-- 分页：每屏最多 3 题；切页只换下标，答案常驻 -->
+    <view class="sv-progress">
+      <text class="sv-progress-text">第 {{pageNoText}} 页 · {{answeredText}}</text>
+      <view class="sv-progress-bar">
+        <view class="sv-progress-inner" style="width: {{progressPct}}%"></view>
+      </view>
+    </view>
+
+    <view wx:for="{{pageQuestions}}" wx:for-item="q" wx:key="id" class="sv-q">
       <view class="sv-q-head">
         <text class="sv-q-index">{{q.index}}.</text>
         <text class="sv-q-title">{{q.title}}</text>
@@ -35,9 +43,13 @@
     <view wx:if="{{missingHint}}" class="sv-hint">{{missingHint}}</view>
 
     <view class="sv-actions">
-      <view class="sv-btn sv-btn-primary {{submitting ? 'sv-btn-busy' : ''}}" bindtap="onSubmit">整卷提交</view>
-      <view class="sv-btn" bindtap="onSubmit">重复提交（回放）</view>
-      <view class="sv-btn" bindtap="onResetAnswers">清空重答</view>
+      <view wx:if="{{pageIndex > 0}}" class="qm-btn sv-btn" bindtap="onPrevPage">上一页</view>
+      <view wx:if="{{!isLastPage}}" class="qm-btn qm-btn-primary sv-btn" bindtap="onNextPage">下一页</view>
+      <block wx:if="{{isLastPage}}">
+        <view class="qm-btn qm-btn-primary sv-btn {{submitting ? 'sv-btn-busy' : ''}}" bindtap="onSubmit">整卷提交</view>
+        <view class="qm-btn sv-btn" bindtap="onSubmit">重复提交（回放）</view>
+        <view class="qm-btn sv-btn" bindtap="onResetAnswers">清空重答</view>
+      </block>
     </view>
 
     <view class="sv-meta">{{modeText}} · card {{cardId}} · action {{submitActionId}} · 指纹 {{keyText}}{{costMs ? ' · ' + costMs + 'ms' : ''}}</view>

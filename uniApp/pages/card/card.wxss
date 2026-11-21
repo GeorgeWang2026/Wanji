@@ -1,4 +1,8 @@
-/* DF-156 · 卡片页样式（沿用全局暗紫底，只加卡片内部排版） */
+/* ============================================================
+ * DF-156 · 卡片页样式
+ * 颜色一律取 app.wxss 的 --qm-* 主题变量，禁止硬编码（§15.3）；
+ * 按键复用全局 .qm-btn / .qm-btn-primary，本文件只管排版。
+ * ============================================================ */
 
 .cx-page {
   padding: 24rpx;
@@ -16,16 +20,16 @@
 /* 文本块 */
 .cx-text {
   font-size: 28rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
   line-height: 1.7;
   word-break: break-all;
 }
 
 .cx-muted {
-  color: rgba(232, 224, 240, .62);
+  color: var(--qm-muted);
 }
 
-/* 按键组 */
+/* 按键组（外观走 .qm-btn，此处只控排布） */
 .cx-btns {
   display: flex;
   flex-direction: row;
@@ -37,30 +41,16 @@
   min-width: 200rpx;
   margin: 8rpx 8rpx 8rpx 0;
   padding: 0 28rpx;
-  height: 72rpx;
-  line-height: 72rpx;
-  text-align: center;
-  font-size: 28rpx;
-  color: #efe6ff;
-  background: rgba(255, 255, 255, .08);
-  border: 1rpx solid rgba(147, 112, 219, .38);
-  border-radius: 36rpx;
   overflow: hidden;
   white-space: nowrap;
   text-overflow: ellipsis;
 }
 
-.cx-btn-primary {
-  color: #fff;
-  background: linear-gradient(135deg, #9370db, #ff8fb5);
-  border-color: transparent;
-}
-
 /* 选择列表 */
 .cx-choice {
-  background: rgba(255, 255, 255, .04);
-  border: 1rpx solid rgba(147, 112, 219, .22);
-  border-radius: 18rpx;
+  background: var(--qm-card-bg-soft);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius-sm);
   padding: 8rpx 0;
 }
 
@@ -69,7 +59,7 @@
   flex-direction: row;
   align-items: flex-start;
   padding: 18rpx 22rpx;
-  border-top: 1rpx solid rgba(147, 112, 219, .12);
+  border-top: 1rpx solid var(--qm-line-soft);
 }
 
 .cx-item:first-child {
@@ -82,8 +72,9 @@
   margin-top: 6rpx;
   margin-right: 16rpx;
   border-radius: 50%;
-  border: 2rpx solid rgba(147, 112, 219, .6);
+  border: 2rpx solid var(--qm-accent-line);
   flex: 0 0 auto;
+  box-sizing: border-box;
 }
 
 .cx-mark-square {
@@ -98,13 +89,13 @@
 
 .cx-item-label {
   font-size: 28rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
 }
 
 .cx-item-desc {
   margin-top: 4rpx;
   font-size: 22rpx;
-  color: rgba(232, 224, 240, .55);
+  color: var(--qm-muted);
   line-height: 1.5;
 }
 
@@ -115,7 +106,7 @@
 
 .cx-form-q-title {
   font-size: 28rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
   font-weight: 500;
 }
 
@@ -124,8 +115,8 @@
   padding: 0 10rpx;
   font-size: 20rpx;
   line-height: 32rpx;
-  color: #ffd08a;
-  border: 1rpx solid rgba(255, 176, 60, .4);
+  color: var(--qm-gold);
+  border: 1rpx solid var(--qm-gold-border);
   border-radius: 8rpx;
 }
 
@@ -139,29 +130,29 @@
   height: 76rpx;
   padding: 0 22rpx;
   font-size: 28rpx;
-  color: #e8e0f0;
-  background: rgba(255, 255, 255, .06);
-  border: 1rpx solid rgba(147, 112, 219, .3);
-  border-radius: 16rpx;
+  color: var(--qm-text);
+  background: var(--qm-card-bg);
+  border: 1rpx solid var(--qm-card-border);
+  border-radius: var(--qm-radius-sm);
 }
 
 /* 图片 */
 .cx-image-wrap {
-  border-radius: 16rpx;
+  border-radius: var(--qm-radius-sm);
   overflow: hidden;
 }
 
 .cx-image {
   width: 100%;
   height: 320rpx;
-  border-radius: 16rpx;
-  background: rgba(255, 255, 255, .05);
+  border-radius: var(--qm-radius-sm);
+  background: var(--qm-card-bg);
 }
 
 .cx-image-alt {
   margin-top: 8rpx;
   font-size: 22rpx;
-  color: rgba(232, 224, 240, .55);
+  color: var(--qm-muted);
 }
 
 /* 状态/进度 */
@@ -170,37 +161,37 @@
   flex-direction: row;
   justify-content: space-between;
   font-size: 26rpx;
-  color: #e8e0f0;
+  color: var(--qm-text);
 }
 
 .cx-status-value {
-  color: #ff8fb5;
+  color: var(--qm-accent-2);
 }
 
 .cx-bar {
   margin-top: 10rpx;
   height: 12rpx;
   border-radius: 6rpx;
-  background: rgba(255, 255, 255, .1);
+  background: var(--qm-line);
   overflow: hidden;
 }
 
 .cx-bar-inner {
   height: 100%;
   border-radius: 6rpx;
-  background: linear-gradient(90deg, #9370db, #ff8fb5);
+  background: linear-gradient(90deg, var(--qm-accent), var(--qm-accent-2));
 }
 
 /* 分组容器 */
 .cx-group {
   padding-left: 14rpx;
-  border-left: 4rpx solid rgba(147, 112, 219, .5);
+  border-left: 4rpx solid var(--qm-accent-line);
 }
 
 .cx-group-title {
   font-size: 26rpx;
   font-weight: 600;
-  color: #cdb8f0;
+  color: var(--qm-text-soft);
   margin-bottom: 6rpx;
 }
 
@@ -208,36 +199,38 @@
 .cx-notice {
   margin-top: 12rpx;
   padding: 16rpx 20rpx;
-  border-radius: 14rpx;
+  border-radius: var(--qm-radius-sm);
   font-size: 26rpx;
   line-height: 1.6;
 }
 
 .cx-notice-info {
-  color: #cdb8f0;
-  background: rgba(147, 112, 219, .16);
-  border: 1rpx solid rgba(147, 112, 219, .32);
+  color: var(--qm-text-soft);
+  background: var(--qm-chip-bg);
+  border: 1rpx solid var(--qm-card-border);
 }
 
 .cx-notice-warn {
-  color: #ffd08a;
-  background: rgba(255, 176, 60, .12);
-  border: 1rpx solid rgba(255, 176, 60, .3);
+  color: var(--qm-warn);
+  background: var(--qm-warn-bg);
+  border: 1rpx solid var(--qm-warn-border);
 }
 
 .cx-notice-error {
-  color: #ffb3b3;
-  background: rgba(255, 96, 96, .12);
-  border: 1rpx solid rgba(255, 96, 96, .32);
+  color: var(--qm-danger);
+  background: var(--qm-danger-bg);
+  border: 1rpx solid var(--qm-danger-border);
 }
 
 .cx-retry {
   margin-top: 20rpx;
   align-self: flex-start;
+  min-width: 220rpx;
+  padding: 0 32rpx;
 }
 
 .cx-foot {
   margin-top: 16rpx;
   font-size: 22rpx;
-  color: rgba(232, 224, 240, .45);
+  color: var(--qm-muted);
 }
