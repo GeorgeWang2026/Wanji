@@ -1,0 +1,71 @@
+{
+  "schema_version": "1",
+  "generated_by": "scripts/gen_card_samples.py",
+  "doc": "https://jian-pei.feishu.cn/docx/DfT0dU48coaijtxjD2ycQK7VnAd §13",
+  "limits": {
+    "max_layout_bytes": 16384,
+    "max_nodes": 200,
+    "max_depth": 3,
+    "max_text_len": 500,
+    "max_label_len": 40,
+    "max_buttons": 4,
+    "max_options": 20
+  },
+  "components": [
+    "group",
+    "text",
+    "buttons",
+    "choice",
+    "input",
+    "image",
+    "status",
+    "notice"
+  ],
+  "unknown_component_policy": "降级为文本块；取不出文本则丢弃，不白屏",
+  "cases": [
+    {
+      "file": "case1-normal.json",
+      "case": "正常",
+      "expected": {
+        "http": 200,
+        "card": "present",
+        "backend": "原样下发",
+        "render": "按 layout 组件树逐类渲染；8 类组件都应出现"
+      }
+    },
+    {
+      "file": "case2-unknown-component.json",
+      "case": "含未知组件",
+      "input_file": "case2-unknown-component.input.json",
+      "expected": {
+        "http": 200,
+        "card": "present",
+        "backend": "carousel 降级为文本块；video 取不出文本，丢弃",
+        "render": "只剩文本块，不得白屏、不得报错"
+      }
+    },
+    {
+      "file": "case3-oversize.json",
+      "case": "超限",
+      "input_file": "case3-oversize.input.json",
+      "expected": {
+        "http": 200,
+        "card": "absent",
+        "backend": "整卡拒发并记日志（layout_too_large）",
+        "render": "只用 reply 走纯文本渲染",
+        "note": "input_file 仅供渲染器自测兜底，后端不会下发这种卡"
+      }
+    },
+    {
+      "file": "case4-no-card.json",
+      "case": "无 card 字段",
+      "expected": {
+        "http": 200,
+        "card": "null/absent",
+        "backend": "不产卡（缺省路径）",
+        "render": "纯文本渲染，响应结构与旧版一致"
+      }
+    }
+  ]
+}
+

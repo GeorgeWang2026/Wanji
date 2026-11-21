@@ -56,39 +56,30 @@
   border-color: transparent;
 }
 
-.cx-btn-disabled {
-  opacity: .4;
-}
-
-/* 列表 */
-.cx-list {
+/* 选择列表 */
+.cx-choice {
   background: rgba(255, 255, 255, .04);
   border: 1rpx solid rgba(147, 112, 219, .22);
   border-radius: 18rpx;
   padding: 8rpx 0;
 }
 
-.cx-list-title {
-  padding: 12rpx 22rpx 4rpx;
-  font-size: 24rpx;
-  color: rgba(232, 224, 240, .6);
-}
-
 .cx-item {
   display: flex;
   flex-direction: row;
-  align-items: center;
+  align-items: flex-start;
   padding: 18rpx 22rpx;
   border-top: 1rpx solid rgba(147, 112, 219, .12);
 }
 
-.cx-item-on {
-  background: rgba(147, 112, 219, .16);
+.cx-item:first-child {
+  border-top: 0;
 }
 
 .cx-mark {
   width: 28rpx;
   height: 28rpx;
+  margin-top: 6rpx;
   margin-right: 16rpx;
   border-radius: 50%;
   border: 2rpx solid rgba(147, 112, 219, .6);
@@ -99,26 +90,28 @@
   border-radius: 6rpx;
 }
 
-.cx-mark-on {
-  background: #ff8fb5;
-  border-color: #ff8fb5;
+.cx-item-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
 }
 
-.cx-item-text {
+.cx-item-label {
   font-size: 28rpx;
   color: #e8e0f0;
+}
+
+.cx-item-desc {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: rgba(232, 224, 240, .55);
+  line-height: 1.5;
 }
 
 /* 输入框 */
 .cx-field {
   display: flex;
   flex-direction: column;
-}
-
-.cx-field-label {
-  font-size: 24rpx;
-  color: rgba(232, 224, 240, .6);
-  margin-bottom: 8rpx;
 }
 
 .cx-input {
@@ -163,10 +156,6 @@
   color: #ff8fb5;
 }
 
-.cx-bad {
-  color: #ff7b7b;
-}
-
 .cx-bar {
   margin-top: 10rpx;
   height: 12rpx;
@@ -179,10 +168,6 @@
   height: 100%;
   border-radius: 6rpx;
   background: linear-gradient(90deg, #9370db, #ff8fb5);
-}
-
-.cx-bar-bad {
-  background: #ff7b7b;
 }
 
 /* 分组容器 */
@@ -199,7 +184,7 @@
 }
 
 /* 提示条 */
-.cx-tip {
+.cx-notice {
   margin-top: 12rpx;
   padding: 16rpx 20rpx;
   border-radius: 14rpx;
@@ -207,19 +192,19 @@
   line-height: 1.6;
 }
 
-.cx-tip-info {
+.cx-notice-info {
   color: #cdb8f0;
   background: rgba(147, 112, 219, .16);
   border: 1rpx solid rgba(147, 112, 219, .32);
 }
 
-.cx-tip-warn {
+.cx-notice-warn {
   color: #ffd08a;
   background: rgba(255, 176, 60, .12);
   border: 1rpx solid rgba(255, 176, 60, .3);
 }
 
-.cx-tip-error {
+.cx-notice-error {
   color: #ffb3b3;
   background: rgba(255, 96, 96, .12);
   border: 1rpx solid rgba(255, 96, 96, .32);
@@ -228,4 +213,10 @@
 .cx-retry {
   margin-top: 20rpx;
   align-self: flex-start;
+}
+
+.cx-foot {
+  margin-top: 16rpx;
+  font-size: 22rpx;
+  color: rgba(232, 224, 240, .45);
 }

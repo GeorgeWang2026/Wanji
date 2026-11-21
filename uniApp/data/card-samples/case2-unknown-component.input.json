@@ -1,0 +1,22 @@
+{
+  "layout": {
+    "type": "group",
+    "title": "未知组件降级示例",
+    "children": [
+      {
+        "type": "text",
+        "text": "下面两个组件不在白名单里。",
+        "tone": "default"
+      },
+      {
+        "type": "carousel",
+        "text": "轮播组件：不在白名单，降级成这段文本。"
+      },
+      {
+        "type": "video",
+        "url": "/media/demo.mp4"
+      }
+    ]
+  }
+}
+

@@ -1,0 +1,90 @@
+{
+  "reply": "这是卡片联调基准：8 类原子组件各一份。",
+  "mode": "llm",
+  "card": {
+    "schema_version": "1",
+    "card_id": "c_20261121_0001",
+    "layout": {
+      "type": "group",
+      "children": [
+        {
+          "type": "notice",
+          "text": "DF-156 联调基准：8 类原子组件各一，按白名单渲染。",
+          "level": "info"
+        },
+        {
+          "type": "text",
+          "text": "文本块：纯展示，不可点击。",
+          "tone": "default"
+        },
+        {
+          "type": "image",
+          "url": "/avatar/xiaoxuan_1.png",
+          "alt": "示意图片"
+        },
+        {
+          "type": "status",
+          "value": 66,
+          "label": "生成进度",
+          "text": "66%"
+        },
+        {
+          "type": "choice",
+          "multiple": false,
+          "options": [
+            {
+              "label": "选项甲",
+              "value": "a",
+              "action_id": "pick_a",
+              "description": "单选列表：一次只能选一项"
+            },
+            {
+              "label": "选项乙",
+              "value": "b",
+              "action_id": "pick_b"
+            }
+          ]
+        },
+        {
+          "type": "choice",
+          "multiple": true,
+          "options": [
+            {
+              "label": "标签一",
+              "value": "t1",
+              "action_id": "tag_1"
+            },
+            {
+              "label": "标签二",
+              "value": "t2",
+              "action_id": "tag_2"
+            }
+          ]
+        },
+        {
+          "type": "input",
+          "name": "note",
+          "placeholder": "补充说明（可选）",
+          "max_length": 100
+        },
+        {
+          "type": "buttons",
+          "items": [
+            {
+              "label": "确认",
+              "action_id": "confirm",
+              "style": "primary"
+            },
+            {
+              "label": "取消",
+              "action_id": "cancel",
+              "style": "default"
+            }
+          ]
+        }
+      ],
+      "title": "卡片组件总览"
+    }
+  }
+}
+
