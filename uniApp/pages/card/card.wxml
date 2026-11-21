@@ -51,7 +51,26 @@
   </view>
 </template>
 
-<!-- 5. 输入框 -->
+<!-- 5. 表单（选择题，只读预览；交互在问卷 demo 页） -->
+<template name="t-form">
+  <view class="cx-group">
+    <view wx:if="{{item.title}}" class="cx-group-title">{{item.title}}</view>
+    <view wx:for="{{item.questions}}" wx:for-item="q" wx:key="id" class="cx-form-q">
+      <view class="cx-form-q-title">
+        {{q.text}}
+        <text wx:if="{{q.required}}" class="cx-form-req">必填</text>
+      </view>
+      <view class="cx-choice">
+        <view wx:for="{{q.options}}" wx:for-item="o" wx:key="value" class="cx-item">
+          <view class="cx-mark {{q.multiple ? 'cx-mark-square' : ''}}"></view>
+          <view class="cx-item-label {{o.skip ? 'cx-muted' : ''}}">{{o.label}}</view>
+        </view>
+      </view>
+    </view>
+  </view>
+</template>
+
+<!-- 6. 输入框 -->
 <template name="t-input">
   <view class="cx-field">
     <input

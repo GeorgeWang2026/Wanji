@@ -1,0 +1,209 @@
+/* DF-156 · 问卷 demo 样式（沿用全局暗紫底，只做选择题排版） */
+
+.sv-page {
+  padding: 24rpx 24rpx 64rpx;
+}
+
+.sv-title {
+  font-size: 34rpx;
+  font-weight: 600;
+  color: #efe6ff;
+}
+
+.sv-intro {
+  margin-top: 10rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: rgba(232, 224, 240, .6);
+}
+
+.sv-q {
+  margin-top: 24rpx;
+  padding: 20rpx 0 8rpx;
+  border-top: 1rpx solid rgba(147, 112, 219, .18);
+}
+
+.sv-q-head {
+  display: flex;
+  flex-direction: row;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.sv-q-index {
+  margin-right: 8rpx;
+  font-size: 28rpx;
+  color: #cdb8f0;
+}
+
+.sv-q-title {
+  font-size: 28rpx;
+  color: #e8e0f0;
+  font-weight: 500;
+}
+
+.sv-req {
+  margin-left: 10rpx;
+  padding: 0 10rpx;
+  font-size: 20rpx;
+  line-height: 32rpx;
+  color: #ffd08a;
+  border: 1rpx solid rgba(255, 176, 60, .4);
+  border-radius: 8rpx;
+}
+
+.sv-type {
+  margin-left: auto;
+  font-size: 22rpx;
+  color: rgba(232, 224, 240, .45);
+}
+
+.sv-opts {
+  margin-top: 12rpx;
+  background: rgba(255, 255, 255, .04);
+  border: 1rpx solid rgba(147, 112, 219, .22);
+  border-radius: 18rpx;
+  padding: 4rpx 0;
+}
+
+.sv-opt {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  padding: 18rpx 22rpx;
+  border-top: 1rpx solid rgba(147, 112, 219, .12);
+}
+
+.sv-opt:first-child {
+  border-top: 0;
+}
+
+.sv-opt-on {
+  background: rgba(147, 112, 219, .16);
+}
+
+.sv-mark {
+  width: 28rpx;
+  height: 28rpx;
+  margin-top: 6rpx;
+  margin-right: 16rpx;
+  border-radius: 50%;
+  border: 2rpx solid rgba(147, 112, 219, .6);
+  flex: 0 0 auto;
+  box-sizing: border-box;
+}
+
+.sv-mark-square {
+  border-radius: 6rpx;
+}
+
+.sv-mark-on {
+  border-color: transparent;
+  background: linear-gradient(135deg, #9370db, #ff8fb5);
+}
+
+.sv-opt-body {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.sv-opt-label {
+  font-size: 28rpx;
+  color: #e8e0f0;
+}
+
+.sv-opt-skip {
+  color: rgba(232, 224, 240, .62);
+}
+
+.sv-opt-desc {
+  margin-top: 4rpx;
+  font-size: 22rpx;
+  color: rgba(232, 224, 240, .55);
+  line-height: 1.5;
+}
+
+.sv-note {
+  margin-top: 16rpx;
+  padding: 14rpx 20rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #cdb8f0;
+  background: rgba(147, 112, 219, .16);
+  border: 1rpx solid rgba(147, 112, 219, .32);
+  border-radius: 14rpx;
+}
+
+.sv-hint {
+  margin-top: 20rpx;
+  padding: 16rpx 20rpx;
+  font-size: 24rpx;
+  line-height: 1.6;
+  color: #ffd08a;
+  background: rgba(255, 176, 60, .12);
+  border: 1rpx solid rgba(255, 176, 60, .3);
+  border-radius: 14rpx;
+}
+
+.sv-actions {
+  margin-top: 26rpx;
+  display: flex;
+  flex-direction: row;
+  flex-wrap: wrap;
+}
+
+.sv-btn {
+  margin: 0 14rpx 14rpx 0;
+  padding: 0 30rpx;
+  height: 76rpx;
+  line-height: 76rpx;
+  font-size: 28rpx;
+  color: #efe6ff;
+  background: rgba(255, 255, 255, .08);
+  border: 1rpx solid rgba(147, 112, 219, .38);
+  border-radius: 38rpx;
+}
+
+.sv-btn-primary {
+  color: #fff;
+  background: linear-gradient(135deg, #9370db, #ff8fb5);
+  border-color: transparent;
+}
+
+.sv-btn-busy {
+  opacity: .55;
+}
+
+.sv-meta {
+  margin-top: 8rpx;
+  font-size: 22rpx;
+  color: rgba(232, 224, 240, .45);
+  word-break: break-all;
+}
+
+.sv-result {
+  margin-top: 20rpx;
+}
+
+.sv-result-title {
+  font-size: 26rpx;
+  color: #cdb8f0;
+}
+
+.sv-json {
+  margin-top: 10rpx;
+  max-height: 480rpx;
+  padding: 16rpx 20rpx;
+  background: rgba(0, 0, 0, .28);
+  border: 1rpx solid rgba(147, 112, 219, .22);
+  border-radius: 14rpx;
+}
+
+.sv-json-text {
+  font-size: 22rpx;
+  line-height: 1.6;
+  color: #d9cdf0;
+  white-space: pre-wrap;
+  word-break: break-all;
+}

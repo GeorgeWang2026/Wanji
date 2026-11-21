@@ -24,7 +24,7 @@ var LIMITS = {
   maxOptions: 20
 };
 
-var COMPONENTS = ['group', 'text', 'buttons', 'choice', 'input', 'image', 'status', 'notice'];
+var COMPONENTS = ['group', 'text', 'buttons', 'choice', 'form', 'input', 'image', 'status', 'notice'];
 
 function isPlainObject(v) {
   return !!v && typeof v === 'object' && !Array.isArray(v);
@@ -58,6 +58,10 @@ function cut(s, max) {
 function num(v, def) {
   var n = Number(v);
   return isFinite(n) ? n : def;
+}
+
+function isSkipLabel(label) {
+  return /不确定\s*[\/／、]?\s*跳过|^跳过$|^不便回答$/.test(label || '');
 }
 
 /* ---------- 单节点归一 ----------
@@ -178,6 +182,58 @@ function normalizeNode(raw, depth, ctx) {
     };
   }
 
+  if (type === 'form') {
+    var qs = Array.isArray(raw.questions) ? raw.questions : [];
+    var outQs = [];
+    for (var qi = 0; qi < qs.length; qi++) {
+      var q = qs[qi];
+      if (!isPlainObject(q)) continue;
+      var qid = str(q.id, 'q' + (qi + 1));
+      var qtext = cut(q.text || q.title, LIMITS.maxTextLen);
+      var rawOpts2 = Array.isArray(q.options) ? q.options : [];
+      var oo = [];
+      var isGender = /性别/.test(qtext);
+      for (var oi = 0; oi < rawOpts2.length && oo.length < LIMITS.maxOptions; oi++) {
+        var o2 = rawOpts2[oi];
+        if (!isPlainObject(o2)) continue;
+        var olabel2 = cut(o2.label, LIMITS.maxLabelLen);
+        if (!olabel2) continue;
+        var oval2 = str(o2.value, '');
+        var skip2 = !!o2.skip || oval2 === '__skip__' || isSkipLabel(olabel2);
+        if (/^(男|女)$/.test(olabel2)) isGender = true;
+        oo.push({ label: olabel2, value: oval2, action_id: str(o2.action_id, ''), skip: skip2 });
+      }
+      if (!oo.length) continue;
+      var hasSkip2 = false;
+      for (var si = 0; si < oo.length; si++) { if (oo[si].skip) { hasSkip2 = true; break; } }
+      if (!hasSkip2) {
+        oo.push({
+          label: isGender ? '不便回答' : '不确定/跳过',
+          value: '__skip__',
+          action_id: qid + '_skip',
+          skip: true
+        });
+      }
+      outQs.push({
+        id: qid,
+        text: qtext,
+        multiple: !!q.multiple || q.type === 'multi',
+        required: !!q.required,
+        options: oo
+      });
+    }
+    if (!outQs.length) return { dropped: '表单无有效题目' };
+    return {
+      node: {
+        type: 'form',
+        title: cut(raw.title, LIMITS.maxLabelLen),
+        questions: outQs,
+        depth: depth,
+        key: key
+      }
+    };
+  }
+
   // group
   var children = Array.isArray(raw.children) ? raw.children : [];
   return {
@@ -264,6 +320,11 @@ function normalizeCard(card) {
       for (var b = 0; b < node.items.length; b++) pushAction(node.items[b].action_id);
     } else if (node.type === 'choice') {
       for (var k = 0; k < node.options.length; k++) pushAction(node.options[k].action_id);
+    } else if (node.type === 'form') {
+      for (var fq = 0; fq < node.questions.length; fq++) {
+        var fopts = node.questions[fq].options || [];
+        for (var fo = 0; fo < fopts.length; fo++) pushAction(fopts[fo].action_id);
+      }
     }
 
     flat.push(node);

@@ -1,0 +1,55 @@
+<view class="sv-page">
+  <view wx:if="{{status === 'rejected'}}" class="sv-hint">{{message}}</view>
+
+  <block wx:if="{{status === 'ok'}}">
+    <view class="sv-title">{{title}}</view>
+    <view wx:if="{{intro}}" class="sv-intro">{{intro}}</view>
+
+    <view wx:for="{{questions}}" wx:for-item="q" wx:key="id" class="sv-q">
+      <view class="sv-q-head">
+        <text class="sv-q-index">{{q.index}}.</text>
+        <text class="sv-q-title">{{q.title}}</text>
+        <text wx:if="{{q.required}}" class="sv-req">必填</text>
+        <text class="sv-type">{{q.typeLabel}}</text>
+      </view>
+
+      <view class="sv-opts">
+        <view
+          wx:for="{{q.options}}"
+          wx:for-item="o"
+          wx:key="value"
+          class="sv-opt {{o.selected ? 'sv-opt-on' : ''}}"
+          data-qid="{{q.id}}"
+          data-value="{{o.value}}"
+          bindtap="onTapOption"
+        >
+          <view class="sv-mark {{q.multiple ? 'sv-mark-square' : ''}} {{o.selected ? 'sv-mark-on' : ''}}"></view>
+          <view class="sv-opt-body">
+            <view class="sv-opt-label {{o.skip ? 'sv-opt-skip' : ''}}">{{o.label}}</view>
+          </view>
+        </view>
+      </view>
+    </view>
+
+    <view wx:if="{{notice}}" class="sv-note">{{notice}}</view>
+    <view wx:if="{{missingHint}}" class="sv-hint">{{missingHint}}</view>
+
+    <view class="sv-actions">
+      <view class="sv-btn sv-btn-primary {{submitting ? 'sv-btn-busy' : ''}}" bindtap="onSubmit">整卷提交</view>
+      <view class="sv-btn" bindtap="onSubmit">重复提交（回放）</view>
+      <view class="sv-btn" bindtap="onResetAnswers">清空重答</view>
+    </view>
+
+    <view class="sv-meta">{{modeText}} · card {{cardId}} · action {{submitActionId}} · 指纹 {{keyText}}{{costMs ? ' · ' + costMs + 'ms' : ''}}</view>
+
+    <view wx:if="{{resultTitle}}" class="sv-result">
+      <view class="sv-result-title">{{resultTitle}}</view>
+      <scroll-view scroll-y class="sv-json"><text class="sv-json-text">{{resultText}}</text></scroll-view>
+    </view>
+
+    <view wx:if="{{payloadText}}" class="sv-result">
+      <view class="sv-result-title">整卷回传载荷（card_id + action_id + card_answers）</view>
+      <scroll-view scroll-y class="sv-json"><text class="sv-json-text">{{payloadText}}</text></scroll-view>
+    </view>
+  </block>
+</view>

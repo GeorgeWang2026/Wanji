@@ -7,7 +7,8 @@
     "uniApp/pages/core/stock-chart/stock-chart",
     "uniApp/pages/core/my-stocks/my-stocks",
     "uniApp/pages/core/inspire/inspire",
-    "uniApp/pages/card/card"
+    "uniApp/pages/card/card",
+    "uniApp/pages/survey/survey"
   ],
   "window": {
     "navigationBarBackgroundColor": "#1a0f2e",

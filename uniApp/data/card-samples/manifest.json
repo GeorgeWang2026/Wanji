@@ -16,11 +16,20 @@
     "text",
     "buttons",
     "choice",
+    "form",
     "input",
     "image",
     "status",
     "notice"
   ],
+  "demo_scope": "本轮测试 demo 只做选择题：单选、多选、整卷一次提交回传；输入框组件后端保留能力，demo 不出现",
+  "form_rules": {
+    "all_questions_at_once": true,
+    "skip_option": "每题自动补「不确定/跳过」；性别题补「不便回答」",
+    "required": "required 仅供前端提示，缺答不阻断提交",
+    "submit": "逐题点选用选项 action_id；整卷提交带 card_id + action_id + card_answers",
+    "submit_idempotency": "整卷提交幂等键 = 动作 + 答案指纹，重复提交回放首次结果"
+  },
   "unknown_component_policy": "降级为文本块；取不出文本则丢弃，不白屏",
   "cases": [
     {
@@ -65,7 +74,17 @@
         "backend": "不产卡（缺省路径）",
         "render": "纯文本渲染，响应结构与旧版一致"
       }
+    },
+    {
+      "file": "case5-choice-form.json",
+      "case": "选择题整卷",
+      "expected": {
+        "http": 200,
+        "card": "present",
+        "backend": "静态预置问卷卡，一次下发全部题目",
+        "render": "4 题一次显示；每题都有「不确定/跳过」，性别题为「不便回答」；必填未答可提示但不阻断提交",
+        "submit": "逐题点选回传选项 action_id；整卷提交回传 card_id + action_id=submit_all + card_answers={题号: 值}"
+      }
     }
   ]
 }
-

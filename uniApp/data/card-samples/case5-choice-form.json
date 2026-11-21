@@ -1,0 +1,157 @@
+{
+  "reply": "先确认几件事，问题一次给全，可以逐题点选，也可以整卷提交。",
+  "mode": "llm",
+  "card": {
+    "schema_version": "1",
+    "card_id": "c_20261121_0005",
+    "layout": {
+      "type": "group",
+      "children": [
+        {
+          "type": "text",
+          "text": "问题一次给全：可以逐题点选，也可以答完一次整卷提交。",
+          "tone": "default"
+        },
+        {
+          "type": "form",
+          "questions": [
+            {
+              "id": "q1",
+              "text": "这次主要想问哪方面？",
+              "multiple": false,
+              "required": true,
+              "options": [
+                {
+                  "label": "事业发展",
+                  "value": "career",
+                  "action_id": "q1_career"
+                },
+                {
+                  "label": "感情婚姻",
+                  "value": "love",
+                  "action_id": "q1_love"
+                },
+                {
+                  "label": "健康",
+                  "value": "health",
+                  "action_id": "q1_health"
+                },
+                {
+                  "label": "财运",
+                  "value": "wealth",
+                  "action_id": "q1_wealth"
+                },
+                {
+                  "label": "不确定/跳过",
+                  "value": "__skip__",
+                  "action_id": "q1_skip"
+                }
+              ]
+            },
+            {
+              "id": "q2",
+              "text": "希望解读覆盖哪些点？（可多选）",
+              "multiple": true,
+              "required": true,
+              "options": [
+                {
+                  "label": "时间节点",
+                  "value": "timing",
+                  "action_id": "q2_timing"
+                },
+                {
+                  "label": "风险提示",
+                  "value": "risk",
+                  "action_id": "q2_risk"
+                },
+                {
+                  "label": "行动建议",
+                  "value": "action",
+                  "action_id": "q2_action"
+                },
+                {
+                  "label": "因果解释",
+                  "value": "cause",
+                  "action_id": "q2_cause"
+                },
+                {
+                  "label": "不确定/跳过",
+                  "value": "__skip__",
+                  "action_id": "q2_skip"
+                }
+              ]
+            },
+            {
+              "id": "q3",
+              "text": "性别",
+              "multiple": false,
+              "required": false,
+              "options": [
+                {
+                  "label": "男",
+                  "value": "male",
+                  "action_id": "q3_male"
+                },
+                {
+                  "label": "女",
+                  "value": "female",
+                  "action_id": "q3_female"
+                },
+                {
+                  "label": "不便回答",
+                  "value": "__skip__",
+                  "action_id": "q3_skip"
+                }
+              ]
+            },
+            {
+              "id": "q4",
+              "text": "希望多久内看到结论？",
+              "multiple": false,
+              "required": false,
+              "options": [
+                {
+                  "label": "一周内",
+                  "value": "week",
+                  "action_id": "q4_week"
+                },
+                {
+                  "label": "一个月内",
+                  "value": "month",
+                  "action_id": "q4_month"
+                },
+                {
+                  "label": "不急",
+                  "value": "any",
+                  "action_id": "q4_any"
+                },
+                {
+                  "label": "不确定/跳过",
+                  "value": "__skip__",
+                  "action_id": "q4_skip"
+                }
+              ]
+            }
+          ],
+          "title": "选择题"
+        },
+        {
+          "type": "notice",
+          "text": "必填项没答会提示，但不影响提交。",
+          "level": "info"
+        },
+        {
+          "type": "buttons",
+          "items": [
+            {
+              "label": "整卷提交",
+              "action_id": "submit_all",
+              "style": "primary"
+            }
+          ]
+        }
+      ],
+      "title": "本次咨询问卷"
+    }
+  }
+}
