@@ -1,0 +1,124 @@
+<!-- ============================================================
+     DF-156 · 卡片渲染器模板
+     8 个原子组件 = 8 个编译期固化的 template，渲染器只做 type 映射。
+     未知 type 在 card-layout.js 里已归一成 text，这里不存在缺分支。
+     ============================================================ -->
+
+<!-- 1. 文本块 -->
+<template name="t-text">
+  <view class="cx-text {{item.muted ? 'cx-muted' : ''}}">{{item.text}}</view>
+</template>
+
+<!-- 2. 按键组 -->
+<template name="t-buttons">
+  <view class="cx-btns">
+    <view
+      wx:for="{{item.buttons}}"
+      wx:key="action_id"
+      class="cx-btn {{item.style === 'primary' ? 'cx-btn-primary' : ''}} {{item.disabled ? 'cx-btn-disabled' : ''}}"
+      data-action-id="{{item.action_id}}"
+      bindtap="onTapAction"
+    >{{item.text}}</view>
+  </view>
+</template>
+
+<!-- 3. 单选/多选列表 -->
+<template name="t-list">
+  <view class="cx-list">
+    <view wx:if="{{item.title}}" class="cx-list-title">{{item.title}}</view>
+    <view
+      wx:for="{{item.items}}"
+      wx:key="action_id"
+      class="cx-item {{item.checked ? 'cx-item-on' : ''}} {{item.disabled ? 'cx-btn-disabled' : ''}}"
+      data-action-id="{{item.action_id}}"
+      bindtap="onTapAction"
+    >
+      <view class="cx-mark {{item.checked ? 'cx-mark-on' : ''}} {{item.mode === 'multi' ? 'cx-mark-square' : ''}}"></view>
+      <view class="cx-item-text">{{item.text}}</view>
+    </view>
+  </view>
+</template>
+
+<!-- 4. 输入框 -->
+<template name="t-input">
+  <view class="cx-field">
+    <view wx:if="{{item.label}}" class="cx-field-label">{{item.label}}</view>
+    <input
+      class="cx-input"
+      value="{{item.value}}"
+      placeholder="{{item.placeholder}}"
+      maxlength="{{item.maxlength}}"
+      data-key="{{item.key}}"
+      bindinput="onInputChange"
+    />
+  </view>
+</template>
+
+<!-- 5. 图片 -->
+<template name="t-image">
+  <view class="cx-image-wrap">
+    <image class="cx-image" src="{{item.src}}" mode="{{item.mode}}" />
+    <view wx:if="{{item.alt}}" class="cx-image-alt">{{item.alt}}</view>
+  </view>
+</template>
+
+<!-- 6. 状态/进度 -->
+<template name="t-status">
+  <view class="cx-status">
+    <view class="cx-status-head">
+      <text class="cx-status-label">{{item.label}}</text>
+      <text class="cx-status-value {{item.state === 'error' ? 'cx-bad' : ''}}">{{item.value}}</text>
+    </view>
+    <view wx:if="{{item.percent !== null}}" class="cx-bar">
+      <view class="cx-bar-inner {{item.state === 'error' ? 'cx-bar-bad' : ''}}" style="width: {{item.percent * 100}}%"></view>
+    </view>
+  </view>
+</template>
+
+<!-- 7. 分组容器（子节点已在解析层展开，按 depth 缩进显示） -->
+<template name="t-group">
+  <view class="cx-group">
+    <view wx:if="{{item.title}}" class="cx-group-title">{{item.title}}</view>
+  </view>
+</template>
+
+<!-- 8. 提示条 -->
+<template name="t-tip">
+  <view class="cx-tip cx-tip-{{item.level}}">{{item.text}}</view>
+</template>
+
+<view class="cx-page">
+  <!-- 状态：无 card 字段 -->
+  <view wx:if="{{status === 'skipped'}}" class="cx-block">
+    <view class="cx-tip cx-tip-info">本条消息无 card 字段，按纯文本渲染（旧消息不受影响）</view>
+  </view>
+
+  <!-- 状态：整卡被拒 -->
+  <view wx:elif="{{status === 'rejected'}}" class="cx-block">
+    <view class="cx-tip cx-tip-error">{{message}}</view>
+    <view class="cx-btn cx-btn-primary cx-retry" bindtap="onRetry">重试</view>
+  </view>
+
+  <!-- 状态：解析异常 -->
+  <view wx:elif="{{status === 'error'}}" class="cx-block">
+    <view class="cx-tip cx-tip-error">{{message}}</view>
+  </view>
+
+  <!-- 正常渲染 -->
+  <view wx:else class="cx-block">
+    <view wx:if="{{notice}}" class="cx-tip cx-tip-warn">{{notice}}</view>
+
+    <view
+      wx:for="{{nodes}}"
+      wx:key="index"
+      class="cx-node"
+      style="margin-left: {{item.depth * 16}}rpx"
+    >
+      <template is="t-{{item.type}}" data="{{item: item}}" />
+    </view>
+
+    <view class="cx-foot" wx:if="{{meta}}" style="opacity:.45;font-size:22rpx;margin-top:16rpx">
+      {{meta.card_id}} · schema {{meta.schema_version}} · {{stats.count}} 节点 · {{costMs}}ms
+    </view>
+  </view>
+</view>
