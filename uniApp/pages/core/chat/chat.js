@@ -1007,9 +1007,9 @@ Page({
   },
 
   toggleInput: function () {
-    // 录音期间一律不开面板：麦克风是录音开关，不是折叠开关
+    // 录音中点上折叠栏：退出录音、转文字输入（识别到的文字留在输入框里，不自动发）
     if (this.data.recording) {
-      wx.showToast({ title: '录音中，结束后再展开', icon: 'none' });
+      this.stopRecord();
       return;
     }
     var open = !this.data.inputOpen;
