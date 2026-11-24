@@ -2893,6 +2893,8 @@ Page({
   /** FB-47：短内容（1-3 字）先弹一次「是否发送」确认，避免误发/静默丢弃 */
   _maybeSendShort: function (text) {
     var self = this;
+    // 语音松手走这条：不再问「内容较短」，直接发
+    if (this._voiceSend) { this._voiceSend = false; this._doSend(text); return; }
     if (text.length >= SHORT_TEXT_MIN && text.length <= SHORT_TEXT_MAX) {
       wx.showModal({
         title: '内容较短，确定发送吗？',
@@ -3848,11 +3850,13 @@ Page({
   /* ---------------- 语音输入 ---------------- */
   /** 长按说话：按下开始识别，松开即停（识别文字留在底部区，可用叉清空） */
   onMicHoldStart: function () {
-    if (this.data.recording) return;
+    // 一次长按只开一次：按住期间 touchstart 可能重复触发，挡住重复建流
+    if (this._micHolding || this.data.recording) return;
+    this._micHolding = true;
     if (this.data.freeTalk) {
       var self = this;
       this.exitFreeTalk();
-      setTimeout(function () { self.onMicHoldStart(); }, 250);
+      setTimeout(function () { self._micHolding = false; self.onMicHoldStart(); }, 250);
       return;
     }
     this.stopSpeaking('record');
@@ -3860,8 +3864,15 @@ Page({
   },
 
   onMicHoldEnd: function () {
+    this._micHolding = false;
     if (!this.data.recording) return;
-    this.stopRecord();
+    // 松手即发：先停识别，等最终文字回填后直接送出，不再让用户回输入框点发送
+    var self = this;
+    Promise.resolve(this.stopRecord()).then(function () {
+      setTimeout(function () {
+        if (String(self.data.input || '').trim()) { self._voiceSend = true; self.onSendTap(); }
+      }, 120);
+    });
   },
 
   onMicTap: function () {
