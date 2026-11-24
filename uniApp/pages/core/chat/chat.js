@@ -2911,7 +2911,21 @@ Page({
   _doSend: function (text) {
     // FB-51：发送后保持顶部咨询面板展开（会话区 / 已发送内容可见）
     this.setData({ input: '', inputOpen: false, topOpen: true, canClear: false });
-    this.startFlow(text);
+    // 普通输入（打字/语音）一律走自由对话（后端 chat/flash），不再弹积分、不再进深度解读。
+    // 只有草稿确认后点「开始解读 / 确认咨询」才走 pro：onFreeConfirm / onDeepDraftSubmit → startFlow。
+    var self = this;
+    if (!this.data.freeTalk) this.enterFreeTalk();
+    var tries = 0;
+    var push = function () {
+      if (self._ft && self._ft._active && self._ft._channel) {
+        try { self._ft._sendUser(text); } catch (e) { self._onCardErr('发送失败', (e && e.message) || '请稍后重试'); }
+        return;
+      }
+      if (tries++ < 40) { setTimeout(push, 250); return; }
+      // 通道连不上才回落旧链路，避免这句话彻底丢掉
+      self.startFlow(text);
+    };
+    setTimeout(push, 200);
   },
 
   /* ---------------- 排盘 bundle ---------------- */
