@@ -3846,6 +3846,24 @@ Page({
   },
 
   /* ---------------- 语音输入 ---------------- */
+  /** 长按说话：按下开始识别，松开即停（识别文字留在底部区，可用叉清空） */
+  onMicHoldStart: function () {
+    if (this.data.recording) return;
+    if (this.data.freeTalk) {
+      var self = this;
+      this.exitFreeTalk();
+      setTimeout(function () { self.onMicHoldStart(); }, 250);
+      return;
+    }
+    this.stopSpeaking('record');
+    this.startRecord();
+  },
+
+  onMicHoldEnd: function () {
+    if (!this.data.recording) return;
+    this.stopRecord();
+  },
+
   onMicTap: function () {
     // DF-97：麦克风链路与头像通道严格分离——先退出通道（停止播报与连续识别），再走原录音流程
     if (this.data.freeTalk) {

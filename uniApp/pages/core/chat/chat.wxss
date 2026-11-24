@@ -918,12 +918,26 @@
   color: rgba(255, 255, 255, .35);
 }
 
-/* 录音态：识别文字顶掉免责声明行，随 ASR 实时刷新；最高三行，超出内部滚动 */
+/* 录音态：识别文字红色，右下角叉可关闭 */
 .disclaimer-bar.asr-live {
+  position: relative;
   text-align: left;
-  padding: 8rpx 32rpx 12rpx;
-  color: #e8dff5;
+  padding: 8rpx 56rpx 12rpx 32rpx;
+  color: #ff5d5d;
   font-size: 26rpx;
+}
+.asr-close {
+  position: absolute;
+  right: 24rpx;
+  bottom: 10rpx;
+  width: 44rpx;
+  height: 44rpx;
+  line-height: 40rpx;
+  text-align: center;
+  border-radius: 50%;
+  color: #ff5d5d;
+  font-size: 34rpx;
+  border: 1rpx solid rgba(255, 93, 93, .5);
 }
 .disclaimer-asr {
   max-height: 3.9em;
