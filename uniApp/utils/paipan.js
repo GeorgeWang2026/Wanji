@@ -128,6 +128,105 @@ function autoMeihua(now) {
   return r;
 }
 
+/* ---------------- B-78：服务端卡片 ⇄ 引擎盘面 ---------------- */
+/* 卡片下发的是「盘面 brief」（n/name/wx/sym/nature/yao）。这里统一换成 yishu.js 的八卦对象，
+ * 让详情页、绑定区、发送请求三处共用同一份盘面，不再各自本地重算一套。 */
+
+/** 卦象爻线 → 八卦对象（自下而上三位，1 阳 0 阴） */
+function mhGuaByYao(yao) {
+  var list = y.dict('MH_GUA') || [];
+  for (var i = 0; i < list.length; i++) {
+    var g = list[i] || {};
+    var gy = g.yao || [];
+    if (gy.length !== yao.length) continue;
+    var same = true;
+    for (var k = 0; k < gy.length; k++) {
+      if ((gy[k] ? 1 : 0) !== (yao[k] ? 1 : 0)) { same = false; break; }
+    }
+    if (same) return { n: g.n, name: g.name, wx: g.wx, sym: g.sym, nature: g.nature || '', yao: gy.slice() };
+  }
+  return null;
+}
+
+/** 盘面 brief → 八卦对象；缺爻线时按卦数从卦典补 */
+function mhGuaOf(g) {
+  if (!g || !g.n) return null;
+  var out = {
+    n: g.n, name: g.name || '', wx: g.wx || '', sym: g.sym || '', nature: g.nature || '',
+    yao: Array.isArray(g.yao) ? g.yao.slice() : null
+  };
+  if (!out.yao) {
+    var list = y.dict('MH_GUA') || [];
+    for (var i = 0; i < list.length; i++) {
+      if (list[i] && list[i].n === g.n) {
+        out.yao = (list[i].yao || []).slice();
+        out.name = out.name || list[i].name;
+        out.wx = out.wx || list[i].wx;
+        out.sym = out.sym || list[i].sym;
+        out.nature = out.nature || list[i].nature || '';
+        break;
+      }
+    }
+  }
+  return out.yao && out.yao.length === 3 ? out : null;
+}
+
+/**
+ * 服务端技能卡 → 引擎形状盘面（up/down/huUpperGua/huLowerGua/bianUpperGua/bianLowerGua/moveYao/tiGua/yongGua）
+ * 卡里没有 pan（旧卡）返回 null，由调用方走原来的本地重算。
+ */
+function meihuaFromCard(card) {
+  var c = card || {};
+  var p = c.pan;
+  if (!p || typeof p !== 'object') return null;
+  var up = mhGuaOf(p.up);
+  var down = mhGuaOf(p.down);
+  if (!up || !down) return null;
+  var moveYao = Number(p.move);
+  if (!moveYao && c.guas && c.guas.move) moveYao = Number(c.guas.move);
+  if (!moveYao || moveYao < 1 || moveYao > 6) return null;
+
+  var benYao = down.yao.concat(up.yao);
+  // 互卦：2-4 爻为下互、3-5 爻为上互；变卦：动爻翻转。卡里没给就按本卦补算，绝不下发空盘。
+  var huLower = mhGuaOf(p.hu_lower) || mhGuaByYao(benYao.slice(1, 4));
+  var huUpper = mhGuaOf(p.hu_upper) || mhGuaByYao(benYao.slice(2, 5));
+  var bianYao = benYao.slice();
+  bianYao[moveYao - 1] = bianYao[moveYao - 1] ? 0 : 1;
+  var bianLower = mhGuaOf(p.bian_lower) || mhGuaByYao(bianYao.slice(0, 3));
+  var bianUpper = mhGuaOf(p.bian_upper) || mhGuaByYao(bianYao.slice(3, 6));
+  // 体用：动爻在上卦(4,5,6) → 下为体；在下卦(1,2,3) → 上为体
+  var ti = mhGuaOf(p.ti) || (moveYao > 3 ? down : up);
+  var yong = mhGuaOf(p.yong) || (moveYao > 3 ? up : down);
+
+  return {
+    up: up, down: down,
+    huUpperGua: huUpper, huLowerGua: huLower,
+    bianUpperGua: bianUpper, bianLowerGua: bianLower,
+    moveYao: moveYao,
+    tiGua: ti, yongGua: yong,
+    tiWx: ti.wx, yongWx: yong.wx,
+    mode: c.mhMode || 'time'
+  };
+}
+
+/** 引擎盘面 → 卡片 pan（skill.bind 回写服务端时用，保证来回都是完整盘面） */
+function meihuaCardOf(payload) {
+  var p = payload || {};
+  if (!p.up || !p.down) return null;
+  var brief = function (g) {
+    return g ? { n: g.n, name: g.name, wx: g.wx, sym: g.sym, nature: g.nature || '', yao: (g.yao || []).slice() } : null;
+  };
+  return {
+    pan: {
+      up: brief(p.up), down: brief(p.down),
+      hu_upper: brief(p.huUpperGua), hu_lower: brief(p.huLowerGua),
+      bian_upper: brief(p.bianUpperGua), bian_lower: brief(p.bianLowerGua),
+      move: p.moveYao,
+      ti: brief(p.tiGua), yong: brief(p.yongGua)
+    }
+  };
+}
+
 /**
  * 请求后端把 paipan_data 组装成提示词文本
  * @param {object} paipanData { qimen?, bazi?, meihua? }
@@ -323,6 +422,8 @@ module.exports = {
   buildBazi: buildBazi,
   buildMeihua: buildMeihua,
   autoMeihua: autoMeihua,
+  meihuaFromCard: meihuaFromCard,
+  meihuaCardOf: meihuaCardOf,
   fetchPromptText: fetchPromptText,
   fetchAnalysisResult: fetchAnalysisResult,
   panInfoToParams: panInfoToParams,

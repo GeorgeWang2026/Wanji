@@ -3187,8 +3187,32 @@ Page({
         payload: { py: c.py, pm: c.pm, pd: c.pd, ph: c.ph, pmi: c.pmi, gender: c.pgender, name: c.pname } };
     }
     if (skill === 'meihua') {
-      return { meta: { type: 'meihua', time: { y: c.mhy, m: c.mhm, d: c.mhd, h: c.mhh, mi: c.mhmi } },
-        payload: { guas: c.guas, mode: c.mhMode } };
+      var mhT = { y: c.mhy, m: c.mhm, d: c.mhd, h: c.mhh, mi: c.mhmi };
+      var mhPan = paipanUtil.meihuaFromCard(c);
+      if (!mhPan) {
+        // 旧卡（只有三个卦名字符串）：形状照旧，详情页仍走本地重算
+        return { meta: { type: 'meihua', time: mhT }, payload: { guas: c.guas, mode: c.mhMode } };
+      }
+      // B-78：卡里有完整盘面 → 还原成引擎形状。详情页与 paipan_data 共用这一份，
+      // 不再从「三个卦名字符串」里猜，也不再各自本地重算（重算会与后端分叉）。
+      mhPan.mode = c.mhMode || mhPan.mode || 'time';
+      return {
+        meta: { type: 'meihua', time: mhT, mode: mhPan.mode },
+        payload: {
+          guas: c.guas,
+          up: mhPan.up, down: mhPan.down,
+          huUpperGua: mhPan.huUpperGua, huLowerGua: mhPan.huLowerGua,
+          bianUpperGua: mhPan.bianUpperGua, bianLowerGua: mhPan.bianLowerGua,
+          moveYao: mhPan.moveYao, tiGua: mhPan.tiGua, yongGua: mhPan.yongGua,
+          tiWx: mhPan.tiWx, yongWx: mhPan.yongWx,
+          mode: mhPan.mode,
+          input: {
+            mode: mhPan.mode, time: mhT,
+            number: { n1: c.mhN1, n2: c.mhN2, n3: c.mhN3 },
+            word: { text: '', upN: null, downN: null, csIdx: null, cs: null }
+          }
+        }
+      };
     }
     if (skill === 'stock') {
       return { stock: { name: c.name, code: c.code }, meta: { type: 'stock' } };
@@ -3351,7 +3375,11 @@ Page({
     }
     if (skill === 'meihua') {
       var t = m.time || {};
-      return { mhy: t.y, mhm: t.m, mhd: t.d, mhh: t.h, mhmi: t.mi, mhMode: m.mode || 'time' };
+      var card = { mhy: t.y, mhm: t.m, mhd: t.d, mhh: t.h, mhmi: t.mi, mhMode: m.mode || pl.mode || 'time' };
+      // B-78：回写时带上完整盘面，服务端不必再从时间重算一遍，来回都是同一盘
+      var mhBack = paipanUtil.meihuaCardOf(pl);
+      if (mhBack && mhBack.pan) card.pan = mhBack.pan;
+      return card;
     }
     if (skill === 'stock') {
       var st = (entry && entry.stock) || {};
