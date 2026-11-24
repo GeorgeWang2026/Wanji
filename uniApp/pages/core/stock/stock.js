@@ -199,6 +199,8 @@ Page({
       wx.showToast({ title: '已关联到提问', icon: 'none' });
       // DF-72：回主界面后自动展开咨询面板 + 问题列表，便于看到刚关联的证券信息卡片
       app.globalData._openPanelOnChat = true;
+      // DF-141(C)：旁挂标记，回首页后上行 skill.bind（纯数据写入，不影响旧绑定流程）
+      app.globalData._df141PendingBind = 'stock';
       // 关联成功后直接回到主界面（对话首页），跳过中间的证券列表
       setTimeout(function () { self._backToChat(); }, 400);
     }).catch(function () {

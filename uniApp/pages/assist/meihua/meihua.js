@@ -6,6 +6,8 @@ var Y = require('../../../utils/yishu.js');
 var paipan = require('../../../utils/paipan.js');
 /* DF-82：时间栏参数（年/月/日/时/分）与奇门同源，统一走 timebar */
 var TB = require('../../../utils/timebar.js');
+/* 送审期隐藏功能总开关：卦典页未注册时点入口只提示，不留死按钮 */
+var FEATURES = require('../../../utils/features.js');
 
 /** DF-82：数字起卦取值 1-99；非数字/0/负数 → 1，大于 99 → 99（静默钳制，不弹错误） */
 function clampNum(v) {
@@ -13,6 +15,22 @@ function clampNum(v) {
   if (isNaN(n) || n < 1) n = 1;
   if (n > 99) n = 99;
   return n;
+}
+
+/** B-78：三位爻线（自下而上，1 阳 0 阴）→ 八卦对象；查不到返回 null */
+function guaByYao(yao) {
+  var list = Y.dict('MH_GUA') || [];
+  for (var i = 0; i < list.length; i++) {
+    var g = list[i] || {};
+    var gy = g.yao || [];
+    if (gy.length !== yao.length) continue;
+    var same = true;
+    for (var k = 0; k < gy.length; k++) {
+      if ((gy[k] ? 1 : 0) !== (yao[k] ? 1 : 0)) { same = false; break; }
+    }
+    if (same) return { n: g.n, name: g.name, wx: g.wx, sym: g.sym, nature: g.nature || '', yao: gy.slice() };
+  }
+  return null;
 }
 
 var MODES = [
@@ -64,8 +82,50 @@ Page({
       csNames: csNames,
       csIdx: Math.max(0, this.chenshiIdxOfHour(d.getHours()) - 1)
     });
-    this._setTime({ y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes() });
+    this._setTime(this._cardTime() || { y: d.getFullYear(), m: d.getMonth() + 1, d: d.getDate(), h: d.getHours(), mi: d.getMinutes() });
+    // B-78：从技能卡点进来、且卡里带着完整盘面 → 直接用卡里的盘，不本地重算（重算会与后端分叉）
+    var boundPan = this._cardPan();
+    if (boundPan) { this._renderBound(boundPan); return; }
     this.buildGua();
+  },
+
+  /** 卡里带的完整盘面（引擎形状）；旧卡或手动进来没有就返回 null */
+  _cardPan: function () {
+    var app = getApp();
+    var b = app.globalData && app.globalData.paipan && app.globalData.paipan.meihua;
+    var p = b && b.payload;
+    if (!p || !p.up || !p.down || !p.up.yao || !p.down.yao || !p.moveYao) return null;
+    return p;
+  },
+
+  /** 用卡里的盘渲染（盘面以服务端为准，页面只负责画）；失败才回落本地起卦 */
+  _renderBound: function (pan) {
+    try {
+      var gua = {
+        up: pan.up, down: pan.down,
+        huUpperGua: pan.huUpperGua, huLowerGua: pan.huLowerGua,
+        bianUpperGua: pan.bianUpperGua, bianLowerGua: pan.bianLowerGua,
+        moveYao: pan.moveYao, tiGua: pan.tiGua, yongGua: pan.yongGua
+      };
+      var r = paipan.buildMeihua(gua, pan.mode || 'time', { time: this._cardTime() });
+      this.result = r;
+      if (this.result && this.result.payload && this.result.payload.input) {
+        this.result.payload.input.summary = r.meta.summary;
+      }
+      this.render(r, gua);
+    } catch (e) {
+      console.error('[meihua] 卡片盘面渲染失败，回落本地起卦', e);
+      this.buildGua();
+    }
+  },
+
+  /** 从聊天技能卡点进来时，取卡片已有时间（无则返回 null，走当前时间） */
+  _cardTime: function () {
+    var app = getApp();
+    var b = app.globalData && app.globalData.paipan && app.globalData.paipan.meihua;
+    var t = b && ((b.meta && b.meta.time) || b.payload);
+    if (!t || !t.y) return null;
+    return { y: t.y, m: t.m, d: t.d, h: (typeof t.h === 'number' ? t.h : 0), mi: (typeof t.mi === 'number' ? t.mi : 0) };
   },
 
   noop: function () {},
@@ -187,23 +247,37 @@ Page({
   },
 
   render: function (r, gua) {
+    // B-78：盘面不全就不画。上卦空/下卦空/变卦 0 是「拿 undefined 去查六十四卦表」得到的假卦，
+    // 宁可提示重起，也不把空卦当结果给人看。
+    if (!gua || !gua.up || !gua.down || !gua.up.yao || !gua.down.yao || !gua.moveYao) {
+      wx.showToast({ title: '盘面缺参数，请重新起卦', icon: 'none' });
+      this.setData({ built: false });
+      return;
+    }
     // 注意：引擎返回的 up/down/huUpperGua... 都是八卦对象（含 n/name/wx/sym/yao），不是序号
     var up = gua.up;
     var down = gua.down;
-    var huUp = gua.huUpperGua;
-    var huDown = gua.huLowerGua;
-    var bianUp = gua.bianUpperGua;
-    var bianDown = gua.bianLowerGua;
     var MH_64 = Y.dict('MH_64') || {};
-
-    var benKey = up.n * 10 + down.n;
-    var huKey = huUp.n * 10 + huDown.n;
-    var bianKey = bianUp.n * 10 + bianDown.n;
 
     // 变卦：本卦自下而上第 moveYao 爻翻转
     var benYao = down.yao.concat(up.yao);
     var bianYao = benYao.slice();
     bianYao[gua.moveYao - 1] = bianYao[gua.moveYao - 1] === 1 ? 0 : 1;
+
+    // 互卦：2-4 爻为下互、3-5 爻为上互。卡里没给（旧数据）就按本卦补算，保证三卦都画得出来
+    var huDown = gua.huLowerGua || guaByYao(benYao.slice(1, 4));
+    var huUp = gua.huUpperGua || guaByYao(benYao.slice(2, 5));
+    var bianDown = gua.bianLowerGua || guaByYao(bianYao.slice(0, 3));
+    var bianUp = gua.bianUpperGua || guaByYao(bianYao.slice(3, 6));
+    if (!huUp || !huDown || !bianUp || !bianDown) {
+      wx.showToast({ title: '盘面不完整，请重新起卦', icon: 'none' });
+      this.setData({ built: false });
+      return;
+    }
+
+    var benKey = up.n * 10 + down.n;
+    var huKey = huUp.n * 10 + huDown.n;
+    var bianKey = bianUp.n * 10 + bianDown.n;
 
     var hexes = [
       {
@@ -226,20 +300,23 @@ Page({
       }
     ];
 
+    // 体用：动爻在上卦(4,5,6) → 下为体；缺就按这条规矩补，别在界面上留空
+    var ti = gua.tiGua || (gua.moveYao > 3 ? down : up);
+    var yong = gua.yongGua || (gua.moveYao > 3 ? up : down);
     var rel = '';
     if (Y.engine && Y.engine.mhWxRel) {
-      try { rel = Y.engine.mhWxRel(gua.yongGua.wx, gua.tiGua.wx) || ''; } catch (e) { rel = ''; }
+      try { rel = Y.engine.mhWxRel(yong.wx, ti.wx) || ''; } catch (e) { rel = ''; }
     }
 
     this.setData({
       built: true,
       hexes: hexes,
-      gua: { moveYao: gua.moveYao, up: gua.up, down: gua.down },
+      gua: { moveYao: gua.moveYao, up: up, down: down },
       tiYong: {
-        tiName: gua.tiGua.name,
-        tiWx: gua.tiGua.wx,
-        yongName: gua.yongGua.name,
-        yongWx: gua.yongGua.wx,
+        tiName: ti.name || '',
+        tiWx: ti.wx || '',
+        yongName: yong.name || '',
+        yongWx: yong.wx || '',
         rel: rel
       },
       summary: {
@@ -254,6 +331,11 @@ Page({
     var num = Number(e.currentTarget.dataset.num);
     var yao = Number(e.currentTarget.dataset.yao || 0);
     if (!num) { wx.showToast({ title: '未找到卦序', icon: 'none' }); return; }
+    /* 送审期卦典页未注册，跳过去只会无声失败；先给一致的气泡提示 */
+    if (!FEATURES.OCCULT_PAGES_ENABLED) {
+      wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+      return;
+    }
     wx.navigateTo({ url: '/uniApp/pages/occult/gua/gua?num=' + num + '&yao=' + yao });
   },
 
@@ -281,6 +363,8 @@ Page({
     wx.showToast({ title: '已关联到提问', icon: 'none' });
     // DF-72：回主界面后自动展开咨询面板 + 问题列表，便于看到刚关联的排盘卡片
     app.globalData._openPanelOnChat = true;
+    // DF-141(C)：旁挂标记，回首页后上行 skill.bind（纯数据写入，不影响旧绑定流程）
+    app.globalData._df141PendingBind = 'meihua';
     setTimeout(function () { self._backToChat(); }, 400);
   },
 

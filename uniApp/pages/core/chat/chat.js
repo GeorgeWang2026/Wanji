@@ -25,6 +25,7 @@ var QUOTES_STOCK = [];
 try { QUOTES_STOCK = require('../../../data/quotes-stock.js') || []; } catch (e) { QUOTES_STOCK = []; }
 if (!Array.isArray(QUOTES_STOCK)) QUOTES_STOCK = [];
 var quickQA = require('../../../utils/quick-qa.js');   // DF-81：首页快捷问题池（关联证券后自动带证券名）
+var FEATURES = require('../../../utils/features.js');   // 送审期隐藏功能总开关（八字详情/卦典）
 
 // 页面路径映射（目录分层后：core 证券+对话 / assist 奇门梅花 / occult 八字卦典隐藏）
 var SKILL_PAGE = {
@@ -439,6 +440,12 @@ Page({
       g._openPanelOnChat = false;
       this.setData({ topOpen: true, pinnedOpen: true });
     }
+    // DF-141(C)：技能页绑定成功（返回首页）→ 旁挂上行 skill.bind；失败只记日志，不影响旧流程
+    if (g && g._df141PendingBind) {
+      var pendingBind = g._df141PendingBind;
+      g._df141PendingBind = '';
+      this._df141ManualBind(pendingBind);
+    }
     // DF-64：回到前台若无覆盖层、在等待/空闲切换时按条件恢复空闲期文字轮播
     this._maybeStartIdleHint();
     // DF-81：回到前台恢复快捷问题 30 秒轮换（页面生命周期驱动，避免常驻）
@@ -720,6 +727,10 @@ Page({
           self.setData({ showDeepDraft: true, deepDraft: draft, deepDraftVersion: Number(n.version) || 0 });
           return;
         }
+        // DF-141：服务端组装技能卡（system.notice, code=SKILL_CARD）→ 投影渲染，前端只负责展示
+        if (n && n.code === 'SKILL_CARD') { self._onSkillCard(n); return; }
+        // DF-141：对话里说「不看了/取消这个」由服务端识别 → 下发清卡通知，前端只做投影清除
+        if (n && n.code === 'SKILL_CLEAR') { self._skillCardClear(n.skill); return; }
         if (!n || !n.message) return;
         wx.showToast({ title: n.message, icon: 'none' });
       },
@@ -2874,6 +2885,8 @@ Page({
       this.setData({ showLogin: true });
       return;
     }
+    // DF-141：自由对话态下按「卡集里有没有卡」分流——有卡原样走旧链路，无卡交服务端识别
+    if (this._df141RouteSend(text)) return;
     this._maybeSendShort(text);
   },
 
@@ -3020,15 +3033,54 @@ Page({
     this.setData(patch);
   },
 
+  /** 送审期隐藏功能闸门：八字详情、卦典都未注册进 app.json，点入口只给气泡，
+   *  不留死按钮。返回 true 表示已拦截；过审后把 utils/features.js 的开关打开即放行。 */
+  _occultGate: function (type) {
+    if (type !== 'bazi' && type !== 'gua') return false;
+    if (FEATURES.OCCULT_PAGES_ENABLED) return false;
+    wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+    return true;
+  },
+
+  /** 点卡片本体 → 进入该技能的详情页（卡片上的「查看深度解读」按钮仍走 onSubCardTap） */
+  onCardOpenDetail: function (e) {
+    var self = this;
+    var type = e.currentTarget.dataset.type;
+    if (!type) { this._onCardErr('卡片缺少技能类型', '这条卡没有 data-type，无法跳转'); return; }
+    if (this._occultGate(type)) return;
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    if (type === 'stock') {
+      var s = (bound.stock && bound.stock.stock) || {};
+      var qs = [];
+      if (s.code) qs.push('code=' + encodeURIComponent(s.code));
+      if (s.name) qs.push('name=' + encodeURIComponent(s.name));
+      wx.navigateTo({
+        url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : ''),
+        fail: function (err) { self._onCardErr('证券页打不开', (err && err.errMsg) || '请稍后重试'); }
+      });
+      return;
+    }
+    if (!SKILL_PAGE[type]) { this._onCardErr('该技能暂无详情页', '技能类型：' + type); return; }
+    /* 跳转失败不再静默：把 errMsg 抛到界面上，避免「点了没反应」查不出原因 */
+    wx.navigateTo({
+      url: SKILL_PAGE[type],
+      fail: function (err) { self._onCardErr('详情页打不开', (err && err.errMsg) || ('技能类型：' + type)); }
+    });
+  },
+
   onSubCardTap: function (e) {
     var type = e.currentTarget.dataset.type;
     var aid = e.currentTarget.dataset.analysisId;
-    if (!type || !aid) return;
+    if (!type) return;
+    // DF-141：派生字段未就绪时不静默——可见提示并可重试
+    if (!aid) { this._onCardErr('该技能尚未生成深度解读', '可先提问，稍后再点开查看'); return; }
     this._openSkillAnalysis(type, aid);
   },
 
   onChipTap: function (e) {
+    var self = this;
     var type = e.currentTarget.dataset.type;
+    if (this._occultGate(type)) return;
     // DF-68：证券标签点击进入详情页，并携带当前绑定 code/name（stock.js 按 ?code= 加载）
     if (type === 'stock') {
       var bound = (app().globalData && app().globalData.paipan) || {};
@@ -3036,14 +3088,23 @@ Page({
       var qs = [];
       if (s.code) qs.push('code=' + encodeURIComponent(s.code));
       if (s.name) qs.push('name=' + encodeURIComponent(s.name));
-      wx.navigateTo({ url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : '') });
+      wx.navigateTo({
+        url: '/uniApp/pages/core/stock/stock' + (qs.length ? ('?' + qs.join('&')) : ''),
+        fail: function (err) { self._onCardErr('证券页打不开', (err && err.errMsg) || '请稍后重试'); }
+      });
       return;
     }
-    wx.navigateTo({ url: SKILL_PAGE[type] });
+    if (!SKILL_PAGE[type]) { this._onCardErr('该技能暂无详情页', '技能类型：' + type); return; }
+    wx.navigateTo({
+      url: SKILL_PAGE[type],
+      fail: function (err) { self._onCardErr('详情页打不开', (err && err.errMsg) || ('技能类型：' + type)); }
+    });
   },
 
   onChipClose: function (e) {
     var type = e.currentTarget.dataset.type;
+    // DF-141(B)：点卡删除（手动/自动同源）→ 即时清本地并渲染 + 上行清卡；失败不阻塞、不回滚，可见提示可重试
+    if (this._hasCardOfType(type)) { this._skillCardDelete(type); return; }
     var bound = (app().globalData && app().globalData.paipan) || {};
     if (bound[type]) {
       delete bound[type];
@@ -3056,8 +3117,330 @@ Page({
     this.syncChips();
   },
 
+  /* ================= DF-141：服务端组装技能卡（并行链路；旧链路函数体零改动） =================
+   * 契约复用网页端 DF-120-B：system.notice / code=SKILL_CARD。
+   * 卡集按 skill 作键，一类一条，覆盖不新增；不记来源。单一真相在智能体端，此处仅为投影。
+   */
+  _skillCards: null,
+
+  /** 卡集是否已有卡（手动 + 自动天然合并：手动写 globalData.paipan，自动另记 _skillCards）。
+   *  分流只看到底有没有卡，不做关键词猜测、不记「手动/自动」来源标记。 */
+  _hasSkillCard: function () {
+    var s = this._skillCards;
+    if (s) {
+      for (var k in s) { if (Object.prototype.hasOwnProperty.call(s, k)) return true; }
+    }
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    var TYPES = ['qimen', 'bazi', 'meihua', 'stock'];
+    for (var i = 0; i < TYPES.length; i++) { if (bound[TYPES[i]]) return true; }
+    return false;
+  },
+
+  /** 卡集里指定类型是否已有卡（手动写在 globalData.paipan，自动另记 _skillCards） */
+  _hasCardOfType: function (type) {
+    if (this._skillCards && this._skillCards[type]) return true;
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    return !!bound[type];
+  },
+
+  _df141CardStore: function () {
+    if (!this._skillCards) this._skillCards = {};
+    return this._skillCards;
+  },
+
+  /** A) 打字入口分流：仅自由对话态生效；有卡→旧链路(false)，无卡→推入自由通道(true) */
+  _df141RouteSend: function (text) {
+    if (!this.data || !this.data.freeTalk) return false;
+    if (!this._ft) return false;
+    if (this._hasSkillCard()) return false;            // 卡集里有卡：原样走旧链路
+    try {
+      if (typeof this._ft._sendUser === 'function' && this._ft._active && this._ft._channel) {
+        this._ft._sendUser(text);
+        this.setData({ input: '', inputOpen: false, canClear: false });
+        return true;
+      }
+    } catch (e) {
+      this._onCardErr('发送失败', (e && e.message) || '请稍后重试');
+    }
+    return false;
+  },
+
+  /** 必填校验：与网页端一致。必填齐 → 出卡；派生字段可缺（先出卡头，异步补齐） */
+  _cardRequiredOk: function (skill, card) {
+    card = card || {};
+    if (skill === 'qimen') return !!(card.qy && card.qm && card.qd);
+    if (skill === 'bazi') return !!(card.py && card.pm && card.pd);
+    if (skill === 'meihua') return !!(card.guas && typeof card.guas === 'object');
+    if (skill === 'stock') return !!(card.code || card.name);
+    return false;
+  },
+
+  /** 服务端卡 → 绑定区条目（shape 与手动绑定一致，保证 chipDetail 取值完全相同） */
+  _cardToBoundEntry: function (skill, card) {
+    var c = card || {};
+    if (skill === 'qimen') {
+      var q = { y: c.qy, m: c.qm, d: c.qd, h: c.qh, mi: c.qmi };
+      return { meta: { type: 'qimen', y: q.y, m: q.m, d: q.d, h: q.h, mi: q.mi }, payload: { solar_time: q } };
+    }
+    if (skill === 'bazi') {
+      return { meta: { type: 'bazi', y: c.py, m: c.pm, d: c.pd, h: c.ph, mi: c.pmi, gender: c.pgender, name: c.pname },
+        payload: { py: c.py, pm: c.pm, pd: c.pd, ph: c.ph, pmi: c.pmi, gender: c.pgender, name: c.pname } };
+    }
+    if (skill === 'meihua') {
+      var mhT = { y: c.mhy, m: c.mhm, d: c.mhd, h: c.mhh, mi: c.mhmi };
+      var mhPan = paipanUtil.meihuaFromCard(c);
+      if (!mhPan) {
+        // 旧卡（只有三个卦名字符串）：形状照旧，详情页仍走本地重算
+        return { meta: { type: 'meihua', time: mhT }, payload: { guas: c.guas, mode: c.mhMode } };
+      }
+      // B-78：卡里有完整盘面 → 还原成引擎形状。详情页与 paipan_data 共用这一份，
+      // 不再从「三个卦名字符串」里猜，也不再各自本地重算（重算会与后端分叉）。
+      mhPan.mode = c.mhMode || mhPan.mode || 'time';
+      return {
+        meta: { type: 'meihua', time: mhT, mode: mhPan.mode },
+        payload: {
+          guas: c.guas,
+          up: mhPan.up, down: mhPan.down,
+          huUpperGua: mhPan.huUpperGua, huLowerGua: mhPan.huLowerGua,
+          bianUpperGua: mhPan.bianUpperGua, bianLowerGua: mhPan.bianLowerGua,
+          moveYao: mhPan.moveYao, tiGua: mhPan.tiGua, yongGua: mhPan.yongGua,
+          tiWx: mhPan.tiWx, yongWx: mhPan.yongWx,
+          mode: mhPan.mode,
+          input: {
+            mode: mhPan.mode, time: mhT,
+            number: { n1: c.mhN1, n2: c.mhN2, n3: c.mhN3 },
+            word: { text: '', upN: null, downN: null, csIdx: null, cs: null }
+          }
+        }
+      };
+    }
+    if (skill === 'stock') {
+      return { stock: { name: c.name, code: c.code }, meta: { type: 'stock' } };
+    }
+    return null;
+  },
+
+  /** 接收 system.notice(code=SKILL_CARD)：投影渲染。一类一条（按 skill 覆盖）；
+   *  必填齐才出卡；派生字段缺失不整卡丢弃（先出卡头，随后异步补齐）；渲染失败可见、不静默。 */
+  _onSkillCard: function (n) {
+    if (!n) return;
+    var skill = String(n.skill || '');
+    if (['qimen', 'bazi', 'meihua', 'stock'].indexOf(skill) < 0) {
+      this._onCardErr('技能卡异常', skill ? ('未知技能：' + skill) : '服务端未提供技能类型');
+      return;
+    }
+    var card = n.card && typeof n.card === 'object' ? n.card : {};
+    var cardId = String(n.card_id || n.notice_id || '');
+    // 主公口径（2026-11-20）：分类对就先出卡。服务端缺参时下发 incomplete 卡，
+    // 这里挂「待补充参数」卡头，参数靠对话补或点卡进详情页补，不丢卡、不静默。
+    if (n.incomplete) { this._onSkillCardPending(skill, n); return; }
+    // 必填不齐：可见提示，不落半张空卡（对齐网页 _xbOnSkillCard 的失败分支）
+    if (!this._cardRequiredOk(skill, card)) {
+      this._onCardErr('已排好，但卡片信息不完整', '请补充更明确的条件后重试');
+      return;
+    }
+    var store = this._df141CardStore();
+    var prev = store[skill];
+    // 幂等：同一任务重投只绑一次；replace=true 时放行（改卡重排需覆盖同一条卡）
+    if (prev && cardId && prev.card_id === cardId && n.replace !== true) return;
+    store[skill] = {
+      skill: skill,
+      card_id: cardId,
+      card: card,
+      fingerprint: n.fingerprint || (card && card.fingerprint) || null,
+      server_pan: (card && card.server_pan) || n.server_pan || null,
+      params: n.params || null,
+      prompt_text: String(n.prompt_text || n.message || ''),
+      degraded: !!n.degraded,
+      analysisId: String((card && card.analysis_id) || n.analysis_id || ''),
+      at: Date.now()
+    };
+    // 覆盖式写绑定区（一类一条，不新增），再投影渲染（复用现有 chips / sub-cards 槽与字段）
+    var entry = this._cardToBoundEntry(skill, card);
+    if (!entry) { this._onCardErr('技能卡渲染失败', '技能类型：' + skill); return; }
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    bound[skill] = entry;
+    app().globalData.paipan = bound;
+    if (!this.threadTypes) this.threadTypes = [];
+    if (this.threadTypes.indexOf(skill) < 0) this.threadTypes.push(skill);
+    try {
+      this.syncChips();
+      this._renderSkillCards();
+    } catch (e) {
+      this._onCardErr('技能卡渲染失败', (e && e.message) || '请稍后重试');
+      return;
+    }
+    // 派生字段（排盘结果）暂缺：先出卡头，异步补齐即可，不整卡丢弃
+    if (n.degraded) this._onCardErr('已排好，部分派生信息稍后补齐', '');
+  },
+
+  /** 缺参卡：分类已定、参数待补 —— 先挂卡头，点卡进详情页补，或在对话里补后重排 */
+  _onSkillCardPending: function (skill, n) {
+    var store = this._df141CardStore();
+    var missing = (n && n.missing) || [];
+    store[skill] = {
+      skill: skill,
+      card_id: String((n && n.card_id) || ('pending:' + skill)),
+      card: {},
+      pending: true,
+      missing: missing,
+      analysisId: '',
+      at: Date.now()
+    };
+    var meta = TOOL_CHIPS[skill] || { icon: '📐', cls: 'qm' };
+    var item = {
+      type: skill,
+      analysisId: '',
+      pending: true,
+      missingText: missing.join('、'),
+      label: TOOL_LABELS[skill] || skill,
+      icon: meta.icon,
+      cls: meta.cls || 'qm'
+    };
+    var cur = (this.data.subCards || []).slice();
+    var idx = -1;
+    for (var i = 0; i < cur.length; i++) { if (cur[i].type === skill) { idx = i; break; } }
+    if (idx >= 0) cur[idx] = item; else cur.push(item);
+    this.setData({ subCards: cur });
+  },
+
+  /** 渲染：卡集投影 → 复用现有 sub-cards 槽与字段（界面零改动）。
+   *  仅当服务端已给出深度解读分析号时才落 sub-card；卡片本体由 chips（bound-tag）承载，
+   *  避免在 sub-cards 槽里出现与实际不符的「深度解读已生成」文案。 */
+  _renderSkillCards: function () {
+    var store = this._skillCards || {};
+    var cur = (this.data.subCards || []).slice();
+    Object.keys(store).forEach(function (t) {
+      var e = store[t] || {};
+      // 缺参卡：保留「待补充参数」卡头，不被渲染清掉
+      if (e.pending) {
+        var pmeta = TOOL_CHIPS[t] || { icon: '📐', cls: 'qm' };
+        var pitem = { type: t, analysisId: '', pending: true, missingText: (e.missing || []).join('、'),
+          label: TOOL_LABELS[t] || t, icon: pmeta.icon, cls: pmeta.cls || 'qm' };
+        var pidx = -1;
+        for (var k = 0; k < cur.length; k++) { if (cur[k].type === t) { pidx = k; break; } }
+        if (pidx >= 0) cur[pidx] = pitem; else cur.push(pitem);
+        return;
+      }
+      var aid = String(e.analysisId || '');
+      if (!aid) return;   // 解读未就绪：不占 sub-cards 槽
+      var meta = TOOL_CHIPS[t] || { icon: '📐', cls: 'qm' };
+      var item = { type: t, analysisId: aid, label: TOOL_LABELS[t] || t, icon: meta.icon, cls: meta.cls || 'qm' };
+      var idx = -1;
+      for (var i = 0; i < cur.length; i++) { if (cur[i].type === t) { idx = i; break; } }
+      if (idx >= 0) cur[idx] = item; else cur.push(item);
+    });
+    this.setData({ subCards: cur });
+  },
+
+  /** B) 点卡删：即时清本地卡集并渲染；再上行清卡。上行失败不阻塞、不回滚，但可见提示可重试 */
+  _skillCardDelete: function (type) {
+    if (this._skillCards) delete this._skillCards[type];
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    if (bound[type]) { delete bound[type]; app().globalData.paipan = bound; }
+    if (this.threadTypes) this.threadTypes = this.threadTypes.filter(function (t) { return t !== type; });
+    if (this.autoMetas && this.autoMetas.length) this.autoMetas = [];   // 与旧删除口径一致：清兜底元数据，避免卡片被回填
+    this.setData({ subCards: (this.data.subCards || []).filter(function (c) { return c.type !== type; }) });
+    this.syncChips();
+    var ok = false;
+    try { ok = !!(this._ft && this._ft.sendEvent('skill.clear', { skill: type })); } catch (e) { ok = false; }
+    if (!ok) wx.showToast({ title: '已在本机移除，云端同步失败，可重试', icon: 'none' });
+  },
+
+  /** 服务端识别「不看了/取消这个」→ 下发清卡：只清本地投影（真相在服务端，无需再回上行） */
+  _skillCardClear: function (type) {
+    var t = String(type || '');
+    if (!t) return;
+    if (this._skillCards) delete this._skillCards[t];
+    var bound = (app().globalData && app().globalData.paipan) || {};
+    if (bound[t]) { delete bound[t]; app().globalData.paipan = bound; }
+    if (this.threadTypes) this.threadTypes = this.threadTypes.filter(function (x) { return x !== t; });
+    if (this.autoMetas && this.autoMetas.length) this.autoMetas = [];
+    this.setData({ subCards: (this.data.subCards || []).filter(function (c) { return c.type !== t; }) });
+    this.syncChips();
+  },
+
+  /** 绑定区条目（与 chipDetail 同形）→ 服务端 SKILL_CARD 同名 card 字段（时间/性别/证券码） */
+  _entryToCard: function (skill, entry) {
+    var m = (entry && entry.meta) || {};
+    var pl = (entry && entry.payload) || {};
+    if (skill === 'qimen') {
+      var q = pl.solar_time || m;
+      return { qy: q.y, qm: q.m, qd: q.d, qh: q.h, qmi: q.mi };
+    }
+    if (skill === 'bazi') {
+      return { py: pl.py || m.y, pm: pl.pm || m.m, pd: pl.pd || m.d,
+        ph: pl.ph != null ? pl.ph : m.h, pmi: pl.pmi != null ? pl.pmi : m.mi,
+        pgender: pl.gender || m.gender || '', pname: pl.name || m.name || '' };
+    }
+    if (skill === 'meihua') {
+      var t = m.time || {};
+      var card = { mhy: t.y, mhm: t.m, mhd: t.d, mhh: t.h, mhmi: t.mi, mhMode: m.mode || pl.mode || 'time' };
+      // B-78：回写时带上完整盘面，服务端不必再从时间重算一遍，来回都是同一盘
+      var mhBack = paipanUtil.meihuaCardOf(pl);
+      if (mhBack && mhBack.pan) card.pan = mhBack.pan;
+      return card;
+    }
+    if (skill === 'stock') {
+      var st = (entry && entry.stock) || {};
+      return { name: st.name || '', code: st.code || '' };
+    }
+    return null;
+  },
+
+  /** C) 手工绑卡回写：技能页绑定成功后旁挂上行 skill.bind（携带 skill、时间/性别/证券码、card_id）。
+   *  拔掉它旧链路照样跑：失败只记日志，不阻塞、不弹错、不回滚、不改旧流程返回值与跳转。 */
+  _df141ManualBind: function (skill) {
+    try {
+      var bound = (app().globalData && app().globalData.paipan) || {};
+      var card = this._entryToCard(skill, bound[skill]);
+      if (!card) return;
+      var payload = { skill: skill, card: card };
+      var prev = this._skillCards && this._skillCards[skill];
+      if (prev && prev.card_id) payload.card_id = prev.card_id;   // 已有则带
+      var sent = !!(this._ft && typeof this._ft.sendEvent === 'function'
+        && this._ft._active && this._ft.sendEvent('skill.bind', payload));
+      if (!sent) console.warn('[DF-141] skill.bind 未上行（自由对话通道未就绪），仅本地保留');
+    } catch (e) {
+      console.warn('[DF-141] skill.bind 旁挂上行失败（已忽略，不影响旧流程）:', e && e.message);
+    }
+  },
+
+  /** 渲染/链路失败一律可见提示，禁止静默 return */
+  _onCardErr: function (title, detail) {
+    try { wx.showToast({ title: title + (detail ? ('（' + detail + '）') : ''), icon: 'none', duration: 2500 }); } catch (e) { /* 忽略 */ }
+    console.warn('[DF-141] skill card:', title, detail || '');
+  },
+
+  /** 四工具入口 1/4：咨询 —— 复用自由对话通道（不排盘、不计费、不建正式提问） */
+  openConsult: function () {
+    if (this.data.freeTalk) return;
+    if (this.data.recording) {
+      wx.showToast({ title: '正在录音，请先结束录音', icon: 'none' });
+      return;
+    }
+    if (!api.getToken()) {
+      this.pendingAction = 'freeTalk';
+      this.setData({ showLogin: true });
+      return;
+    }
+    this.enterFreeTalk();
+  },
+
+  /** 未实现入口统一占位：投资 / 灵感 / 健康 */
+  openComingSoon: function () {
+    wx.showToast({ title: '功能开发中，敬请期待', icon: 'none' });
+  },
+
+  /** 个人中心 · 我的证券 —— 未登录先弹登录，回来后由 pendingAction 接续 */
+  onMyStocks: function () {
+    if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }
+    wx.navigateTo({ url: '/uniApp/pages/core/my-stocks/my-stocks' });
+  },
+
   openPaipan: function (e) {
     var type = e.currentTarget.dataset.type;
+    if (this._occultGate(type)) return;
     // DF-69：证券按钮改为进入「我的证券」全屏列表页（未登录先弹登录，登录后进入）
     if (type === 'stock') {
       if (!api.getToken()) { this.pendingAction = 'stock'; this.setData({ showLogin: true }); return; }

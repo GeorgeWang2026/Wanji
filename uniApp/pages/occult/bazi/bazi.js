@@ -47,7 +47,32 @@ Page({
       dayIdx: d.getDate() - 1,
       time: p2(d.getHours()) + ':' + p2(d.getMinutes())
     });
+    // 从聊天里的技能卡点进来：带上卡片已有的出生信息，不用「当前时间」顶替
+    this._applyCardParams();
     this.buildPan();
+  },
+
+  /** 从聊天技能卡点进来时回填卡片参数（无卡片参数返回 false，保持当前时间） */
+  _applyCardParams: function () {
+    var app = getApp();
+    var b = app && app.globalData && app.globalData.paipan && app.globalData.paipan.bazi;
+    var t = b && (b.meta || b.payload);
+    if (!t || !t.y) return false;
+    var years = this.data.years;
+    var yIdx = years.indexOf(Number(t.y));
+    if (yIdx < 0) return false;
+    var m = Number(t.m) || 1;
+    var days = this._daysInMonth(years[yIdx], m);
+    var dIdx = Math.min(Math.max((Number(t.d) || 1) - 1, 0), days.length - 1);
+    this.setData({
+      yearIdx: yIdx,
+      monthIdx: m - 1,
+      days: days,
+      dayIdx: dIdx,
+      time: p2(Number(t.h) || 0) + ':' + p2(Number(t.mi) || 0),
+      genderIdx: String(t.gender || '').indexOf('女') >= 0 ? 1 : 0
+    });
+    return true;
   },
 
   onShow: function () {
@@ -332,6 +357,8 @@ Page({
     wx.showToast({ title: '已关联到提问', icon: 'none' });
     // DF-72：回主界面后自动展开咨询面板 + 问题列表，便于看到刚关联的排盘卡片
     app.globalData._openPanelOnChat = true;
+    // DF-141(C)：旁挂标记，回首页后上行 skill.bind（纯数据写入，不影响旧绑定流程）
+    app.globalData._df141PendingBind = 'bazi';
     setTimeout(function () { self._backToChat(); }, 400);
   },
 

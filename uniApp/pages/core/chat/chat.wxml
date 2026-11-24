@@ -77,12 +77,14 @@
       <!-- 语音/文字提问后，后端自动排盘回传的技能信息卡片（对应参考页 renderSubCards） -->
       <view class="sub-cards" wx:if="{{subCards.length > 0}}">
         <view class="sub-card {{item.cls}}" wx:for="{{subCards}}" wx:key="type"
-              hover-class="sub-card-press" catchtap="onSubCardTap"
+              hover-class="sub-card-press" catchtap="onCardOpenDetail"
               data-type="{{item.type}}" data-analysis-id="{{item.analysisId}}">
           <text class="sc-icon">{{item.icon}}</text>
           <view class="sc-body">
-            <text class="sc-label">{{item.label}} · 深度解读已生成</text>
-            <view class="sc-btn">📖 查看深度解读</view>
+            <text class="sc-label" wx:if="{{item.pending}}">{{item.label}} · 待补充{{item.missingText ? '：' + item.missingText : '参数'}}</text>
+            <text class="sc-label" wx:else>{{item.label}} · 深度解读已生成</text>
+            <view class="sc-btn" wx:if="{{!item.pending}}" catchtap="onSubCardTap" data-type="{{item.type}}" data-analysis-id="{{item.analysisId}}">📖 查看深度解读</view>
+            <view class="sc-btn" wx:else>去补全参数 ›</view>
           </view>
         </view>
       </view>
@@ -172,21 +174,23 @@
     </view>
 
     <view class="paipan-bar">
-      <view class="paipan-btn {{skillActive.qimen ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="qimen">
-        <text class="p-icon">☯</text>
-        <text class="p-label">奇门</text>
+      <!-- 四工具入口 1/4：咨询（自由对话，不排盘、不起卦） -->
+      <view class="paipan-btn {{freeTalk ? 'active' : ''}}" hover-class="press-zone" bindtap="openConsult">
+        <text class="p-icon">💬</text>
+        <text class="p-label">咨询</text>
       </view>
-      <view class="paipan-btn {{skillActive.stock ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="stock">
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
         <text class="p-icon">📈</text>
         <text class="p-label">投资</text>
       </view>
-      <view class="paipan-btn {{skillActive.inspire ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="inspire">
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
         <image class="p-icon-img" src="data:image/svg+xml;base64,PHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHdpZHRoPSIyNCIgaGVpZ2h0PSIyNCIgdmlld0JveD0iMCAwIDI0IDI0IiBmaWxsPSJub25lIiBzdHJva2U9IiNlOGRmZjUiIHN0cm9rZS13aWR0aD0iMiIgc3Ryb2tlLWxpbmVjYXA9InJvdW5kIiBzdHJva2UtbGluZWpvaW49InJvdW5kIj48cGF0aCBkPSJNMTUgMTRjLjItMSAuNy0xLjcgMS41LTIuNSAxLS45IDEuNS0yLjIgMS41LTMuNUE2IDYgMCAwIDAgNiA4YzAgMS4zLjUgMi42IDEuNSAzLjUuOC44IDEuMyAxLjUgMS41IDIuNSIvPjxwYXRoIGQ9Ik05IDE4aDYiLz48cGF0aCBkPSJNMTAgMjJoNCIvPjwvc3ZnPg==" mode="aspectFit" />
         <text class="p-label">灵感</text>
       </view>
-      <view class="paipan-btn {{skillActive.meihua ? 'active' : ''}}" hover-class="press-zone" bindtap="openPaipan" data-type="meihua">
-        <text class="p-icon">☰</text>
-        <text class="p-label">梅花</text>
+      <!-- 四工具入口 4/4：健康（规划中，统一占位提示） -->
+      <view class="paipan-btn" hover-class="press-zone" bindtap="openComingSoon">
+        <text class="p-icon">✚</text>
+        <text class="p-label">健康</text>
       </view>
     </view>
   </view>
@@ -428,7 +432,22 @@
           </view>
           <view class="profile-item" hover-class="item-press" bindtap="onProfileHistory">
             <text class="pi-icon">📜</text>
-            <text class="pi-text">我的咨询记录</text>
+            <text class="pi-text">我的咨询</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="onMyStocks">
+            <text class="pi-icon">📈</text>
+            <text class="pi-text">我的证券</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="openComingSoon">
+            <text class="pi-icon">💡</text>
+            <text class="pi-text">我的灵感</text>
+            <text class="pi-arrow">›</text>
+          </view>
+          <view class="profile-item" hover-class="item-press" bindtap="openComingSoon">
+            <text class="pi-icon">📊</text>
+            <text class="pi-text">我的指标</text>
             <text class="pi-arrow">›</text>
           </view>
           <view class="profile-item" hover-class="item-press" bindtap="onProfileCredits">
