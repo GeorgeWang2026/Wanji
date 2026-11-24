@@ -201,7 +201,12 @@
   </view>
 
   <!-- 合规免责声明：始终展示 -->
-  <view class="disclaimer-bar">内容仅供传统文化交流与趣味参考，不构成任何决策或投资建议</view>
+  <view class="disclaimer-bar {{recording ? 'asr-live' : ''}}">
+    <scroll-view wx:if="{{recording && ftUserText}}" scroll-y class="disclaimer-asr">
+      <text>{{ftUserText}}</text>
+    </scroll-view>
+    <block wx:else>内容仅供传统文化交流与趣味参考，不构成任何决策或投资建议</block>
+  </view>
 
   <!-- ============ 底部：输入面板 ============ -->
   <view class="panel-bot {{inputOpen ? 'open' : ''}}">
@@ -213,7 +218,7 @@
     </view>
 
     <!-- 展开态：向上浮在标题之上，覆盖头像/技能按钮区；catchtap 阻止点击穿透 -->
-    <view class="panel-body" wx:if="{{inputOpen}}" catchtap="noop">
+    <view class="panel-body" wx:if="{{inputOpen && !recording}}" catchtap="noop">
       <view class="quick-qas" wx:if="{{!freeTalk}}">
         <view class="quick-qa {{examplesStock ? 'stock-themed' : ''}}" wx:for="{{examples}}" wx:key="*this" bindtap="onExample" data-text="{{item}}">{{examplesStock ? '📈 ' : ''}}{{item}}</view>
       </view>

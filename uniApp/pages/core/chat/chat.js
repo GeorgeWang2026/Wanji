@@ -1007,9 +1007,9 @@ Page({
   },
 
   toggleInput: function () {
-    // 录音期间禁止收起：收起会把正在回填的文字藏起来，先结束录音
-    if (this.data.recording && this.data.inputOpen) {
-      wx.showToast({ title: '录音中，结束后再收起', icon: 'none' });
+    // 录音期间一律不开面板：麦克风是录音开关，不是折叠开关
+    if (this.data.recording) {
+      wx.showToast({ title: '录音中，结束后再展开', icon: 'none' });
       return;
     }
     var open = !this.data.inputOpen;
@@ -3861,10 +3861,14 @@ Page({
     try {
       // onPartial：同声传译插件的实时累计文本，边录边写进输入框
       await asr.start(function (text) {
-        self.setData({ input: text, canClear: (text || '').trim().length > 0 });
+        self.setData({
+          input: text,
+          ftUserText: text || '',
+          canClear: (text || '').trim().length > 0,
+        });
       });
-      // 录音开始即展开输入面板（向上浮层），让用户边录边看到回填区域
-      this.setData({ recording: true, recSeconds: 0, inputOpen: true, topOpen: false });
+      // 录音开始：面板保持收起，识别文字顶到底部免责行上，麦克风只做录音开关
+      this.setData({ recording: true, recSeconds: 0, inputOpen: false, topOpen: false });
       this._stopIdleHint();
       if (this.recTimer) clearInterval(this.recTimer);
       this.recTimer = setInterval(function () {

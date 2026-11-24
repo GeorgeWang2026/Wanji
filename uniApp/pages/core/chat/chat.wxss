@@ -918,7 +918,18 @@
   color: rgba(255, 255, 255, .35);
 }
 
-/* ================= 底部：输入面板 ================= */
+/* 录音态：识别文字顶掉免责声明行，随 ASR 实时刷新；最高三行，超出内部滚动 */
+.disclaimer-bar.asr-live {
+  text-align: left;
+  padding: 8rpx 32rpx 12rpx;
+  color: #e8dff5;
+  font-size: 26rpx;
+}
+.disclaimer-asr {
+  max-height: 3.9em;
+  line-height: 1.3;
+  word-break: break-all;
+}
 .panel-bot {
   flex: 0 0 auto;
   padding: 0 32rpx;
