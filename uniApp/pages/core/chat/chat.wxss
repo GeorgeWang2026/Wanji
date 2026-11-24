@@ -169,9 +169,14 @@
   /* 用户明确要求：识别到多少显示多少，不省略号截断，超宽自动换行、多行显示。
      高度随行数自然增长，由外层 .panel-body 自身的纵向滚动兜住，
      不新增滚动容器、不改面板结构与尺寸。 */
+  /* 语音态：识别文字最多三行，超出滚/省略，右侧 ✕ 整块清空 */
   white-space: normal;
   word-break: break-all;
-  overflow: visible;
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 3;
+  max-height: 3.6em;
 }
 
 /* 发送倒计时：跟在用户文字尾部的小字提示。

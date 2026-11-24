@@ -90,7 +90,7 @@
       </view>
 
       <!-- DF-72：免费引导流 → 手动确认进入深度解读（口述/语音不算授权，必须点此按钮） -->
-      <view class="free-cta" wx:if="{{freeMode && !pinned && !sending && !typing}}">
+      <view class="free-cta" wx:if="{{freeMode && !pinned && !sending && !typing && !freeTalk}}">
         <view class="free-cta-tip">已为你记录问题，准备好后点击下方按钮开始深度解读</view>
         <view class="free-cta-btn" hover-class="free-cta-btn-press" catchtap="onFreeConfirm">开始解读 · 消耗 {{deepReadingCost}} 积分</view>
       </view>
@@ -128,7 +128,7 @@
       </view>
 
       <!-- 无置顶内容时，绑定标签仍留在面板底部（参考页 #boundTags 的静态位置） -->
-      <view class="bound-tags" wx:if="{{!pinned && chips.length > 0}}">
+      <view class="bound-tags" wx:if="{{!pinned && !freeTalk && chips.length > 0}}">
         <view class="bound-tag {{item.cls}}" wx:for="{{chips}}" wx:key="type"
               hover-class="bound-tag-press" catchtap="onChipTap" data-type="{{item.type}}">
           <text class="bt-icon">{{item.icon}}</text>
@@ -214,11 +214,11 @@
 
     <!-- 展开态：向上浮在标题之上，覆盖头像/技能按钮区；catchtap 阻止点击穿透 -->
     <view class="panel-body" wx:if="{{inputOpen}}" catchtap="noop">
-      <view class="quick-qas">
+      <view class="quick-qas" wx:if="{{!freeTalk}}">
         <view class="quick-qa {{examplesStock ? 'stock-themed' : ''}}" wx:for="{{examples}}" wx:key="*this" bindtap="onExample" data-text="{{item}}">{{examplesStock ? '📈 ' : ''}}{{item}}</view>
       </view>
 
-      <view class="input-row">
+      <view class="input-row" wx:if="{{!recording}}">
         <view class="rec-input-wrap">
           <textarea
             class="rec-input"
