@@ -630,13 +630,13 @@ Page({
   },
 
   /** DF-97：进入连续对话（换票 → WebSocket → 连续识别 + 流式播报；不计费、不建正式提问） */
-  enterFreeTalk: function () {
+  enterFreeTalk: function (silent) {
     if (this._ft) return;
     var self = this;
     // 与等待期/空闲期提示、正式播报互斥：先停干净再进（stopSpeaking 内部已清等待期提示）
     this.stopSpeaking('ft');
     this._stopIdleHint();
-    this.setData({
+    if (!silent) this.setData({
       freeTalk: true,
       ftUserText: '',
       ftCountdown: '',
@@ -2914,7 +2914,7 @@ Page({
     // 普通输入（打字/语音）一律走自由对话（后端 chat/flash），不再弹积分、不再进深度解读。
     // 只有草稿确认后点「开始解读 / 确认咨询」才走 pro：onFreeConfirm / onDeepDraftSubmit → startFlow。
     var self = this;
-    if (!this.data.freeTalk) this.enterFreeTalk();
+    if (!this.data.freeTalk) this.enterFreeTalk(true);
     var tries = 0;
     var push = function () {
       if (self._ft && self._ft._active && self._ft._channel) {

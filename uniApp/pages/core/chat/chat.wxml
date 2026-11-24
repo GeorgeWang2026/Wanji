@@ -195,10 +195,11 @@
     </view>
   </view>
 
-  <!-- DF-72：落地提示（未交互前显示在技能按钮下方、输入区上方，交互后消失） -->
+  <!-- DF-72：落地提示（主公要求先撤下，保留注释便于恢复）
   <view class="landing-hint" wx:if="{{!freeTalk && !pinned && !sentVisible && !inputOpen && !recording && !typing && !sending}}">
     <text class="landing-hint-text">请点击头像自由对话或在下方输入你想咨询的问题</text>
   </view>
+  -->
 
   <!-- 合规免责声明：始终展示 -->
   <view class="disclaimer-bar {{recording ? 'asr-live' : ''}}">
