@@ -57,7 +57,7 @@
       </view>
 
       <!-- DF-104：置顶「当前问题」草稿确认区（DEEP_DRAFT 通知写入）；放弃即清空草稿 -->
-      <view class="deep-draft-bar" wx:if="{{showDeepDraft}}">
+      <view class="deep-draft-bar" wx:if="{{showDeepDraft && !freeTalk}}">
         <text class="ddb-label">当前问题</text>
         <view class="ddb-text">{{deepDraft}}</view>
         <view class="ddb-actions">
