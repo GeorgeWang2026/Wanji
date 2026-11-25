@@ -139,18 +139,6 @@
     </view>
   </view>
 
-  <!-- ============ D-02：对讲模式回复区（逐条追加，可滚动回看；点一下停播） ============ -->
-  <view class="ptt-replies-wrap" wx:if="{{pttMode}}" catchtap="noop">
-    <scroll-view class="ptt-replies" scroll-y scroll-into-view="{{pttAnchor}}" scroll-with-animation="{{true}}">
-      <view class="ptt-reply {{item.speaking ? 'live' : ''}}" id="ptt-{{item.id}}"
-            wx:for="{{pttReplies}}" wx:key="id" bindtap="onPttReplyTap" data-idx="{{index}}">
-        <text class="ptt-reply-text">{{item.text}}</text>
-        <text class="ptt-reply-tag" wx:if="{{item.speaking}}">播报中 · 点此停止</text>
-      </view>
-      <view class="ptt-empty" wx:if="{{pttReplies.length === 0}}">{{recording ? '松开手我再看你说了什么' : '这边等回复…'}}</view>
-    </scroll-view>
-  </view>
-
   <!-- ============ 中部：头像舞台 ============ -->
   <view class="stage">
     <view class="status-tag {{((freeTalk ? ftStatus : (recording || typing || speaking)) && !topOpen) ? 'show' : ''}}">{{freeTalk ? ftStatus : (recording ? '正在聆听…' : (typing ? typingText : (speaking ? '正在播报…' : '')))}}</view>
@@ -215,6 +203,18 @@
 
   <!-- ============ D-02：对讲模式底部文字区（录音时张开＋实时识别；松手进待发倒计时；发出后留「已发送」） ============ -->
   <view class="ptt-bar {{recording ? 'rec' : ''}}" wx:if="{{pttMode}}">
+    <!-- 回复区浮在这条之上：最多 5 行，框内上滚回看，不占页面高度（不再把头像区顶掉） -->
+    <view class="ptt-replies-wrap {{pttReplies.length ? '' : 'is-empty'}}" catchtap="noop">
+      <scroll-view class="ptt-replies" scroll-y scroll-into-view="{{pttAnchor}}" scroll-with-animation="{{true}}">
+        <view class="ptt-reply {{item.speaking ? 'live' : ''}}" id="ptt-{{item.id}}"
+              wx:for="{{pttReplies}}" wx:key="id" bindtap="onPttReplyTap" data-idx="{{index}}">
+          <text class="ptt-reply-text">{{item.text}}</text>
+          <text class="ptt-reply-tag" wx:if="{{item.speaking}}">播报中 · 点此停止</text>
+        </view>
+        <view class="ptt-empty" wx:if="{{pttReplies.length === 0}}">{{recording ? '松开手我再看你说了什么' : '这边等回复…'}}</view>
+      </scroll-view>
+    </view>
+
     <view class="ptt-head">
       <block wx:if="{{recording}}"><text class="ptt-dot">●</text><text class="ptt-head-txt">正在聆听 {{recSeconds}}s · 松手结束</text></block>
       <block wx:elif="{{pttCountdown > 0}}"><text class="ptt-dot">●</text><text class="ptt-head-txt">{{pttCountdown}} 秒后发送 · 可直接改字</text></block>
@@ -240,8 +240,8 @@
     </view>
   </view>
 
-  <!-- 合规免责声明：始终展示（对讲态的录音文字由上方文字区接管） -->
-  <view class="disclaimer-bar {{recording && !pttMode ? 'asr-live' : ''}}">
+  <!-- 合规免责声明：默认展示；对讲态整条收起（主公 2026-11-25：麦克风模式下界面要干净） -->
+  <view class="disclaimer-bar {{recording && !pttMode ? 'asr-live' : ''}}" wx:if="{{!pttMode}}">
     <scroll-view wx:if="{{recording && !pttMode && ftUserText}}" scroll-y class="disclaimer-asr">
       <text>{{ftUserText}}</text>
     </scroll-view>

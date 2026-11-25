@@ -698,8 +698,9 @@ Page({
           ftUserText: top ? (top.user || '') : '',
           ttsLabel: '玄机子'
         });
-        // D-02：对讲态把每条回复按到达顺序追加进上方回复区，不覆盖上一条
-        if (self.data.pttMode && top && top.ai) self._pttPushReply(top.ai);
+        // D-02：对讲态把每条回复按到达顺序排进上方回复区；同一轮（同一个 exchange）只占一行，
+        // 流式分段变长就把那一行的文字换掉，不往下再堆一条
+        if (self.data.pttMode && top && top.ai) self._pttPushReply(top.ai, top.id);
       },
       // AI 字幕逐句上屏：free-talk 在每一句开始播报时回调，与播报队列同一分段、同一时刻；
       // 不再随流式 delta 整体刷新，避免整段回复一次性铺满。
@@ -4160,15 +4161,30 @@ Page({
     this.onSendTap();
   },
 
-  /** 对讲回复逐条追加：同一句重复到达不重复记 */
-  _pttPushReply: function (text) {
+  /** 对讲回复逐条排：同一轮（exchange）只占一行，分段到了就换这一行的字。
+   *  以 top.ai 是「本轮累计全文」，每变长一次都会来一遍；按轮次键合并，
+   *  才不会出现「一句话拆成五六条、越往下越像重复」。 */
+  _pttPushReply: function (text, key) {
     var t = String(text || '').trim();
     if (!t) return;
     var arr = (this.data.pttReplies || []).slice();
-    if (arr.length && arr[arr.length - 1].text === t) return;
+    var k = String(key || '');
+    var hit = -1;
+    if (k) {
+      for (var i = arr.length - 1; i >= 0; i--) {
+        if (arr[i].key === k) { hit = i; break; }
+      }
+    }
+    if (hit >= 0) {
+      // 本轮已在页面上：只换文字，不动位置、不重设锚点，滚动条不跳
+      if (arr[hit].text === t) return;
+      arr[hit] = { id: arr[hit].id, key: k, text: t, speaking: arr[hit].speaking };
+      this.setData({ pttReplies: arr });
+      return;
+    }
     var seq = (this._pttSeq || 0) + 1;
     this._pttSeq = seq;
-    arr.push({ id: 'r' + seq, text: t, speaking: false });
+    arr.push({ id: 'r' + seq, key: k, text: t, speaking: false });
     if (arr.length > 50) arr = arr.slice(arr.length - 50);
     this.setData({ pttReplies: arr, pttAnchor: 'ptt-r' + seq });
   },
