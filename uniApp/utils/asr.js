@@ -134,6 +134,70 @@ function finishStop(patch) {
 /* ---------------- 插件：RecordRecognitionManager ---------------- */
 var pluginManager = null;
 
+/* ---------------- 单次录音（对讲／麦克风按钮）：停-开串行守卫 ----------------
+ * WechatSI 0.3.10 是单实例：上一段识别没真正结束（onStop 未到）就再 start，
+ * 插件直接回 -30011 please wait recognition finished，onStart 也不会来 ——
+ * 页面看到的是「录音启动失败」，而紧接着仍有 partial，证明识别本身是好的，坏在时序。
+ * 连续模式有 scheduleContRestart 的退避阶梯，单次链路原来一条都没有，所以补在这里：
+ *   1) start 前若上一段还没收尾，先 stop() 推它去收尾，等 onStop 再发 start；
+ *   2) 真撞上 -30011 不往上抛（页面会弹「录音启动失败」），按阶梯重试，超限才 reject。 */
+var shotBusy = false;          // 插件的上一次识别还没收尾（onStop 未到）
+var shotRetry = 0;             // 单次链路 -30011 重试次数（onStart 成功即清零）
+var shotRetryTimer = null;
+var shotIdleWaiters = [];      // 等「插件空闲」的回调，onStop 时统一唤醒
+var SHOT_BUSY_BACKOFF = [0, 400, 900, 1600];
+var SHOT_BUSY_MAX = SHOT_BUSY_BACKOFF.length - 1;
+var SHOT_IDLE_WAIT_MS = 1500;  // 等 onStop 的上限：等不到也试一次，由阶梯兜底
+
+function clearShotRetry() {
+  if (shotRetryTimer) { clearTimeout(shotRetryTimer); shotRetryTimer = null; }
+}
+
+/** 插件已收尾（onStop 到达）：放掉所有等空闲的回调 */
+function markShotIdle() {
+  shotBusy = false;
+  var ws = shotIdleWaiters;
+  shotIdleWaiters = [];
+  for (var i = 0; i < ws.length; i++) {
+    try { ws[i](); } catch (e) { /* 忽略 */ }
+  }
+}
+
+/** 等插件空闲再回调；已空闲立即回。最多等 SHOT_IDLE_WAIT_MS。
+ *  忙的时候顺手 stop() 推它一把：只等不催的话，有的机型要干等到超时才重试。 */
+function whenShotIdle(cb) {
+  if (!shotBusy) { cb(); return; }
+  if (!contWanted) {
+    try { if (pluginManager && pluginManager.stop) pluginManager.stop(); } catch (e) { /* 忽略 */ }
+  }
+  var fired = false;
+  var once = function () {
+    if (fired) return;
+    fired = true;
+    var k = shotIdleWaiters.indexOf(once);
+    if (k >= 0) shotIdleWaiters.splice(k, 1);
+    cb();
+  };
+  shotIdleWaiters.push(once);
+  setTimeout(once, SHOT_IDLE_WAIT_MS);
+}
+
+/** 真正发出一次单次录音 start：所有重试共用这一个出口，不许裸调 m.start() */
+function issueShotStart(m) {
+  if (!startReject) return;   // 页面已经放弃（松手／取消）
+  m = m || pluginManager;
+  if (!m) { rejectStart(new Error('录音实例不可用')); return; }
+  startTimer = setTimeout(resolveStart, 2000);   // 兜底：个别机型不进 onStart
+  try {
+    m.start({ lang: 'zh_CN', duration: 60000 });
+    shotBusy = true;
+  } catch (e) {
+    startResolve = null;
+    clearStartTimer();
+    if (startReject) { var rj = startReject; startReject = null; rj(e); }
+  }
+}
+
 /* ---------------- DF-97：连续监听（自由对话通道专用） ----------------
  * 插件自带的 VAD 会在停顿后自动结束一段录音，这里在 onStop 后自动续录，
  * 形成「连续听」；与麦克风链路（start/stop 单次录音）共用同一个 manager，
@@ -554,6 +618,8 @@ function bindPluginManager() {
       return;
     }
     console.log('[asr] plugin recorder started');
+    shotBusy = true;
+    shotRetry = 0;
     resolveStart();
   };
 
@@ -737,6 +803,7 @@ function bindPluginManager() {
       scheduleContRestart(trimmed ? 300 : contEmptyBackoffMs(), 'after-onStop');
       return;
     }
+    markShotIdle();   // 单次链路：这一段识别真正收尾了，下一次 start 才允许发
     finishStop({
       text: t,
       filePath: finalPath,
@@ -818,6 +885,26 @@ function bindPluginManager() {
       scheduleContRestart(errWait, 'after-error-backoff');
       return;
     }
+    // 单次链路撞 -30011（上一段识别还没收尾）不往上抛：页面会弹「录音启动失败」，
+    // 而紧接着 partial 照样来，证明识别本身是好的、坏的只是时序。按阶梯重试，超限才 reject。
+    var shotBusyErr = (res && res.retcode === -30011) || /please wait recognition finished|-30011/i.test(msg);
+    if (shotBusyErr && startReject) {
+      shotBusy = true;
+      if (shotRetry < SHOT_BUSY_MAX) {
+        var shotWait = SHOT_BUSY_BACKOFF[++shotRetry] || 400;
+        console.warn('[asr] 单次录音撞 -30011 → 第', shotRetry, '次重试，等待', shotWait + 'ms');
+        clearStartTimer();
+        clearShotRetry();
+        shotRetryTimer = setTimeout(function () {
+          shotRetryTimer = null;
+          if (!startReject) return;   // 页面已经放弃（松手／取消）
+          try { if (pluginManager && pluginManager.stop) pluginManager.stop(); } catch (e) { /* 忽略 */ }
+          issueShotStart(pluginManager);
+        }, shotWait);
+        return;
+      }
+      console.warn('[asr] 单次录音 -30011 重试', shotRetry, '次仍忙，交回页面');
+    }
     // 还在启动阶段：直接让 start() 失败，页面走权限/重试提示
     if (startReject) {
       rejectStart(new Error(msg));
@@ -885,18 +972,13 @@ function start(onPartial) {
 
 function startPlugin() {
   var m = ensurePluginManager();
+  shotRetry = 0;
+  clearShotRetry();
   return new Promise(function (resolve, reject) {
     startResolve = resolve;
     startReject = reject;
-    // 兜底：个别机型不进 onStart，2s 后按成功处理，避免按钮卡死
-    startTimer = setTimeout(resolveStart, 2000);
-    try {
-      m.start({ lang: 'zh_CN', duration: 60000 });
-    } catch (e) {
-      startResolve = null;
-      clearStartTimer();
-      reject(e);
-    }
+    // 上一段还没收尾就裸 start 必撞 -30011：先等插件空闲（onStop），再发 start
+    whenShotIdle(function () { issueShotStart(m); });
   });
 }
 
