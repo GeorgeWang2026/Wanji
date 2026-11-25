@@ -3850,9 +3850,11 @@ Page({
   /* ---------------- 语音输入 ---------------- */
   /** 长按说话：按下开始识别，松开即停（识别文字留在底部区，可用叉清空） */
   onMicHoldStart: function () {
-    // 一次长按只开一次：按住期间 touchstart 可能重复触发，挡住重复建流
-    if (this._micHolding || this.data.recording) return;
+    // 一次长按只开一次：真机按住期间 touchstart 会连发好几次。
+    // 「手指还按着」「正在起录」「已经在录」任一成立就忽略，绝不开第二条录音流。
+    if (this._micHolding || this._micStarting || this.data.recording) return;
     this._micHolding = true;
+    this._micStopPending = false;
     if (this.data.freeTalk) {
       var self = this;
       this.exitFreeTalk();
@@ -3865,10 +3867,16 @@ Page({
 
   onMicHoldEnd: function () {
     this._micHolding = false;
+    if (this._micStarting) {
+      // 手指比识别启动还快（轻点一下就松）：只记一笔，等 start 落地立刻收，
+      // 否则这条流会在没人按着的情况下一直录到 60 秒。
+      this._micStopPending = true;
+      return;
+    }
     if (!this.data.recording) return;
     // 松手即发：先停识别，等最终文字回填后直接送出，不再让用户回输入框点发送
     var self = this;
-    Promise.resolve(this.stopRecord()).then(function () {
+    Promise.resolve(this.stopRecord({ release: true })).then(function () {
       setTimeout(function () {
         if (String(self.data.input || '').trim()) { self._voiceSend = true; self.onSendTap(); }
       }, 120);
@@ -3889,7 +3897,8 @@ Page({
   },
 
   startRecord: async function () {
-    if (this._stopping) return;
+    if (this._stopping || this._micStarting || this.data.recording) return;
+    this._micStarting = true;
     var self = this;
     // 插件不可用时明确提示一次，避免误以为实时识别失效
     if (!this._asrNoted) {
@@ -3912,6 +3921,15 @@ Page({
       });
       // 录音开始：面板保持收起，识别文字顶到底部免责行上，麦克风只做录音开关
       this.setData({ recording: true, recSeconds: 0, inputOpen: false, topOpen: false });
+      this._micStarting = false;
+      if (this._micStopPending) {
+        // 松手发生在起录之前：立刻收，别让这条流自己往下录
+        this._micStopPending = false;
+        await this.stopRecord({ release: true });
+        var pendingText = String(this.data.input || '').trim();
+        if (pendingText) { this._voiceSend = true; this.onSendTap(); }
+        return;
+      }
       this._stopIdleHint();
       if (this.recTimer) clearInterval(this.recTimer);
       this.recTimer = setInterval(function () {
@@ -3935,12 +3953,13 @@ Page({
     }
   },
 
-  stopRecord: async function () {
+  stopRecord: async function (opts) {
     if (this._stopping) return;
+    var release = !!(opts && opts.release);
     this._stopping = true;
     if (this.recTimer) { clearInterval(this.recTimer); this.recTimer = null; }
-    // 结束（含回填失败）都保持面板展开，避免把已回填/待回填的文字藏起来
-    this.setData({ recording: false, inputOpen: true });
+    // 松手即发这条路径不再把输入区翻出来；其余情况保持面板展开，避免把回填的文字藏起来
+    this.setData({ recording: false, inputOpen: !release });
 
     try {
       var r = null;
@@ -3981,8 +4000,10 @@ Page({
       }
 
       // 最终结果整体覆盖中间结果，避免重复拼接
-      this.setData({ input: trimmed, inputOpen: true, canClear: true });
+      this.setData({ input: trimmed, inputOpen: !release, canClear: true });
 
+      // 松手即发：不弹「内容较短」确认、不提示「已填入」，由 onMicHoldEnd 直接送出
+      if (release) return;
       // FB-47：识别出的短内容（1-3 字）同样先弹确认，取消则停在输入态
       if (trimmed.length <= SHORT_TEXT_MAX) {
         var self = this;
