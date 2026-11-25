@@ -54,6 +54,10 @@ var MSG_SEQ = 0;
 var SHORT_TEXT_MIN = 1;
 var SHORT_TEXT_MAX = 3;
 
+// D-02：对讲模式（长按麦克风）口径——松手先给可改可确认的倒计时，极短内容不自动发
+var PTT_SEND_SECONDS = 5;   // 与自由对话那套发送倒计时同一口径：5 秒
+var PTT_MIN_CHARS = 2;      // 1 个字以下（含 1 个字）不自动发送，留在待发区让人改
+
 // DF-63：等待期思考提示语三组词库（照抄 xiaoxuan.html _THINK_VERBS/_THINK_OBJS/_THINK_TAILS，各 6 条，组合 216）
 var THINK_VERBS = ['正在分析', '正在思考', '正在整理', '正在琢磨', '正在核对', '正在洞察'];
 var THINK_OBJS = ['你的问题', '其中的趋势', '这件事的走向', '潜在的变量', '背后的格局', '关键的节点'];
@@ -316,6 +320,15 @@ Page({
     ftStatus: '',          // 通道状态文案（正在连接/思考/回答…）
     ftPhase: '',           // connecting | listening | thinking | speaking（光圈/脉冲判定用）
     ftTurnHint: false,     // DF-103：「可以开始说话了」提示是否显示（麦克风闪烁动效开关）
+    /* ---- D-02：对讲模式（长按麦克风；与头像自由对话两条路并行打磨）---- */
+    pttMode: false,        // 对讲态：界面只留下方文字区 + 上方回复区，输入/咨询面板都不展开
+    pttDraft: '',          // 松手后的待发文字（可改；倒计时到点自动发）
+    pttCountdown: 0,       // 发送倒计时剩余秒（0 = 不计时）
+    pttSentText: '',       // 已发出的那句（保留到下一次按下麦克风才清空）
+    pttSentMark: false,    // 是否已在下方标「已发送」
+    pttReplies: [],        // 对讲收到的回复，按到达顺序逐条追加（可回看）
+    pttAnchor: '',         // 回复区滚动锚点
+    pttHint: '',           // 待发区状态（太短没发 / 识别中…）
     /* ---- DF-72：免费引导流（取消扣费后）手动确认进入深度解读 ---- */
     freeMode: false,       // 是否处于免费引导流（未付费、无 rootQuestionId）
     freeQuestion: '',      // 免费流最近一句问题（CTA 复用，无需重输）
@@ -685,6 +698,8 @@ Page({
           ftUserText: top ? (top.user || '') : '',
           ttsLabel: '玄机子'
         });
+        // D-02：对讲态把每条回复按到达顺序追加进上方回复区，不覆盖上一条
+        if (self.data.pttMode && top && top.ai) self._pttPushReply(top.ai);
       },
       // AI 字幕逐句上屏：free-talk 在每一句开始播报时回调，与播报队列同一分段、同一时刻；
       // 不再随流式 delta 整体刷新，避免整段回复一次性铺满。
@@ -714,6 +729,16 @@ Page({
       onSpeaking: function (on) {
         self.setData({ speaking: !!on });
         if (on) self._startMouth(); else self._stopMouth();
+        // D-02：回复区标出「正在播这一条」，点它就能停
+        var arr = self.data.pttReplies || [];
+        if (self.data.pttMode && arr.length) {
+          var last = arr.length - 1;
+          if (!!arr[last].speaking !== !!on) {
+            var copy = arr.slice();
+            copy[last] = { id: copy[last].id, text: copy[last].text, speaking: !!on };
+            self.setData({ pttReplies: copy });
+          }
+        }
       },
       onNotice: function (n) {
         // DF-104：后端收口下发的深度解读草稿 → 写入置顶「草稿确认区」，由用户点确认/放弃
@@ -1013,6 +1038,8 @@ Page({
       return;
     }
     var open = !this.data.inputOpen;
+    // D-02：展开输入面板＝转去打字那条路，离开对讲态（对讲的面板与残留文字一起收起）
+    if (open) this._pttExit();
     this.setData({
       inputOpen: open,
       topOpen: open ? false : true,
@@ -2912,7 +2939,8 @@ Page({
 
   _doSend: function (text) {
     // FB-51：发送后保持顶部咨询面板展开（会话区 / 已发送内容可见）
-    this.setData({ input: '', inputOpen: false, topOpen: true, canClear: false });
+    // D-02：对讲态例外——面板一律不展开，界面上只留「下方已发送的那句 + 上方回复区」
+    this.setData({ input: '', inputOpen: false, topOpen: !this.data.pttMode, canClear: false });
     // 普通输入（打字/语音）一律走自由对话（后端 chat/flash），不再弹积分、不再进深度解读。
     // 只有草稿确认后点「开始解读 / 确认咨询」才走 pro：onFreeConfirm / onDeepDraftSubmit → startFlow。
     var self = this;
@@ -3440,6 +3468,7 @@ Page({
       this.setData({ showLogin: true });
       return;
     }
+    this._pttExit();   // D-02：点头像/咨询＝走自由对话那条路，离开对讲态
     this.enterFreeTalk();
   },
 
@@ -3855,7 +3884,9 @@ Page({
     if (this._micHolding || this._micStarting || this.data.recording) return;
     this._micHolding = true;
     this._micStopPending = false;
-    if (this.data.freeTalk) {
+    // D-02：按下麦克风＝新一轮对讲——清掉上一句「已发送」与待发草稿，下方换成这一轮实时识别的字
+    this._pttEnter();
+    if (this.data.freeTalk || this._ft) {
       var self = this;
       this.exitFreeTalk();
       setTimeout(function () { self._micHolding = false; self.onMicHoldStart(); }, 250);
@@ -3874,12 +3905,10 @@ Page({
       return;
     }
     if (!this.data.recording) return;
-    // 松手即发：先停识别，等最终文字回填后直接送出，不再让用户回输入框点发送
+    // D-02：松手先停识别，拿到最终文字后不立刻发——进 5 秒可改可确认的待发区
     var self = this;
     Promise.resolve(this.stopRecord({ release: true })).then(function () {
-      setTimeout(function () {
-        if (String(self.data.input || '').trim()) { self._voiceSend = true; self.onSendTap(); }
-      }, 120);
+      setTimeout(function () { self._pttAfterStop(); }, 120);
     });
   },
 
@@ -3926,8 +3955,7 @@ Page({
         // 松手发生在起录之前：立刻收，别让这条流自己往下录
         this._micStopPending = false;
         await this.stopRecord({ release: true });
-        var pendingText = String(this.data.input || '').trim();
-        if (pendingText) { this._voiceSend = true; this.onSendTap(); }
+        this._pttAfterStop();
         return;
       }
       this._stopIdleHint();
@@ -4027,6 +4055,133 @@ Page({
   /** FB-47：识别「太短 / 没录到声音」类结果，归为空结果静默处理，绝不弹「语音识别失败」 */
   _isAsrShortErr: function (msg) {
     return /too short|太短|没听清|没有录到声音|没录到声音|录音时间过短/i.test(String(msg || ''));
+  },
+
+  /* ================= D-02：对讲模式（长按麦克风） ================= */
+
+  /** 按下麦克风：进对讲态。清上一句「已发送」和待发草稿，回复历史保留可回看 */
+  _pttEnter: function () {
+    this._pttClearTimer();
+    this.setData({
+      pttMode: true,
+      pttDraft: '',
+      pttCountdown: 0,
+      pttSentText: '',
+      pttSentMark: false,
+      pttHint: '',
+      inputOpen: false,
+      topOpen: false
+    });
+  },
+
+  /** 离开对讲态（转去打字的输入面板 / 点头像那条自由对话）：对讲的面板与残留文字一并收起 */
+  _pttExit: function () {
+    if (!this.data.pttMode) return;
+    this._pttClearTimer();
+    this.setData({
+      pttMode: false,
+      pttDraft: '',
+      pttCountdown: 0,
+      pttSentText: '',
+      pttSentMark: false,
+      pttHint: ''
+    });
+  },
+
+  _pttClearTimer: function () {
+    if (this._pttTimer) { clearInterval(this._pttTimer); this._pttTimer = null; }
+  },
+
+  /** 松手后：空结果不发（防误触）；极短不发、留给人改；其余进 5 秒可改可确认的倒计时 */
+  _pttAfterStop: function () {
+    this._pttClearTimer();
+    var text = String(this.data.input || '').trim();
+    if (!text) {
+      // 按一下就松、一句都没识别出来：不发、不提示、不写记录
+      this.setData({ pttDraft: '', pttCountdown: 0, pttHint: '' });
+      return;
+    }
+    if (text.length < PTT_MIN_CHARS) {
+      this.setData({ pttDraft: text, pttCountdown: 0, pttHint: '太短了，没发；改完点「立即发送」' });
+      return;
+    }
+    this.setData({ pttDraft: text, pttHint: '' });
+    this._pttStartCountdown();
+  },
+
+  /** 5 秒倒计时：到点自动发；期间改字、点「立即发送」、点「取消」都能接管 */
+  _pttStartCountdown: function () {
+    var self = this;
+    this._pttClearTimer();
+    var left = PTT_SEND_SECONDS;
+    this.setData({ pttCountdown: left });
+    this._pttTimer = setInterval(function () {
+      left -= 1;
+      if (left > 0) { self.setData({ pttCountdown: left }); return; }
+      self._pttClearTimer();
+      self.setData({ pttCountdown: 0 });
+      self.onPttSendNow();
+    }, 1000);
+  },
+
+  /** 待发区改字：内容一变就重新计时，别把改到一半的句子发出去 */
+  onPttDraftInput: function (e) {
+    var v = (e && e.detail && e.detail.value != null) ? String(e.detail.value) : '';
+    this.setData({ pttDraft: v, pttHint: '' });
+    if (String(v || '').trim()) this._pttStartCountdown();
+    else this._pttClearTimer();
+  },
+
+  /** 取消这一条：不发、清空待发区，等下一次按麦克风重来 */
+  onPttCancel: function () {
+    this._pttClearTimer();
+    this.setData({ pttDraft: '', pttCountdown: 0, pttHint: '', input: '', canClear: false });
+  },
+
+  /** 立即发送：倒计时提前收 */
+  onPttSendNow: function () {
+    this._pttClearTimer();
+    var text = String(this.data.pttDraft || this.data.input || '').trim();
+    if (!text) {
+      this.setData({ pttDraft: '', pttCountdown: 0, pttHint: '' });
+      return;
+    }
+    if (text.length < PTT_MIN_CHARS) {
+      // 防误触：一个字的短音不往外发
+      this.setData({ pttDraft: text, pttCountdown: 0, pttHint: '太短了，没发' });
+      return;
+    }
+    // 发出后：下方留原文＋「已发送」，一直到下一次按下麦克风才清空
+    this.setData({
+      pttDraft: '', pttCountdown: 0, pttHint: '',
+      pttSentText: text, pttSentMark: true, input: text
+    });
+    this._voiceSend = true;
+    this.onSendTap();
+  },
+
+  /** 对讲回复逐条追加：同一句重复到达不重复记 */
+  _pttPushReply: function (text) {
+    var t = String(text || '').trim();
+    if (!t) return;
+    var arr = (this.data.pttReplies || []).slice();
+    if (arr.length && arr[arr.length - 1].text === t) return;
+    var seq = (this._pttSeq || 0) + 1;
+    this._pttSeq = seq;
+    arr.push({ id: 'r' + seq, text: t, speaking: false });
+    if (arr.length > 50) arr = arr.slice(arr.length - 50);
+    this.setData({ pttReplies: arr, pttAnchor: 'ptt-r' + seq });
+  },
+
+  /** 点回复区任意一条：正在播就停——人已经看到了，不用再念 */
+  onPttReplyTap: function () {
+    if (!this.data.speaking) return;
+    if (this._ft) {
+      try { this._ft.interrupt('点回复停止'); } catch (e) { /* 忽略 */ }
+      return;
+    }
+    try { tts.stop(); } catch (e) { /* 忽略 */ }
+    this.setData({ speaking: false });
   },
 
   /* ---------------- 登录 ---------------- */

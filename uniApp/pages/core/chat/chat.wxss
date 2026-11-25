@@ -2659,4 +2659,78 @@
 .credits-empty { padding: 120rpx 40rpx; text-align: center; color: rgba(224, 208, 240, .5); font-size: 26rpx; }
 .credits-load-more { padding: 28rpx; text-align: center; font-size: 26rpx; color: #c9a3ff; }
 
+/* ================= D-02：对讲模式（长按麦克风） =================
+ * 上方：逐条追加的回复区，可滚动回看，点一条可停播；
+ * 下方：录音时张开的大文字区（实时识别）→ 松手后 5 秒可改倒计时 → 发出后留原文＋「已发送」。
+ */
+.ptt-replies-wrap {
+  flex: 1 1 auto;
+  min-height: 0;
+  padding: 8rpx 32rpx 0;
+  overflow: hidden;
+}
+.ptt-replies { height: 100%; max-height: 52vh; }
+.ptt-reply {
+  margin-bottom: 16rpx;
+  padding: 20rpx 24rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, .06);
+  border: 1rpx solid rgba(255, 255, 255, .08);
+}
+.ptt-reply.live {
+  border-color: rgba(190, 150, 255, .55);
+  box-shadow: 0 0 18rpx rgba(150, 110, 240, .35);
+}
+.ptt-reply-text {
+  display: block;
+  color: rgba(255, 255, 255, .92);
+  font-size: 30rpx;
+  line-height: 1.6;
+  word-break: break-all;
+}
+.ptt-reply-tag { display: block; margin-top: 8rpx; color: rgba(200, 170, 255, .85); font-size: 22rpx; }
+.ptt-empty { color: rgba(255, 255, 255, .42); font-size: 26rpx; padding: 24rpx 4rpx; }
+
+.ptt-bar {
+  flex: 0 0 auto;
+  margin: 8rpx 32rpx 0;
+  padding: 16rpx 24rpx;
+  border-radius: 22rpx;
+  background: rgba(255, 255, 255, .06);
+  border: 1rpx solid rgba(255, 255, 255, .10);
+  position: relative;
+}
+.ptt-bar.rec {
+  background: rgba(255, 93, 93, .10);
+  border-color: rgba(255, 93, 93, .45);
+}
+.ptt-head { display: flex; align-items: center; }
+.ptt-dot { color: #ff5d5d; font-size: 22rpx; margin-right: 10rpx; }
+.ptt-head-txt { color: rgba(255, 255, 255, .62); font-size: 24rpx; }
+.ptt-head-txt.warn { color: #ffb45d; }
+.ptt-bar.rec .ptt-head-txt { color: #ff8a8a; }
+.ptt-text { margin-top: 10rpx; max-height: 8em; }
+.ptt-text-in {
+  display: block;
+  color: #ff5d5d;
+  font-size: 32rpx;
+  line-height: 1.45;
+  word-break: break-all;
+}
+.ptt-text-in.sent { color: rgba(255, 255, 255, .88); }
+.ptt-input { width: 100%; color: #ffd7d7; font-size: 30rpx; line-height: 1.5; min-height: 1.5em; }
+.ptt-input-ph { color: rgba(255, 255, 255, .35); }
+.ptt-foot {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  margin-top: 12rpx;
+  min-height: 44rpx;
+}
+.ptt-actions { display: flex; }
+.ptt-btn { padding: 10rpx 28rpx; border-radius: 30rpx; font-size: 26rpx; margin-left: 16rpx; }
+.ptt-btn.ghost { color: rgba(255, 255, 255, .7); border: 1rpx solid rgba(255, 255, 255, .25); }
+.ptt-btn.solid { color: #2a1445; background: linear-gradient(120deg, #f7d78a, #e9b45c); font-weight: 600; }
+.ptt-mark { color: #7ee3a6; font-size: 24rpx; }
+
 
