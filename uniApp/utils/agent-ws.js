@@ -10,6 +10,10 @@ var env = require('./env.js');
 
 var BACKOFF_MS = [500, 1000, 2000, 4000, 8000, 15000, 30000];
 var MAX_RETRY = 8;
+// 换票被限流（服务端 429／「请求过于频繁」）时另走一条慢阶梯：短退避会把票打光，越重越快。
+var RATE_LIMIT_BACKOFF_MS = [5000, 10000, 20000, 30000, 60000];
+// 连上后这么快就断＝连接不稳，不把重试计数清零，否则会无限快重连。
+var UNSTABLE_CLOSE_MS = 5000;
 var CLIENT_PING_MS = 20000;
 var MAX_TEXT_CHARS = 1900;
 var READY_TIMEOUT_MS = 8000;   // 建连后等 session.ready 的上限：超时主动断开重连
@@ -54,6 +58,10 @@ function AgentChannel(opts) {
   this._retryTimer = null;
   this._pingTimer = null;
   this._readyTimer = null;
+  this._stableTimer = null;
+  this._readyAt = 0;         // 上次 session.ready 的时刻：判断「连上即断」
+  this._unstable = 0;        // 连续不稳定断线次数
+  this._rateLimitHits = 0;   // 换票被限流的连续次数
   this._mergeTimer = null;
   this._frag = '';
   this._pendingText = '';
@@ -114,6 +122,7 @@ AgentChannel.prototype._fetchTicket = function () {
       var msg = (body && (body.detail || body.msg)) || '换票失败，请稍后重试';
       var e1 = new Error(msg);
       if (body && body.code === 401) e1.fatal = true;
+      if (body && (body.code === 429 || /过于频繁|稍后再试|too many/i.test(msg))) e1.rateLimited = true;
       throw e1;
     }
     var data = body.data || body;
@@ -150,6 +159,20 @@ AgentChannel.prototype._connect = function (first) {
     console.warn('[agent-ws] 换票失败', (e && e.message) || e);
     try { self.onError(e); } catch (err) { /* 忽略 */ }
     if (e && e.fatal) { self._finish('failed'); return; }
+    if (e && e.rateLimited) {
+      // 限流不是「连不上」，是「换票换太勤」：拉长间隔，且不占普通重试次数。
+      self._rateLimitHits = (self._rateLimitHits || 0) + 1;
+      if (self._rateLimitHits === 1) {
+        try {
+          self.onNotice({ code: 'RATE_LIMITED', level: 'warn', message: '服务端限流，正在放慢重连' });
+        } catch (err) { /* 忽略 */ }
+      }
+      var wait = RATE_LIMIT_BACKOFF_MS[Math.min(self._rateLimitHits - 1, RATE_LIMIT_BACKOFF_MS.length - 1)];
+      console.warn('[agent-ws] 换票限流，第', self._rateLimitHits, '次，', wait + 'ms 后再试');
+      self._scheduleReconnect(false, wait);
+      return;
+    }
+    self._rateLimitHits = 0;
     self._scheduleReconnect();
   });
 };
@@ -207,7 +230,7 @@ AgentChannel.prototype._open = function (ticket) {
   task.onOpen(function () {
     clearTimeout(connectTimer);
     self._opened = true;
-    self._attempt = 0;
+    // 不在这里清零重试计数：连上即断时清零＝无限快重连。等连接稳住 5 秒再清（见 session.ready）。
     self._authRetried = false;
     self._startPing();
     console.log('[agent-ws] open');
@@ -267,6 +290,17 @@ AgentChannel.prototype._onFrame = function (raw) {
       '| scenario =', data.scenario || this._ticketScenario || this.scenario || '-',
       '| model =', data.model || '-', '| model_mode =', data.model_mode || '-');
     this._setState('ready', data);
+    this._readyAt = Date.now();
+    // 稳住 5 秒才算这轮连接可用：清重试计数与限流计数，之后断线按正常退避走。
+    this._clearStableTimer();
+    var selfStable = this;
+    this._stableTimer = setTimeout(function () {
+      selfStable._stableTimer = null;
+      if (!selfStable._opened) return;
+      selfStable._attempt = 0;
+      selfStable._rateLimitHits = 0;
+      selfStable._unstable = 0;
+    }, UNSTABLE_CLOSE_MS);
     if (this._pendingText) {
       var pending = this._pendingText;
       this._pendingText = '';
@@ -325,8 +359,26 @@ AgentChannel.prototype._onFrame = function (raw) {
 AgentChannel.prototype._onClose = function (ev) {
   this._stopPing();
   this._clearReadyTimer();
+  this._clearStableTimer();
   this._task = null;
   console.warn('[agent-ws] close | code =', (ev && ev.code), '| reason =', (ev && ev.reason) || '-');
+
+  // ready 后 5 秒内就断＝连接不稳：界面不能一直停在「生成中」，连断两次就把状态拉回空闲并说明。
+  var unstable = !!(this._readyAt && (Date.now() - this._readyAt) < UNSTABLE_CLOSE_MS);
+  this._readyAt = 0;
+  if (unstable) {
+    this._unstable = (this._unstable || 0) + 1;
+    if (this._unstable >= 2 && this._generating) {
+      this._generating = false;
+      this._assistantText = '';
+      this._setState('idle');
+      try {
+        this.onNotice({ code: 'REPLY_INTERRUPTED', level: 'warn', message: '连接不稳，这次回复中断了，请再说一次' });
+      } catch (e) { /* 忽略 */ }
+    }
+  } else {
+    this._unstable = 0;
+  }
 
   if (!this._wantOpen) {
     this._setState('idle');
@@ -359,9 +411,18 @@ AgentChannel.prototype._onClose = function (ev) {
   this._scheduleReconnect();
 };
 
-AgentChannel.prototype._scheduleReconnect = function (immediate) {
+AgentChannel.prototype._scheduleReconnect = function (immediate, delayOverride) {
   if (!this._wantOpen) return;
   this._clearRetryTimer();
+  if (delayOverride !== undefined && delayOverride !== null) {
+    // 指定间隔（限流阶梯）：不计入普通重试次数，也不受 MAX_RETRY 截断。
+    var selfDelay = this;
+    this._retryTimer = setTimeout(function () {
+      selfDelay._retryTimer = null;
+      selfDelay._connect(false);
+    }, delayOverride);
+    return;
+  }
   this._attempt += 1;
   if (this._attempt > MAX_RETRY) {
     this.onError(new Error('连接失败，请稍后重试'));
@@ -390,6 +451,10 @@ AgentChannel.prototype._stopPing = function () {
 
 AgentChannel.prototype._clearRetryTimer = function () {
   if (this._retryTimer) { clearTimeout(this._retryTimer); this._retryTimer = null; }
+};
+
+AgentChannel.prototype._clearStableTimer = function () {
+  if (this._stableTimer) { clearTimeout(this._stableTimer); this._stableTimer = null; }
 };
 
 AgentChannel.prototype._emitUserMessage = function (text) {
